@@ -15,5 +15,5 @@
   ],
   "author": "Alex Nesterovich",
   "license": "MIT",
-  "description": "Universal API Key Proxy & Orchestrator for Windows and Linux. Provides zero-downtime rotation via stable proxy endpoints while automatically syncing active keys to system environment variables on Workstations and VPS."
+  "description": "Universal API Key Orchestrator & Proxy with native MCP support. Automates rotation, health checks, and environment injection for Windows/Linux Workstations and VPS."
 }
