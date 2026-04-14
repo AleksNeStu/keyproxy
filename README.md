@@ -1,8 +1,9 @@
-# KeyProxy 🛡️
+# keyproxy 🛡️
 
-Professional API Key Orchestrator and Proxy for LLMs and MCP Servers.
+**Universal API Key Proxy & Orchestrator for Windows and Linux.**
+*Provides zero-downtime rotation via stable proxy endpoints while automatically syncing active keys to system environment variables on Workstations and VPS.*
 
-KeyProxy helps you manage, rotate, and monitor your API keys (OpenAI, Gemini, Anthropic, Tavily, etc.) through a unified, high-performance Node.js interface.
+keyproxy helps you manage, rotate, and monitor your API keys (OpenAI, Gemini, Anthropic, Tavily, etc.) through a unified, high-performance Node.js interface.
 
 ## 🚀 Features
 

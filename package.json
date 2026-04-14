@@ -15,5 +15,5 @@
   ],
   "author": "Alex Nesterovich",
   "license": "MIT",
-  "description": "Professional API Key Orchestrator with Rotation & Health Checks"
+  "description": "Universal API Key Proxy & Orchestrator for Windows and Linux. Provides zero-downtime rotation via stable proxy endpoints while automatically syncing active keys to system environment variables on Workstations and VPS."
 }
