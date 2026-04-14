@@ -27,7 +27,7 @@ class ProxyServer {
     this.loginBlockedUntil = null;
 
     // Store required classes for reinitialization
-    this.KeyRotator = require('./keyRotator');
+    this.KeyKeyProxyr = require('./keyKeyProxyr');
     this.GeminiClient = require('./geminiClient');
     this.OpenAIClient = require('./openaiClient');
 
@@ -248,8 +248,8 @@ class ProxyServer {
 
       // Sync active key to Windows system environment variable if enabled
       const syncEnabled = this.config?.envVars?.ENABLE_SYSTEM_SYNC === 'true';
-      if (syncEnabled && keyInfo?.actualKey && client?.keyRotator) {
-        client.keyRotator.syncIfChanged(keyInfo.actualKey).catch(() => {});
+      if (syncEnabled && keyInfo?.actualKey && client?.keyKeyProxyr) {
+        client.keyKeyProxyr.syncIfChanged(keyInfo.actualKey).catch(() => {});
       }
 
       if (isStreaming && response.stream) {
@@ -434,13 +434,13 @@ class ProxyServer {
       const systemEnvName = this.config?.envVars?.ENABLE_SYSTEM_SYNC === 'true'
         ? SystemSync.deriveEnvName(providerName)
         : null;
-      const keyRotator = new this.KeyRotator(enabledKeys, provider.apiType, systemEnvName);
+      const keyKeyProxyr = new this.KeyKeyProxyr(enabledKeys, provider.apiType, systemEnvName);
       let client;
 
       if (provider.apiType === 'openai') {
-        client = new this.OpenAIClient(keyRotator, provider.baseUrl);
+        client = new this.OpenAIClient(keyKeyProxyr, provider.baseUrl);
       } else if (provider.apiType === 'gemini') {
-        client = new this.GeminiClient(keyRotator, provider.baseUrl);
+        client = new this.GeminiClient(keyKeyProxyr, provider.baseUrl);
       } else {
         return null;
       }
@@ -1364,17 +1364,17 @@ $form.Dispose()
 
       // Get usage from provider clients
       for (const [providerName, client] of this.providerClients.entries()) {
-        if (client.keyRotator) {
-          usage[providerName] = mapStats(client.keyRotator.getKeyUsageStats());
+        if (client.keyKeyProxyr) {
+          usage[providerName] = mapStats(client.keyKeyProxyr.getKeyUsageStats());
         }
       }
 
       // Legacy clients
-      if (this.geminiClient && this.geminiClient.keyRotator && !usage['gemini']) {
-        usage['gemini'] = mapStats(this.geminiClient.keyRotator.getKeyUsageStats());
+      if (this.geminiClient && this.geminiClient.keyKeyProxyr && !usage['gemini']) {
+        usage['gemini'] = mapStats(this.geminiClient.keyKeyProxyr.getKeyUsageStats());
       }
-      if (this.openaiClient && this.openaiClient.keyRotator && !usage['openai']) {
-        usage['openai'] = mapStats(this.openaiClient.keyRotator.getKeyUsageStats());
+      if (this.openaiClient && this.openaiClient.keyKeyProxyr && !usage['openai']) {
+        usage['openai'] = mapStats(this.openaiClient.keyKeyProxyr.getKeyUsageStats());
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -1556,7 +1556,7 @@ $form.Dispose()
   writeEnvFile(envVars) {
     const envPath = path.join(process.cwd(), '.env');
 
-    let envContent = '# API Key Rotator Configuration\n';
+    let envContent = '# API Key KeyProxyr Configuration\n';
     envContent += `# Last updated: ${new Date().toISOString()}\n\n`;
 
     const basicConfig = {};
@@ -1655,8 +1655,8 @@ $form.Dispose()
     
     // Reinitialize legacy clients for backward compatibility
     if (this.config.hasGeminiKeys()) {
-      const geminiKeyRotator = new this.KeyRotator(this.config.getGeminiApiKeys(), 'gemini');
-      this.geminiClient = new this.GeminiClient(geminiKeyRotator, this.config.getGeminiBaseUrl());
+      const geminiKeyKeyProxyr = new this.KeyKeyProxyr(this.config.getGeminiApiKeys(), 'gemini');
+      this.geminiClient = new this.GeminiClient(geminiKeyKeyProxyr, this.config.getGeminiBaseUrl());
       console.log('[SERVER] Legacy Gemini client reinitialized');
     } else {
       this.geminiClient = null;
@@ -1664,8 +1664,8 @@ $form.Dispose()
     }
     
     if (this.config.hasOpenaiKeys()) {
-      const openaiKeyRotator = new this.KeyRotator(this.config.getOpenaiApiKeys(), 'openai');
-      this.openaiClient = new this.OpenAIClient(openaiKeyRotator, this.config.getOpenaiBaseUrl());
+      const openaiKeyKeyProxyr = new this.KeyKeyProxyr(this.config.getOpenaiApiKeys(), 'openai');
+      this.openaiClient = new this.OpenAIClient(openaiKeyKeyProxyr, this.config.getOpenaiBaseUrl());
       console.log('[SERVER] Legacy OpenAI client reinitialized');
     } else {
       this.openaiClient = null;

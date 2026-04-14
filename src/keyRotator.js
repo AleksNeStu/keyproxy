@@ -1,4 +1,4 @@
-class KeyRotator {
+class KeyKeyProxyr {
   constructor(apiKeys, apiType = 'unknown', systemEnvName = null) {
     this.apiKeys = [...apiKeys];
     this.apiType = apiType;
@@ -11,7 +11,7 @@ class KeyRotator {
       this.keyUsageCount.set(key, 0);
     }
     
-    let logMsg = `[${apiType.toUpperCase()}-ROTATOR] Initialized with ${this.apiKeys.length} API keys`;
+    let logMsg = `[${apiType.toUpperCase()}-KeyProxyR] Initialized with ${this.apiKeys.length} API keys`;
     if (systemEnvName) logMsg += ` (Syncing to System Env: ${systemEnvName})`;
     console.log(logMsg);
   }
@@ -49,7 +49,7 @@ class KeyRotator {
     this.lastFailedKey = failedKey;
     if (failedKey) {
       const maskedKey = this.maskApiKey(failedKey);
-      console.log(`[${this.apiType.toUpperCase()}-ROTATOR] Last failed key updated: ${maskedKey}`);
+      console.log(`[${this.apiType.toUpperCase()}-KeyProxyR] Last failed key updated: ${maskedKey}`);
     }
   }
 
@@ -224,4 +224,4 @@ class RequestKeyContext {
   }
 }
 
-module.exports = KeyRotator;
+module.exports = KeyKeyProxyr;

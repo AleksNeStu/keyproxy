@@ -1,72 +1,40 @@
-# 🔄 Rotato — API Key Rotation Proxy
+# KeyProxy 🛡️
 
-Rotato is a local HTTP proxy that automatically rotates API keys to prevent `429 Too Many Requests` errors. It intercepts all AI/scraping traffic and cycles through your key pool transparently.
+Professional API Key Orchestrator and Proxy for LLMs and MCP Servers.
 
-## What It Proxies
+KeyProxy helps you manage, rotate, and monitor your API keys (OpenAI, Gemini, Anthropic, Tavily, etc.) through a unified, high-performance Node.js interface.
 
-Rotato acts as a transparent bridge to various AI and data services.
+## 🚀 Features
 
-| Service | Local Rotato Endpoint | Key Discovery Pattern |
-|---------|-----------------------|----------------------|
-| **Gemini** | `http://localhost:8990/gemini/*` | `GEMINI_API_KEY_*` |
-| **OpenAI** | `http://localhost:8990/openai/*` | `OPENAI_API_KEY_*` |
-| **Firecrawl** | `http://localhost:8990/firecrawl/*` | `OPENAI_FIRECRAWL_API_KEY_*` |
-| **Context7** | `http://localhost:8990/context7/*` | `OPENAI_CONTEXT7_API_KEY_*` |
-| **Ref** | `http://localhost:8990/onref/*` | `OPENAI_REF_API_KEY_*` |
-| **Custom** | `http://localhost:8990/{name}/*` | `OPENAI_{NAME}_API_KEY_*` |
+- **Smart Rotation**: Handles multiple keys per provider with failure tracking and deprioritization.
+- **Provider Support**: Seamlessly proxy requests to OpenAI, Google Gemini, and custom endpoints.
+- **Tavily / Search Integration**: Native support for search engines with dynamic key injection.
+- **Admin Dashboard**: Real-time monitoring of key health and configuration via a sleek web UI.
+- **Windows Integration**: Automatic synchronization of rotated keys with system environment variables.
+- **Security First**: Designed to run locally or as a containerized service with zero data retention.
 
-> [!TIP]
-> **Blog Documentation**: For detailed service mapping, custom provider configuration (like **7jm** or **Comantek**), and implementation examples, see the [Mapping Documentation](docs/MAPPING.md).
+## 🛠️ Quick Start
 
-## Quick Start
+### Prerequisites
+- Node.js 18+
+- `.env` file with your API keys (see `.env.example`)
 
-```powershell
-# From infra/nest-rotato/
-.\manage.ps1 start     # Start in background
-.\manage.ps1 status    # Check if running
-.\manage.ps1 stop      # Stop
-.\manage.ps1 restart   # Restart (after .env changes)
-.\manage.ps1 logs      # Tail stdout.log
+### Installation
+```bash
+git clone https://github.com/AleksNeStu/KeyProxy.git
+cd KeyProxy
+npm install
 ```
 
-## Admin Dashboard
-
-- **URL**: http://localhost:8990/admin  
-- **Password**: see `ADMIN_PASSWORD` in `.env`
-
-## Configuration
-
-This service uses **Zero-Maintenance Global Discovery**.  
-API keys are read **automatically** from the root `nest-solo/.env`.  
-The local `.env` in this folder contains **only** service settings (port, password):
-
-```env
-PORT=8990
-ADMIN_PASSWORD=your-password-here
+### Running
+```bash
+npm start
 ```
 
-### Adding a new key
+## 📊 Configuration
+Configure your keys in the root `.env` file. The orchestrator will automatically pick them up and begin rotation.
 
-Just add it to `nest-solo/.env`:
-```env
-GEMINI_API_KEY_26=AIza...
-FIRECRAWL_API_KEY_03=fc-...
-```
-Then restart: `.\manage.ps1 restart`
-
-## Autostart (Windows)
-
-To enable automatic startup at login:
-```powershell
-# From nest-solo root (requires Admin / UAC prompt):
-.\scripts\setup\install-rotato-autostart.ps1
-```
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---------|-----|
-| Admin shows no keys | Restart the server: `.\manage.ps1 restart` |
-| Test button shows "404 Not Found" | Normal for Firecrawl/Ref/Context7 — they have no `/models` endpoint. Proxy still works. |
-| Port 8990 in use | `.\manage.ps1 stop` then `start` |
-| Server won't start | Check `logs\stderr.log` |
+## 📜 Credits & License
+- **Lead Developer**: Alex Nesterovich.
+- **Inspiration**: This project is inspired by the original logic from [KeyProxy/KeyProxy](https://github.com/KeyProxy/KeyProxy) under the MIT License.
+- **License**: MIT.

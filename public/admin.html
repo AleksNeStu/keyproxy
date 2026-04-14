@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>API Key Rotator - Admin Panel</title>
+    <title>API Key KeyProxyr - Admin Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         :root {
@@ -450,7 +450,7 @@
                             </svg>
                         </div>
                         <div>
-                            <h1 class="text-lg font-semibold text-foreground">API Key Rotator</h1>
+                            <h1 class="text-lg font-semibold text-foreground">API Key KeyProxyr</h1>
                             <p class="text-xs text-muted-foreground">Admin Dashboard</p>
                         </div>
                     </div>
@@ -733,7 +733,7 @@
         <footer class="mt-12 py-6 border-t border-border">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-center text-sm text-muted-foreground">
-                    <a href="https://github.com/p32929/openai-gemini-api-key-rotator" target="_blank" rel="noopener noreferrer" class="hover:text-primary transition-colors">
+                    <a href="https://github.com/KeyProxy/openai-gemini-api-key-KeyProxyr" target="_blank" rel="noopener noreferrer" class="hover:text-primary transition-colors">
                         Star & Fork on GitHub
                     </a>
                 </div>
@@ -1304,7 +1304,7 @@
                     body: JSON.stringify({ EXTERNAL_ENV_PATH: externalEnvPath })
                 });
                 if (response.ok) {
-                    showToast('Global settings saved! Rotato has applied the new path.');
+                    showToast('Global settings saved! KeyProxy has applied the new path.');
                     loadEnvVars();
                 } else {
                     const data = await response.json();

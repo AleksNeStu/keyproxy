@@ -281,7 +281,7 @@ class TelegramBot {
       : '*No model selected yet*';
 
     const helpText = [
-      '*API Key Rotator Bot*',
+      '*API Key KeyProxyr Bot*',
       '',
       current,
       '',

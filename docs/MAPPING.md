@@ -1,10 +1,10 @@
-# 🗺️ Rotato Service Mapping Documentation
+# 🗺️ KeyProxy Service Mapping Documentation
 
-Rotato functions as a **Transparent Multi-API Proxy**. It allows you to use multiple AI and scraping services through a single local endpoint while handling automatic key rotation and rate-limit recovery.
+KeyProxy functions as a **Transparent Multi-API Proxy**. It allows you to use multiple AI and scraping services through a single local endpoint while handling automatic key rotation and rate-limit recovery.
 
 ## 🚀 Routing Logic
 
-Rotato uses a simple, predictable routing pattern to determine which upstream service to call:
+KeyProxy uses a simple, predictable routing pattern to determine which upstream service to call:
 
 `http://localhost:8990/{provider_name}/{API_PATH}`
 
@@ -13,7 +13,7 @@ Rotato uses a simple, predictable routing pattern to determine which upstream se
 
 ### 🔄 Dynamic Discovery
 
-Rotato automatically discovers providers based on the environment variables in your root `.env` file (`nest-solo/.env`). You don't need to register providers in code; just add the keys following the naming convention.
+KeyProxy automatically discovers providers based on the environment variables in your root `.env` file (`nest-solo/.env`). You don't need to register providers in code; just add the keys following the naming convention.
 
 ---
 
@@ -37,11 +37,11 @@ If not provided, the proxy defaults to the official provider endpoint (e.g., Goo
 
 ## 📋 Standard Service Mappings (Blog Reference)
 
-The following tables document how to integrate specific services through Rotato.
+The following tables document how to integrate specific services through KeyProxy.
 
 ### AI & LLM Services
 
-| Service | Local Rotato URL | .env Pattern Example | Upstream Base URL |
+| Service | Local KeyProxy URL | .env Pattern Example | Upstream Base URL |
 |---------|------------------|----------------------|-------------------|
 | **Gemini** | `http://localhost:8990/gemini/*` | `GEMINI_API_KEY_01` | `https://generativelanguage.googleapis.com` |
 | **OpenAI** | `http://localhost:8990/openai/*` | `OPENAI_API_KEY_01` | `https://api.openai.com` |
@@ -50,7 +50,7 @@ The following tables document how to integrate specific services through Rotato.
 
 ### Scraping & Search Services
 
-| Service | Local Rotato URL | .env Pattern Example | Upstream Base URL |
+| Service | Local KeyProxy URL | .env Pattern Example | Upstream Base URL |
 |---------|------------------|----------------------|-------------------|
 | **Firecrawl** | `http://localhost:8990/firecrawl/*` | `OPENAI_FIRECRAWL_API_KEY_01` | `https://api.firecrawl.dev` |
 | **Context7** | `http://localhost:8990/context7/*` | `OPENAI_CONTEXT7_API_KEY_01` | `https://api.context7.com` |
@@ -60,14 +60,14 @@ The following tables document how to integrate specific services through Rotato.
 
 ## 🛠️ Implementation Example (Python)
 
-If you are using the OpenAI SDK and want to route through Rotato with a specific provider:
+If you are using the OpenAI SDK and want to route through KeyProxy with a specific provider:
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
-    api_key="ANY_LOCAL_ACCESS_KEY", # Rotato ignores this and uses rotated keys
-    base_url="http://localhost:8990/7jm/v1" # Point to the Rotato provider endpoint
+    api_key="ANY_LOCAL_ACCESS_KEY", # KeyProxy ignores this and uses rotated keys
+    base_url="http://localhost:8990/7jm/v1" # Point to the KeyProxy provider endpoint
 )
 
 response = client.chat.completions.create(
@@ -77,4 +77,4 @@ response = client.chat.completions.create(
 ```
 
 > [!TIP]
-> You can find the exact location of your active `.env` file and the expected naming patterns for every provider directly in the **Rotato Admin Panel** at `http://localhost:8990/admin`.
+> You can find the exact location of your active `.env` file and the expected naming patterns for every provider directly in the **KeyProxy Admin Panel** at `http://localhost:8990/admin`.

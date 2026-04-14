@@ -1,5 +1,5 @@
 const Config = require('./src/config');
-const KeyRotator = require('./src/keyRotator');
+const KeyKeyProxyr = require('./src/keyKeyProxyr');
 const GeminiClient = require('./src/geminiClient');
 const OpenAIClient = require('./src/openaiClient');
 const ProxyServer = require('./src/server');
@@ -13,16 +13,16 @@ function main() {
     let openaiClient = null;
     
     if (config.hasGeminiKeys()) {
-      const geminiKeyRotator = new KeyRotator(config.getGeminiApiKeys(), 'gemini');
-      geminiClient = new GeminiClient(geminiKeyRotator, config.getGeminiBaseUrl());
+      const geminiKeyKeyProxyr = new KeyKeyProxyr(config.getGeminiApiKeys(), 'gemini');
+      geminiClient = new GeminiClient(geminiKeyKeyProxyr, config.getGeminiBaseUrl());
       console.log('[INIT] Legacy Gemini client initialized');
     } else if (config.hasAdminPassword()) {
       console.log('[INIT] No legacy Gemini keys found - can be configured via admin panel');
     }
     
     if (config.hasOpenaiKeys()) {
-      const openaiKeyRotator = new KeyRotator(config.getOpenaiApiKeys(), 'openai');
-      openaiClient = new OpenAIClient(openaiKeyRotator, config.getOpenaiBaseUrl());
+      const openaiKeyKeyProxyr = new KeyKeyProxyr(config.getOpenaiApiKeys(), 'openai');
+      openaiClient = new OpenAIClient(openaiKeyKeyProxyr, config.getOpenaiBaseUrl());
       console.log('[INIT] Legacy OpenAI client initialized');
     } else if (config.hasAdminPassword()) {
       console.log('[INIT] No legacy OpenAI keys found - can be configured via admin panel');
@@ -48,4 +48,4 @@ if (require.main === module) {
 }
 
 const TelegramBot = require('./src/telegramBot');
-module.exports = { Config, KeyRotator, GeminiClient, OpenAIClient, ProxyServer, TelegramBot };
+module.exports = { Config, KeyKeyProxyr, GeminiClient, OpenAIClient, ProxyServer, TelegramBot };

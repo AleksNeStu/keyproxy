@@ -4,11 +4,11 @@ param(
     [string]$Command
 )
 
-# When called from anywhere, $PSScriptRoot resolves to infra/nest-rotato/
-$RotatoDir = $PSScriptRoot
+# When called from anywhere, $PSScriptRoot resolves to infra/nest-KeyProxy/
+$KeyProxyDir = $PSScriptRoot
 $Port = 8990
 
-function Get-RotatoPid {
+function Get-KeyProxyPid {
     $conns = netstat -ano 2>$null | findstr ":$Port"
     if ($conns) {
         foreach ($line in ($conns -split "`n")) {
@@ -26,41 +26,41 @@ function Get-RotatoPid {
 
 switch ($Command) {
     'start' {
-        $rotatoPid = Get-RotatoPid
-        if ($rotatoPid) {
-            Write-Host "âś… Rotato already running on port $Port (PID: $rotatoPid)" -ForegroundColor Yellow
+        $KeyProxyPid = Get-KeyProxyPid
+        if ($KeyProxyPid) {
+            Write-Host "âś… KeyProxy already running on port $Port (PID: $KeyProxyPid)" -ForegroundColor Yellow
         } else {
-            Write-Host "đźš€ Starting Rotato in background..." -ForegroundColor Cyan
-            $logDir = Join-Path $RotatoDir "logs"
+            Write-Host "đźš€ Starting KeyProxy in background..." -ForegroundColor Cyan
+            $logDir = Join-Path $KeyProxyDir "logs"
             if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 
             $ProcParams = @{
                 FilePath = "node"
                 ArgumentList = "index.js"
-                WorkingDirectory = $RotatoDir
+                WorkingDirectory = $KeyProxyDir
                 WindowStyle = "Hidden"
                 RedirectStandardOutput = "$logDir\stdout.log"
                 RedirectStandardError = "$logDir\stderr.log"
             }
             Start-Process @ProcParams
             Start-Sleep -Seconds 2
-            $newPid = Get-RotatoPid
+            $newPid = Get-KeyProxyPid
             if ($newPid) {
-                Write-Host "âś… Rotato started (PID: $newPid)" -ForegroundColor Green
+                Write-Host "âś… KeyProxy started (PID: $newPid)" -ForegroundColor Green
                 Write-Host "   Admin: http://localhost:$Port/admin" -ForegroundColor Gray
             } else {
-                Write-Host "âťŚ Failed to start Rotato. Check: $logDir\stderr.log" -ForegroundColor Red
+                Write-Host "âťŚ Failed to start KeyProxy. Check: $logDir\stderr.log" -ForegroundColor Red
             }
         }
     }
     'stop' {
-        $rotatoPid = Get-RotatoPid
-        if ($rotatoPid) {
-            Write-Host "đź›‘ Stopping Rotato (PID: $rotatoPid)..." -ForegroundColor Cyan
-            Stop-Process -Id $rotatoPid -Force -ErrorAction SilentlyContinue
-            Write-Host "âś… Rotato stopped." -ForegroundColor Green
+        $KeyProxyPid = Get-KeyProxyPid
+        if ($KeyProxyPid) {
+            Write-Host "đź›‘ Stopping KeyProxy (PID: $KeyProxyPid)..." -ForegroundColor Cyan
+            Stop-Process -Id $KeyProxyPid -Force -ErrorAction SilentlyContinue
+            Write-Host "âś… KeyProxy stopped." -ForegroundColor Green
         } else {
-            Write-Host "Rotato is not running on port $Port." -ForegroundColor Yellow
+            Write-Host "KeyProxy is not running on port $Port." -ForegroundColor Yellow
         }
     }
     'restart' {
@@ -69,16 +69,16 @@ switch ($Command) {
         & $PSCommandPath start
     }
     'status' {
-        $rotatoPid = Get-RotatoPid
-        if ($rotatoPid) {
-            Write-Host "âś… Rotato is RUNNING (PID: $rotatoPid, Port: $Port)" -ForegroundColor Green
+        $KeyProxyPid = Get-KeyProxyPid
+        if ($KeyProxyPid) {
+            Write-Host "âś… KeyProxy is RUNNING (PID: $KeyProxyPid, Port: $Port)" -ForegroundColor Green
             Write-Host "   Admin: http://localhost:$Port/admin" -ForegroundColor Gray
         } else {
-            Write-Host "đź”´ Rotato is STOPPED" -ForegroundColor Red
+            Write-Host "đź”´ KeyProxy is STOPPED" -ForegroundColor Red
         }
     }
     'logs' {
-        $logFile = Join-Path $RotatoDir "logs\stdout.log"
+        $logFile = Join-Path $KeyProxyDir "logs\stdout.log"
         if (-not (Test-Path $logFile)) {
             Write-Host "Log file not found: $logFile" -ForegroundColor Yellow
             return
@@ -88,8 +88,8 @@ switch ($Command) {
     }
     'watch' {
         Write-Host "👀 Watching for .env changes... (Ctrl+C to stop)" -ForegroundColor Cyan
-        $rootEnv = Resolve-Path (Join-Path $RotatoDir "../../.env") -ErrorAction SilentlyContinue
-        $localEnv = Resolve-Path (Join-Path $RotatoDir ".env") -ErrorAction SilentlyContinue
+        $rootEnv = Resolve-Path (Join-Path $KeyProxyDir "../../.env") -ErrorAction SilentlyContinue
+        $localEnv = Resolve-Path (Join-Path $KeyProxyDir ".env") -ErrorAction SilentlyContinue
         
         $filesToWatch = @()
         if ($rootEnv) { $filesToWatch += $rootEnv.Path }
@@ -104,8 +104,8 @@ switch ($Command) {
         $lastWriteTimes = @{}
         foreach ($f in $filesToWatch) { $lastWriteTimes[$f] = (Get-Item $f).LastWriteTime }
 
-        # Start Rotato if not running
-        if (-not (Get-RotatoPid)) { & $PSCommandPath start }
+        # Start KeyProxy if not running
+        if (-not (Get-KeyProxyPid)) { & $PSCommandPath start }
 
         while($true) {
             Start-Sleep -Seconds 2

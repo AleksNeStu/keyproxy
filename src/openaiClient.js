@@ -2,14 +2,14 @@ const https = require('https');
 const { URL } = require('url');
 
 class OpenAIClient {
-  constructor(keyRotator, baseUrl = 'https://api.openai.com') {
-    this.keyRotator = keyRotator;
+  constructor(keyKeyProxyr, baseUrl = 'https://api.openai.com') {
+    this.keyKeyProxyr = keyKeyProxyr;
     this.baseUrl = baseUrl;
   }
 
   async makeRequest(method, path, body, headers = {}, customStatusCodes = null, streaming = false) {
     // Create a new request context for this specific request
-    const requestContext = this.keyRotator.createRequestContext();
+    const requestContext = this.keyKeyProxyr.createRequestContext();
     let lastError = null;
     let lastResponse = null;
     const failedKeys = []; // Track which keys failed and why
@@ -38,7 +38,7 @@ class OpenAIClient {
           }
 
           console.log(`[OPENAI::${maskedKey}] Success (${response.statusCode}) - streaming`);
-          this.keyRotator.incrementKeyUsage(apiKey);
+          this.keyKeyProxyr.incrementKeyUsage(apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         } else {
@@ -53,7 +53,7 @@ class OpenAIClient {
           }
 
           console.log(`[OPENAI::${maskedKey}] Success (${response.statusCode})`);
-          this.keyRotator.incrementKeyUsage(apiKey);
+          this.keyKeyProxyr.incrementKeyUsage(apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         }
@@ -70,7 +70,7 @@ class OpenAIClient {
     console.log(`[OPENAI] All ${stats.totalKeys} keys tried for this request. ${stats.rateLimitedKeys} were rate limited.`);
 
     const lastFailedKey = requestContext.getLastFailedKey();
-    this.keyRotator.updateLastFailedKey(lastFailedKey);
+    this.keyKeyProxyr.updateLastFailedKey(lastFailedKey);
 
     if (requestContext.allTriedKeysRateLimited()) {
       console.log('[OPENAI] All keys rate limited for this request - returning 429');
@@ -107,9 +107,9 @@ class OpenAIClient {
     }
 
     // Support for query-parameter authentication (e.g. for Tavily MCP or other custom proxies)
-    // If the URL contains the placeholder "ROTATO", replace it with the rotated API key and SKIP Bearer header
-    if (fullUrl.includes('ROTATO')) {
-      fullUrl = fullUrl.replace(/ROTATO/g, apiKey);
+    // If the URL contains the placeholder "KeyProxy", replace it with the rotated API key and SKIP Bearer header
+    if (fullUrl.includes('KeyProxy')) {
+      fullUrl = fullUrl.replace(/KeyProxy/g, apiKey);
     }
 
     const url = new URL(fullUrl);
@@ -119,7 +119,7 @@ class OpenAIClient {
       ...headers
     };
 
-    // Only add Bearer auth if not using query-param auth (ROTATO placeholder)
+    // Only add Bearer auth if not using query-param auth (KeyProxy placeholder)
     if (!fullUrl.includes(apiKey) || !url.searchParams.has('tavilyApiKey')) {
       finalHeaders['Authorization'] = `Bearer ${apiKey}`;
     }
