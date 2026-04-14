@@ -64,15 +64,19 @@ KeyProxy is designed for flexibility:
 
 - **Indexed Keys:** Add as many as you want:
   ```env
-  GEMINI_API_KEY=key_zero
-  GEMINI_API_KEY_1=key_one
-  GEMINI_API_KEY_2=key_two
+  TAVILY_API_KEY=key_zero
+  TAVILY_API_KEY_1=key_one
+  TAVILY_API_KEY_2=key_two
   ```
 - **External Config:** Use `EXTERNAL_ENV_PATH` to point KeyProxy to a global configuration file (e.g., in your monorepo root):
   ```env
   EXTERNAL_ENV_PATH=../../.env
   ```
-- **Custom Providers:** Support for any OpenAI-compatible API (Tavily, Firecrawl, etc.) with custom base URLs.
+- **Custom Providers:** Full support for any OpenAI-compatible API (Exa, Tavily, Firecrawl, etc.) with custom base URLs.
+  - OpenAI / OpenAI-compatible APIs
+  - Anthropic (Claude)
+  - Google Gemini
+  - Specialized Search: Brave Search, Perplexity, Tavily, Exa
 
 ---
 

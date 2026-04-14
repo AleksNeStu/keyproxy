@@ -2,9 +2,10 @@ const https = require('https');
 const { URL } = require('url');
 
 class GeminiClient {
-  constructor(keyRotator, baseUrl = 'https://generativelanguage.googleapis.com') {
+  constructor(keyRotator, baseUrl = 'https://generativelanguage.googleapis.com', providerName = 'gemini') {
     this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
+    this.providerName = providerName;
   }
 
   async makeRequest(method, path, body, headers = {}, customStatusCodes = null, streaming = false) {
@@ -59,6 +60,7 @@ class GeminiClient {
             console.log(`[GEMINI::${maskedKey}] Status ${response.statusCode} triggers rotation - trying next key`);
             response.stream.resume();
             requestContext.markKeyAsRateLimited(apiKey);
+            this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
             failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
             lastResponse = { statusCode: response.statusCode, headers: response.headers, data: '' };
             continue;
@@ -66,6 +68,7 @@ class GeminiClient {
 
           console.log(`[GEMINI::${maskedKey}] Success (${response.statusCode}) - streaming`);
           this.keyRotator.incrementKeyUsage(apiKey);
+          this.keyRotator.recordSuccessEvent(this.providerName, apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         } else {
@@ -74,6 +77,7 @@ class GeminiClient {
           if (rotationStatusCodes.has(response.statusCode)) {
             console.log(`[GEMINI::${maskedKey}] Status ${response.statusCode} triggers rotation - trying next key`);
             requestContext.markKeyAsRateLimited(apiKey);
+            this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
             failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
             lastResponse = response;
             continue;
@@ -81,6 +85,7 @@ class GeminiClient {
 
           console.log(`[GEMINI::${maskedKey}] Success (${response.statusCode})`);
           this.keyRotator.incrementKeyUsage(apiKey);
+          this.keyRotator.recordSuccessEvent(this.providerName, apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         }

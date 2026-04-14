@@ -1,8 +1,9 @@
 class KeyRotator {
-  constructor(apiKeys, apiType = 'unknown', systemEnvName = null) {
+  constructor(apiKeys, apiType = 'unknown', systemEnvName = null, historyManager = null) {
     this.apiKeys = [...apiKeys];
     this.apiType = apiType;
     this.systemEnvName = systemEnvName;
+    this.historyManager = historyManager;
     this.activeKey = null; // Currently synced system-wide key
     this.lastFailedKey = null; // Track the key that failed in the last request
     this.keyUsageCount = new Map(); // Track per-key usage count
@@ -10,9 +11,10 @@ class KeyRotator {
     for (const key of this.apiKeys) {
       this.keyUsageCount.set(key, 0);
     }
-    
+
     let logMsg = `[${apiType.toUpperCase()}-ROTATOR] Initialized with ${this.apiKeys.length} API keys`;
     if (systemEnvName) logMsg += ` (Syncing to System Env: ${systemEnvName})`;
+    if (historyManager) logMsg += ` (History tracking enabled)`;
     console.log(logMsg);
   }
 
@@ -61,22 +63,48 @@ class KeyRotator {
     if (this.keyUsageCount.has(key)) {
       this.keyUsageCount.set(key, this.keyUsageCount.get(key) + 1);
     }
-    
+
     // Auto-sync to system environment if this is the new active/successful key
     await this.syncIfChanged(key);
   }
 
   /**
-   * Get usage statistics for all keys
+   * Record a rotation event: a key was exhausted and a new one is being tried.
+   * Called by client classes after markKeyAsRateLimited().
    */
-  getKeyUsageStats() {
+  recordRotationEvent(providerName, fullKey, statusCode) {
+    if (!this.historyManager) return;
+    this.historyManager.recordKeyExhausted(providerName, fullKey, statusCode);
+  }
+
+  /**
+   * Record a successful key use (marks key as active in history).
+   * Called by client classes when a request succeeds.
+   */
+  recordSuccessEvent(providerName, fullKey) {
+    if (!this.historyManager) return;
+    this.historyManager.recordKeyActive(providerName, fullKey);
+  }
+
+  /**
+   * Get usage statistics for all keys, including history status if available
+   */
+  getKeyUsageStats(providerName = null) {
     const stats = [];
     for (const key of this.apiKeys) {
-      stats.push({
+      const entry = {
         key: this.maskApiKey(key),
         fullKey: key,
         usageCount: this.keyUsageCount.get(key) || 0
-      });
+      };
+      if (this.historyManager && providerName) {
+        const status = this.historyManager.getKeyStatus(providerName, key);
+        entry.status = status.status;
+        entry.rotatedOutAt = status.rotatedOutAt;
+        entry.rotationReason = status.rotationReason;
+        entry.rotationCount = status.rotationCount;
+      }
+      stats.push(entry);
     }
     return stats;
   }

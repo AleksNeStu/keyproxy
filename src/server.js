@@ -31,6 +31,10 @@ class ProxyServer {
     this.GeminiClient = require('./providers/gemini');
     this.OpenAIClient = require('./providers/openai');
 
+    // Key rotation history (persistent across restarts)
+    const KeyHistoryManager = require('./core/keyHistory');
+    this.historyManager = new KeyHistoryManager();
+
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
   }
@@ -434,13 +438,16 @@ class ProxyServer {
       const systemEnvName = this.config?.envVars?.ENABLE_SYSTEM_SYNC === 'true'
         ? SystemSync.deriveEnvName(providerName)
         : null;
-      const keyKeyProxyr = new this.KeyKeyProxyr(enabledKeys, provider.apiType, systemEnvName);
+      const keyRotator = new this.KeyRotator(enabledKeys, provider.apiType, systemEnvName, this.historyManager);
+      // Sync provider keys into history (add fresh entries, remove stale ones)
+      const allKeys = provider.allKeys ? provider.allKeys.map(k => k.key) : enabledKeys;
+      this.historyManager.syncProviderKeys(providerName, allKeys);
       let client;
 
       if (provider.apiType === 'openai') {
-        client = new this.OpenAIClient(keyKeyProxyr, provider.baseUrl);
+        client = new this.OpenAIClient(keyRotator, provider.baseUrl, providerName);
       } else if (provider.apiType === 'gemini') {
-        client = new this.GeminiClient(keyKeyProxyr, provider.baseUrl);
+        client = new this.GeminiClient(keyRotator, provider.baseUrl, providerName);
       } else {
         return null;
       }

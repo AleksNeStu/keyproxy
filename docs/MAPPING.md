@@ -43,8 +43,8 @@ The following tables document how to integrate specific services through KeyProx
 
 | Service | Local KeyProxy URL | .env Pattern Example | Upstream Base URL |
 |---------|------------------|----------------------|-------------------|
-| **Gemini** | `http://localhost:8990/gemini/*` | `GEMINI_API_KEY_01` | `https://generativelanguage.googleapis.com` |
-| **OpenAI** | `http://localhost:8990/openai/*` | `OPENAI_API_KEY_01` | `https://api.openai.com` |
+| **Tavily** | `http://localhost:8990/tavily/*` | `OPENAI_TAVILY_API_KEY_01` | `https://api.tavily.com` |
+| **Exa** | `http://localhost:8990/exa/*` | `OPENAI_EXA_API_KEY_01` | `https://api.exa.ai` |
 
 ### Scraping & Search Services
 

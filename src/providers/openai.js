@@ -2,9 +2,10 @@ const https = require('https');
 const { URL } = require('url');
 
 class OpenAIClient {
-  constructor(keyRotator, baseUrl = 'https://api.openai.com') {
+  constructor(keyRotator, baseUrl = 'https://api.openai.com', providerName = 'openai') {
     this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
+    this.providerName = providerName;
   }
 
   async makeRequest(method, path, body, headers = {}, customStatusCodes = null, streaming = false) {
@@ -32,6 +33,7 @@ class OpenAIClient {
             console.log(`[OPENAI::${maskedKey}] Status ${response.statusCode} triggers rotation - trying next key`);
             response.stream.resume();
             requestContext.markKeyAsRateLimited(apiKey);
+            this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
             failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
             lastResponse = { statusCode: response.statusCode, headers: response.headers, data: '' };
             continue;
@@ -39,6 +41,7 @@ class OpenAIClient {
 
           console.log(`[OPENAI::${maskedKey}] Success (${response.statusCode}) - streaming`);
           this.keyRotator.incrementKeyUsage(apiKey);
+          this.keyRotator.recordSuccessEvent(this.providerName, apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         } else {
@@ -47,6 +50,7 @@ class OpenAIClient {
           if (rotationStatusCodes.has(response.statusCode)) {
             console.log(`[OPENAI::${maskedKey}] Status ${response.statusCode} triggers rotation - trying next key`);
             requestContext.markKeyAsRateLimited(apiKey);
+            this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
             failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
             lastResponse = response;
             continue;
@@ -54,6 +58,7 @@ class OpenAIClient {
 
           console.log(`[OPENAI::${maskedKey}] Success (${response.statusCode})`);
           this.keyRotator.incrementKeyUsage(apiKey);
+          this.keyRotator.recordSuccessEvent(this.providerName, apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         }
