@@ -3,7 +3,7 @@ const { URL } = require('url');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const TelegramBot = require('./telegramBot');
+const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
   constructor(config, geminiClient = null, openaiClient = null) {
@@ -27,9 +27,9 @@ class ProxyServer {
     this.loginBlockedUntil = null;
 
     // Store required classes for reinitialization
-    this.KeyKeyProxyr = require('./keyKeyProxyr');
-    this.GeminiClient = require('./geminiClient');
-    this.OpenAIClient = require('./openaiClient');
+    this.KeyRotator = require('./core/keyRotator');
+    this.GeminiClient = require('./providers/gemini');
+    this.OpenAIClient = require('./providers/openai');
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);

@@ -1,7 +1,7 @@
-const Config = require('./src/config');
-const KeyKeyProxyr = require('./src/keyKeyProxyr');
-const GeminiClient = require('./src/geminiClient');
-const OpenAIClient = require('./src/openaiClient');
+const Config = require('./src/core/config');
+const KeyRotator = require('./src/core/keyRotator');
+const GeminiClient = require('./src/providers/gemini');
+const OpenAIClient = require('./src/providers/openai');
 const ProxyServer = require('./src/server');
 
 function main() {
@@ -13,16 +13,16 @@ function main() {
     let openaiClient = null;
     
     if (config.hasGeminiKeys()) {
-      const geminiKeyKeyProxyr = new KeyKeyProxyr(config.getGeminiApiKeys(), 'gemini');
-      geminiClient = new GeminiClient(geminiKeyKeyProxyr, config.getGeminiBaseUrl());
+      const geminiKeyRotator = new KeyRotator(config.getGeminiApiKeys(), 'gemini');
+      geminiClient = new GeminiClient(geminiKeyRotator, config.getGeminiBaseUrl());
       console.log('[INIT] Legacy Gemini client initialized');
     } else if (config.hasAdminPassword()) {
       console.log('[INIT] No legacy Gemini keys found - can be configured via admin panel');
     }
     
     if (config.hasOpenaiKeys()) {
-      const openaiKeyKeyProxyr = new KeyKeyProxyr(config.getOpenaiApiKeys(), 'openai');
-      openaiClient = new OpenAIClient(openaiKeyKeyProxyr, config.getOpenaiBaseUrl());
+      const openaiKeyRotator = new KeyRotator(config.getOpenaiApiKeys(), 'openai');
+      openaiClient = new OpenAIClient(openaiKeyRotator, config.getOpenaiBaseUrl());
       console.log('[INIT] Legacy OpenAI client initialized');
     } else if (config.hasAdminPassword()) {
       console.log('[INIT] No legacy OpenAI keys found - can be configured via admin panel');
@@ -47,5 +47,5 @@ if (require.main === module) {
   main();
 }
 
-const TelegramBot = require('./src/telegramBot');
-module.exports = { Config, KeyKeyProxyr, GeminiClient, OpenAIClient, ProxyServer, TelegramBot };
+const TelegramBot = require('./src/core/telegramBot');
+module.exports = { Config, KeyRotator, GeminiClient, OpenAIClient, ProxyServer, TelegramBot };

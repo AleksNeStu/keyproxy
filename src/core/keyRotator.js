@@ -1,4 +1,4 @@
-class KeyKeyProxyr {
+class KeyRotator {
   constructor(apiKeys, apiType = 'unknown', systemEnvName = null) {
     this.apiKeys = [...apiKeys];
     this.apiType = apiType;
@@ -11,7 +11,7 @@ class KeyKeyProxyr {
       this.keyUsageCount.set(key, 0);
     }
     
-    let logMsg = `[${apiType.toUpperCase()}-KeyProxyR] Initialized with ${this.apiKeys.length} API keys`;
+    let logMsg = `[${apiType.toUpperCase()}-ROTATOR] Initialized with ${this.apiKeys.length} API keys`;
     if (systemEnvName) logMsg += ` (Syncing to System Env: ${systemEnvName})`;
     console.log(logMsg);
   }
@@ -24,12 +24,13 @@ class KeyKeyProxyr {
     if (!this.systemEnvName || !key) return;
     if (key === this.activeKey) return;
 
-    const SystemSync = require('./utils/systemSync');
+    // Pointing to the new Destination module
+    const WindowsEnv = require('../destinations/windowsEnv');
     try {
-      await SystemSync.setEnvVar(this.systemEnvName, key);
+      await WindowsEnv.setEnvVar(this.systemEnvName, key);
       this.activeKey = key;
     } catch (error) {
-      // Error handled in systemSync
+      // Error handled in windowsEnv
     }
   }
 
@@ -49,17 +50,20 @@ class KeyKeyProxyr {
     this.lastFailedKey = failedKey;
     if (failedKey) {
       const maskedKey = this.maskApiKey(failedKey);
-      console.log(`[${this.apiType.toUpperCase()}-KeyProxyR] Last failed key updated: ${maskedKey}`);
+      console.log(`[${this.apiType.toUpperCase()}-ROTATOR] Last failed key updated: ${maskedKey}`);
     }
   }
 
   /**
    * Increment usage count for a key (called on successful use)
    */
-  incrementKeyUsage(key) {
+  async incrementKeyUsage(key) {
     if (this.keyUsageCount.has(key)) {
       this.keyUsageCount.set(key, this.keyUsageCount.get(key) + 1);
     }
+    
+    // Auto-sync to system environment if this is the new active/successful key
+    await this.syncIfChanged(key);
   }
 
   /**
@@ -224,4 +228,4 @@ class RequestKeyContext {
   }
 }
 
-module.exports = KeyKeyProxyr;
+module.exports = KeyRotator;

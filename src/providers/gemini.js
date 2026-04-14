@@ -2,8 +2,8 @@ const https = require('https');
 const { URL } = require('url');
 
 class GeminiClient {
-  constructor(keyKeyProxyr, baseUrl = 'https://generativelanguage.googleapis.com') {
-    this.keyKeyProxyr = keyKeyProxyr;
+  constructor(keyRotator, baseUrl = 'https://generativelanguage.googleapis.com') {
+    this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
   }
 
@@ -38,7 +38,7 @@ class GeminiClient {
     }
 
     // No API key provided, use rotation system
-    const requestContext = this.keyKeyProxyr.createRequestContext();
+    const requestContext = this.keyRotator.createRequestContext();
     let lastError = null;
     let lastResponse = null;
     const failedKeys = [];
@@ -65,7 +65,7 @@ class GeminiClient {
           }
 
           console.log(`[GEMINI::${maskedKey}] Success (${response.statusCode}) - streaming`);
-          this.keyKeyProxyr.incrementKeyUsage(apiKey);
+          this.keyRotator.incrementKeyUsage(apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         } else {
@@ -80,7 +80,7 @@ class GeminiClient {
           }
 
           console.log(`[GEMINI::${maskedKey}] Success (${response.statusCode})`);
-          this.keyKeyProxyr.incrementKeyUsage(apiKey);
+          this.keyRotator.incrementKeyUsage(apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         }
@@ -96,7 +96,7 @@ class GeminiClient {
     console.log(`[GEMINI] All ${stats.totalKeys} keys tried for this request. ${stats.rateLimitedKeys} were rate limited.`);
 
     const lastFailedKey = requestContext.getLastFailedKey();
-    this.keyKeyProxyr.updateLastFailedKey(lastFailedKey);
+    this.keyRotator.updateLastFailedKey(lastFailedKey);
 
     if (requestContext.allTriedKeysRateLimited()) {
       console.log('[GEMINI] All keys rate limited for this request - returning 429');

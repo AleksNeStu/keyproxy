@@ -2,14 +2,14 @@ const https = require('https');
 const { URL } = require('url');
 
 class OpenAIClient {
-  constructor(keyKeyProxyr, baseUrl = 'https://api.openai.com') {
-    this.keyKeyProxyr = keyKeyProxyr;
+  constructor(keyRotator, baseUrl = 'https://api.openai.com') {
+    this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
   }
 
   async makeRequest(method, path, body, headers = {}, customStatusCodes = null, streaming = false) {
     // Create a new request context for this specific request
-    const requestContext = this.keyKeyProxyr.createRequestContext();
+    const requestContext = this.keyRotator.createRequestContext();
     let lastError = null;
     let lastResponse = null;
     const failedKeys = []; // Track which keys failed and why
@@ -38,7 +38,7 @@ class OpenAIClient {
           }
 
           console.log(`[OPENAI::${maskedKey}] Success (${response.statusCode}) - streaming`);
-          this.keyKeyProxyr.incrementKeyUsage(apiKey);
+          this.keyRotator.incrementKeyUsage(apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         } else {
@@ -53,7 +53,7 @@ class OpenAIClient {
           }
 
           console.log(`[OPENAI::${maskedKey}] Success (${response.statusCode})`);
-          this.keyKeyProxyr.incrementKeyUsage(apiKey);
+          this.keyRotator.incrementKeyUsage(apiKey);
           response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
           return response;
         }
@@ -70,7 +70,7 @@ class OpenAIClient {
     console.log(`[OPENAI] All ${stats.totalKeys} keys tried for this request. ${stats.rateLimitedKeys} were rate limited.`);
 
     const lastFailedKey = requestContext.getLastFailedKey();
-    this.keyKeyProxyr.updateLastFailedKey(lastFailedKey);
+    this.keyRotator.updateLastFailedKey(lastFailedKey);
 
     if (requestContext.allTriedKeysRateLimited()) {
       console.log('[OPENAI] All keys rate limited for this request - returning 429');
