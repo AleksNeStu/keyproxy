@@ -25,13 +25,13 @@ To enable a provider, add environment variables using the following patterns:
 `{API_TYPE}_{PROVIDER_NAME}_API_KEY_{N}`
 
 - **`API_TYPE`**: Either `GEMINI` or `OPENAI` (determines the protocol and authentication header).
-- **`PROVIDER_NAME`**: The name you will use in the URL (e.g., `7jm`, `comantek`).
+- **`PROVIDER_NAME`**: The name you will use in the URL (e.g., `openai`, `gemini`).
 - **`N`**: A unique suffix (usually a number) for each key in the pool.
 
 ### 2. Base URL Configuration (Optional)
 `{API_TYPE}_{PROVIDER_NAME}_BASE_URL`
 
-If not provided, the proxy defaults to the official provider endpoint (e.g., Google or OpenAI). For custom aggregators like 7jm or Comantek, you **must** specify the base URL.
+If not provided, the proxy defaults to the official provider endpoint (e.g., Google or OpenAI). For custom aggregators, you can specify the base URL.
 
 ---
 
@@ -45,8 +45,6 @@ The following tables document how to integrate specific services through KeyProx
 |---------|------------------|----------------------|-------------------|
 | **Gemini** | `http://localhost:8990/gemini/*` | `GEMINI_API_KEY_01` | `https://generativelanguage.googleapis.com` |
 | **OpenAI** | `http://localhost:8990/openai/*` | `OPENAI_API_KEY_01` | `https://api.openai.com` |
-| **7jm** | `http://localhost:8990/7jm/*` | `OPENAI_7JM_API_KEY_01` | `https://api.7jm.top/v1` |
-| **Comantek** | `http://localhost:8990/comantek/*` | `OPENAI_COMANTEK_API_KEY_01` | `https://api.comantek.com/v1` |
 
 ### Scraping & Search Services
 
@@ -67,7 +65,7 @@ from openai import OpenAI
 
 client = OpenAI(
     api_key="ANY_LOCAL_ACCESS_KEY", # KeyProxy ignores this and uses rotated keys
-    base_url="http://localhost:8990/7jm/v1" # Point to the KeyProxy provider endpoint
+    base_url="http://localhost:8990/openai/v1" # Point to the KeyProxy provider endpoint
 )
 
 response = client.chat.completions.create(

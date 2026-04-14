@@ -4,7 +4,7 @@ param(
     [string]$Command
 )
 
-# When called from anywhere, $PSScriptRoot resolves to infra/nest-KeyProxy/
+# When called from anywhere, $PSScriptRoot resolves to current directory
 $KeyProxyDir = $PSScriptRoot
 $Port = 8990
 
@@ -28,15 +28,15 @@ switch ($Command) {
     'start' {
         $KeyProxyPid = Get-KeyProxyPid
         if ($KeyProxyPid) {
-            Write-Host "âś… KeyProxy already running on port $Port (PID: $KeyProxyPid)" -ForegroundColor Yellow
+            Write-Host "✅ KeyProxy already running on port $Port (PID: $KeyProxyPid)" -ForegroundColor Yellow
         } else {
-            Write-Host "đźš€ Starting KeyProxy in background..." -ForegroundColor Cyan
+            Write-Host "🚀 Starting KeyProxy in background..." -ForegroundColor Cyan
             $logDir = Join-Path $KeyProxyDir "logs"
             if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
 
             $ProcParams = @{
                 FilePath = "node"
-                ArgumentList = "index.js"
+                ArgumentList = "main.js"
                 WorkingDirectory = $KeyProxyDir
                 WindowStyle = "Hidden"
                 RedirectStandardOutput = "$logDir\stdout.log"
@@ -46,19 +46,19 @@ switch ($Command) {
             Start-Sleep -Seconds 2
             $newPid = Get-KeyProxyPid
             if ($newPid) {
-                Write-Host "âś… KeyProxy started (PID: $newPid)" -ForegroundColor Green
+                Write-Host "✅ KeyProxy started (PID: $newPid)" -ForegroundColor Green
                 Write-Host "   Admin: http://localhost:$Port/admin" -ForegroundColor Gray
             } else {
-                Write-Host "âťŚ Failed to start KeyProxy. Check: $logDir\stderr.log" -ForegroundColor Red
+                Write-Host "❌ Failed to start KeyProxy. Check: $logDir\stderr.log" -ForegroundColor Red
             }
         }
     }
     'stop' {
         $KeyProxyPid = Get-KeyProxyPid
         if ($KeyProxyPid) {
-            Write-Host "đź›‘ Stopping KeyProxy (PID: $KeyProxyPid)..." -ForegroundColor Cyan
+            Write-Host "🛑 Stopping KeyProxy (PID: $KeyProxyPid)..." -ForegroundColor Cyan
             Stop-Process -Id $KeyProxyPid -Force -ErrorAction SilentlyContinue
-            Write-Host "âś… KeyProxy stopped." -ForegroundColor Green
+            Write-Host "✅ KeyProxy stopped." -ForegroundColor Green
         } else {
             Write-Host "KeyProxy is not running on port $Port." -ForegroundColor Yellow
         }
@@ -71,10 +71,10 @@ switch ($Command) {
     'status' {
         $KeyProxyPid = Get-KeyProxyPid
         if ($KeyProxyPid) {
-            Write-Host "âś… KeyProxy is RUNNING (PID: $KeyProxyPid, Port: $Port)" -ForegroundColor Green
+            Write-Host "✅ KeyProxy is RUNNING (PID: $KeyProxyPid, Port: $Port)" -ForegroundColor Green
             Write-Host "   Admin: http://localhost:$Port/admin" -ForegroundColor Gray
         } else {
-            Write-Host "đź”´ KeyProxy is STOPPED" -ForegroundColor Red
+            Write-Host "🔴 KeyProxy is STOPPED" -ForegroundColor Red
         }
     }
     'logs' {
@@ -83,11 +83,11 @@ switch ($Command) {
             Write-Host "Log file not found: $logFile" -ForegroundColor Yellow
             return
         }
-        Write-Host "Tailing log file... (Ctrl+C to stop)" -ForegroundColor Gray
+        Write-Host "Tailing KeyProxy logs... (Ctrl+C to stop)" -ForegroundColor Gray
         Get-Content $logFile -Tail 30 -Wait
     }
     'watch' {
-        Write-Host "👀 Watching for .env changes... (Ctrl+C to stop)" -ForegroundColor Cyan
+        Write-Host "👀 KeyProxy: Watching for configuration changes... (Ctrl+C to stop)" -ForegroundColor Cyan
         $rootEnv = Resolve-Path (Join-Path $KeyProxyDir "../../.env") -ErrorAction SilentlyContinue
         $localEnv = Resolve-Path (Join-Path $KeyProxyDir ".env") -ErrorAction SilentlyContinue
         
@@ -112,7 +112,7 @@ switch ($Command) {
             foreach ($f in $filesToWatch) {
                 $currentWriteTime = (Get-Item $f).LastWriteTime
                 if ($currentWriteTime -gt $lastWriteTimes[$f]) {
-                    Write-Host "✅ Change detected in $(Split-Path $f -Leaf). Restarting..." -ForegroundColor Yellow
+                    Write-Host "✅ Change detected in $(Split-Path $f -Leaf). Reloading KeyProxy..." -ForegroundColor Yellow
                     $lastWriteTimes[$f] = $currentWriteTime
                     & $PSCommandPath restart
                 }

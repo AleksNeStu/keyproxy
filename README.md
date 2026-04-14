@@ -76,8 +76,36 @@ KeyProxy is designed for flexibility:
 
 ---
 
+### 🎮 Operational Management
+
+KeyProxy comes with dedicated management scripts for background execution and easy monitoring.
+
+#### **Windows (Workstation)**
+Use the provided PowerShell script for one-command operations:
+```powershell
+./manage.ps1 start    # Run KeyProxy in persistent background mode
+./manage.ps1 status   # Check if KeyProxy is running
+./manage.ps1 logs     # Tail real-time operations logs
+./manage.ps1 watch    # Auto-restart KeyProxy whenever your .env changes
+./manage.ps1 stop     # Gracefully terminate the service
+```
+
+#### **Linux (VPS)**
+Use the Bash script for stable server operations:
+```bash
+chmod +x manage.sh     # First time setup
+./manage.sh start      # Launch as a background daemon
+./manage.sh status     # Check process and port health
+./manage.sh logs       # Tail output logs
+./manage.sh stop       # Kill the background process
+```
+
+---
+
 ### ⚖️ License
 MIT License
 
 Copyright (c) 2025 Fayaz Bin Salam
 Copyright (c) 2026 AleksNeStu (KeyProxy)
+
+Based on Rotato by Fayaz Bin Salam: https://github.com/p32929/rotato
