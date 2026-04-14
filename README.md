@@ -45,12 +45,34 @@ npm install
 node main.js
 ```
 
-### ⚙️ Configuration
-Create a `.env` file based on the provided examples. KeyProxy will automatically discover and manage keys for:
-- OpenAI / OpenAI-compatible APIs
-- Anthropic (Claude)
-- Google Gemini
-- Tavily / Firecrawl / Brave Search
+### ⚙️ How it Works: Smart Environment Sync
+
+KeyProxy does more than just proxy requests; it manages your system's "source of truth" for keys:
+
+1.  **Discovery:** It scans your `.env` for patterns like `OPENAI_API_KEY`, `OPENAI_API_KEY_1`, `OPENAI_API_KEY_2`, etc.
+2.  **Rotation:** When a key is rate-limited or fails, KeyProxy automatically switches to the next available indexed key.
+3.  **System Injection:** The **currently active and healthy key** is automatically injected into your system's root environment variable (e.g., `OPENAI_API_KEY`).
+    - **Windows:** Injected via `setx` (persists across reboots and new terminals).
+    - **Linux:** Syncs via standard environment management (perfect for VPS).
+4.  **Zero Manual Work:** Your tools (Cursor, VS Code, Python scripts) can simply read the standard `OPENAI_API_KEY` variable, and KeyProxy ensures it **always contains a working key**.
+
+---
+
+### 🧩 Configuration & Patterns
+
+KeyProxy is designed for flexibility:
+
+- **Indexed Keys:** Add as many as you want:
+  ```env
+  GEMINI_API_KEY=key_zero
+  GEMINI_API_KEY_1=key_one
+  GEMINI_API_KEY_2=key_two
+  ```
+- **External Config:** Use `EXTERNAL_ENV_PATH` to point KeyProxy to a global configuration file (e.g., in your monorepo root):
+  ```env
+  EXTERNAL_ENV_PATH=../../.env
+  ```
+- **Custom Providers:** Support for any OpenAI-compatible API (Tavily, Firecrawl, etc.) with custom base URLs.
 
 ---
 
