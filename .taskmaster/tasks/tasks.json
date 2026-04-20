@@ -1,0 +1,69 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": "1",
+        "title": "Secure password storage with scrypt hashing",
+        "description": "Replace plaintext ADMIN_PASSWORD comparison with scrypt-based hashing. Create src/core/auth.js using Node.js built-in crypto.scryptSync (zero dependencies). Support both plaintext and hashed passwords for backward compatibility. Format: $scrypt$<salt>$<hash>. Auto-upgrade plaintext to hash on first successful login.",
+        "details": "Files: src/core/auth.js (new), src/server.js (login + change-password + upgrade-password endpoints), public/admin.html (upgrade banner + change password form in Settings). Verification: Login with plaintext → see upgrade banner → upgrade → login with hash.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [],
+        "priority": "high",
+        "subtasks": [],
+        "updatedAt": "2026-04-20T21:34:05.369Z"
+      },
+      {
+        "id": "2",
+        "title": "Multi .env selector with UI dropdown",
+        "description": "Support multiple named .env files (production, staging, personal) with dropdown switching in admin UI. Convention: ENV_FILES=name:path,name2:path2 and ACTIVE_ENV=name in local .env. Backward compatible with existing EXTERNAL_ENV_PATH. Hot-reload on switch.",
+        "details": "Files: src/core/config.js (getEnvFiles, setActiveEnv, addEnvFile, removeEnvFile), src/server.js (4 new API routes), public/admin.html (dropdown + add/remove form). Reuse existing selectEnvFile() file picker.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [
+          "1"
+        ],
+        "priority": "medium",
+        "subtasks": [],
+        "updatedAt": "2026-04-20T21:38:28.956Z"
+      },
+      {
+        "id": "3",
+        "title": "Management tab with provider health table",
+        "description": "Rewrite healthCheck.js stub into functional HealthMonitor class. Add Management tab to admin UI with table showing: provider name, status badge, key counts, last check time, request count, avg response time, action buttons. Auto-refresh every 30s.",
+        "details": "Files: src/core/healthCheck.js (rewrite), src/server.js (4 health API routes + instantiate HealthMonitor), public/admin.html (new Management tab). Data sources: config.providers, providerClients, key-history.json, logBuffer. Status: active/degraded/failed/disabled.",
+        "testStrategy": "",
+        "status": "done",
+        "dependencies": [
+          "1"
+        ],
+        "priority": "medium",
+        "subtasks": [],
+        "updatedAt": "2026-04-20T21:49:29.916Z"
+      },
+      {
+        "id": "4",
+        "title": "Telegram broadcast and Slack webhook notifications",
+        "description": "Create unified Notifier hub with Telegram broadcast and Slack webhook channels. Add broadcastMessage() to existing telegramBot.js. Create slackNotifier.js using built-in https (zero deps). Wire notifications into health events and key failures. Admin UI for notification settings.",
+        "details": "Files: src/core/notifier.js (new), src/core/slackNotifier.js (new), src/core/telegramBot.js (add broadcastMessage), src/server.js (instantiate Notifier, notification API routes, wire events), public/admin.html (Notifications section in Settings). Config: SLACK_WEBHOOK_URL, SLACK_NOTIFY_ON, TELEGRAM_NOTIFY_ON.",
+        "testStrategy": "",
+        "status": "in-progress",
+        "dependencies": [
+          "3"
+        ],
+        "priority": "low",
+        "subtasks": [],
+        "updatedAt": "2026-04-20T21:50:26.996Z"
+      }
+    ],
+    "metadata": {
+      "version": "1.0.0",
+      "lastModified": "2026-04-20T21:50:26.997Z",
+      "taskCount": 4,
+      "completedCount": 3,
+      "tags": [
+        "master"
+      ]
+    }
+  }
+}
