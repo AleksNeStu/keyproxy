@@ -8,18 +8,9 @@ function main() {
   try {
     const config = new Config();
     
-    // Initialize Destination Manager and register destinations
+    // Initialize Destination Manager
     const destMgr = require('./src/destinations/manager');
-    const destConfig = config.getDestinationConfig();
-
-    // 1. File Sync Destination (default: enabled)
-    if (destConfig.fileSync) {
-      const FileSync = require('./src/destinations/fileSync');
-      destMgr.register(new FileSync(destConfig.filePath));
-    }
-
-    // 2. Windows Environment Destination (default: disabled for security)
-    if (destConfig.systemEnv && process.platform === 'win32') {
+    if (process.platform === 'win32') {
       const WindowsEnv = require('./src/destinations/windowsEnv');
       destMgr.register(WindowsEnv);
     }

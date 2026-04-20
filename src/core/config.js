@@ -305,6 +305,18 @@ class Config {
 
           providerConfigs.get(provider).disabled = (value.trim().toLowerCase() === 'true');
         }
+      } else if (key.endsWith('_SYNC_ENV') && value) {
+        const parts = key.replace('_SYNC_ENV', '').split('_');
+        if (parts.length >= 1) {
+          const apiType = parts[0].toLowerCase();
+          const provider = parts.length === 1 ? apiType : parts.slice(1).join('_').toLowerCase();
+
+          if (!providerConfigs.has(provider)) {
+            providerConfigs.set(provider, defaultConfig());
+          }
+
+          providerConfigs.get(provider).syncEnv = (value.trim().toLowerCase() === 'true');
+        }
       }
     }
 
@@ -407,15 +419,6 @@ class Config {
 
   hasProvider(providerName) {
     return this.providers.has(providerName);
-  }
-
-  // Destination sync configuration
-  getDestinationConfig() {
-    return {
-      fileSync: this.envVars.KEYPROXY_SYNC_FILE !== 'false',
-      filePath: this.envVars.KEYPROXY_SYNC_FILE_PATH || '.active_keys.env',
-      systemEnv: this.envVars.KEYPROXY_SYNC_SYSTEM === 'true',
-    };
   }
 
   // Retry configuration
