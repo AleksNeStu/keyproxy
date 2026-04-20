@@ -2,10 +2,15 @@ const https = require('https');
 const { URL } = require('url');
 
 class OpenAIClient {
-  constructor(keyRotator, baseUrl = 'https://api.openai.com', providerName = 'openai') {
+  constructor(keyRotator, baseUrl = 'https://api.openai.com', providerName = 'openai', retryConfig = null) {
     this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
     this.providerName = providerName;
+    this.retryConfig = retryConfig || { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };
+  }
+
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   async makeRequest(method, path, body, headers = {}, customStatusCodes = null, streaming = false) {
@@ -17,10 +22,13 @@ class OpenAIClient {
 
     // Determine which status codes should trigger rotation
     const rotationStatusCodes = customStatusCodes || new Set([429]);
+    const { maxRetries, retryDelayMs, retryBackoff } = this.retryConfig;
 
-    // Try each available key for this request
+    // Try each available key for this request, respecting maxRetries and delay
     let apiKey;
-    while ((apiKey = requestContext.getNextKey()) !== null) {
+    let attempt = 0;
+    while ((apiKey = requestContext.getNextKey()) !== null && attempt < maxRetries) {
+      attempt++;
       const maskedKey = this.maskApiKey(apiKey);
 
       console.log(`[OPENAI::${maskedKey}] Attempting ${method} ${path}${streaming ? ' (streaming)' : ''}`);
@@ -36,6 +44,9 @@ class OpenAIClient {
             this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
             failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
             lastResponse = { statusCode: response.statusCode, headers: response.headers, data: '' };
+            const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
+            console.log(`[OPENAI] Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
+            await this.sleep(delay);
             continue;
           }
 
@@ -53,6 +64,9 @@ class OpenAIClient {
             this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
             failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
             lastResponse = response;
+            const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
+            console.log(`[OPENAI] Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
+            await this.sleep(delay);
             continue;
           }
 
@@ -66,6 +80,8 @@ class OpenAIClient {
         console.log(`[OPENAI::${maskedKey}] Request failed: ${error.message}`);
         failedKeys.push({ key: maskedKey, status: null, reason: error.message });
         lastError = error;
+        const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
+        await this.sleep(delay);
         continue;
       }
     }

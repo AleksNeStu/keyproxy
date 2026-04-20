@@ -127,6 +127,7 @@ class Config {
         discovery.gemini.keys.push(value);
       }
       // 3. Known specific patterns (e.g. FIRECRAWL_API_KEY) - for backward compatibility with existing .env
+      // Note: no break — one key can match multiple providers (e.g. TAVILY_API_KEY → both 'tavily' and 'tavily_mcp')
       else {
         for (const [knownName, config] of Object.entries(knownDefaults)) {
           const patternSource = config.keyPattern || knownName;
@@ -134,7 +135,6 @@ class Config {
           if (pattern.test(upperKey)) {
             if (!discovery[knownName]) discovery[knownName] = { type: config.type, keys: [], baseUrl: config.baseUrl };
             discovery[knownName].keys.push(value);
-            break;
           }
         }
       }
@@ -157,6 +157,8 @@ class Config {
         
         const existing = (localVars[envKey] || '').split(',').map(k => k.trim()).filter(k => k);
         const merged = [...new Set([...existing, ...data.keys])].join(',');
+        // Deduplicate keys within this provider too
+        data.keys = [...new Set(data.keys)];
         
         localVars[envKey] = merged;
         if (finalBaseUrl) {
@@ -405,6 +407,30 @@ class Config {
 
   hasProvider(providerName) {
     return this.providers.has(providerName);
+  }
+
+  // Retry configuration
+  getRetryConfig(providerName) {
+    const defaults = { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };
+    const global = {
+      maxRetries: parseInt(this.envVars.KEYPROXY_MAX_RETRIES) || defaults.maxRetries,
+      retryDelayMs: parseInt(this.envVars.KEYPROXY_RETRY_DELAY_MS) || defaults.retryDelayMs,
+      retryBackoff: parseFloat(this.envVars.KEYPROXY_RETRY_BACKOFF) || defaults.retryBackoff,
+    };
+
+    if (!providerName) return global;
+
+    // Per-provider override: {TYPE}_{PROVIDER}_MAX_RETRIES etc.
+    const prov = this.providers.get(providerName);
+    if (!prov) return global;
+
+    const prefix = `${prov.apiType.toUpperCase()}_${providerName.toUpperCase()}`;
+    const perProvider = {};
+    if (this.envVars[`${prefix}_MAX_RETRIES`]) perProvider.maxRetries = parseInt(this.envVars[`${prefix}_MAX_RETRIES`]);
+    if (this.envVars[`${prefix}_RETRY_DELAY_MS`]) perProvider.retryDelayMs = parseInt(this.envVars[`${prefix}_RETRY_DELAY_MS`]);
+    if (this.envVars[`${prefix}_RETRY_BACKOFF`]) perProvider.retryBackoff = parseFloat(this.envVars[`${prefix}_RETRY_BACKOFF`]);
+
+    return { ...global, ...perProvider };
   }
 
   getProvidersByApiType(apiType) {

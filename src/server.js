@@ -442,12 +442,13 @@ class ProxyServer {
       // Sync provider keys into history (add fresh entries, remove stale ones)
       const allKeys = provider.allKeys ? provider.allKeys.map(k => k.key) : enabledKeys;
       this.historyManager.syncProviderKeys(providerName, allKeys);
+      const retryConfig = this.config.getRetryConfig(providerName);
       let client;
 
       if (provider.apiType === 'openai') {
-        client = new this.OpenAIClient(keyRotator, provider.baseUrl, providerName);
+        client = new this.OpenAIClient(keyRotator, provider.baseUrl, providerName, retryConfig);
       } else if (provider.apiType === 'gemini') {
-        client = new this.GeminiClient(keyRotator, provider.baseUrl, providerName);
+        client = new this.GeminiClient(keyRotator, provider.baseUrl, providerName, retryConfig);
       } else {
         return null;
       }
@@ -779,6 +780,12 @@ class ProxyServer {
       await this.handleGetTelegramSettings(res);
     } else if (path === '/admin/api/telegram' && req.method === 'POST') {
       await this.handleUpdateTelegramSettings(res, body);
+    } else if (path === '/admin/api/reload' && req.method === 'POST') {
+      await this.handleReloadConfig(res);
+    } else if (path === '/admin/api/retry-config' && req.method === 'GET') {
+      await this.handleGetRetryConfig(res);
+    } else if (path === '/admin/api/retry-config' && req.method === 'POST') {
+      await this.handleUpdateRetryConfig(res, body);
     } else if (path === '/admin/api/settings' && req.method === 'POST') {
       await this.handleUpdateSettings(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
@@ -984,6 +991,85 @@ class ProxyServer {
       res.end(JSON.stringify({ success: true }));
     } catch (error) {
       this.sendError(res, 500, 'Failed to update settings: ' + error.message);
+    }
+  }
+
+  async handleReloadConfig(res) {
+    try {
+      this.config.loadConfig();
+      this.reinitializeClients();
+      const providers = [];
+      for (const [name, config] of this.config.getProviders().entries()) {
+        providers.push({ name, apiType: config.apiType, keyCount: config.keys.length, baseUrl: config.baseUrl });
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, providers }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to reload config: ' + error.message);
+    }
+  }
+
+  async handleGetRetryConfig(res) {
+    try {
+      const globalConfig = this.config.getRetryConfig();
+      const perProvider = {};
+      for (const [name] of this.config.getProviders().entries()) {
+        perProvider[name] = this.config.getRetryConfig(name);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ global: globalConfig, perProvider }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to get retry config: ' + error.message);
+    }
+  }
+
+  async handleUpdateRetryConfig(res, body) {
+    try {
+      const data = JSON.parse(body);
+      const envPath = path.join(process.cwd(), '.env');
+      let envContent = '';
+      if (fs.existsSync(envPath)) {
+        envContent = fs.readFileSync(envPath, 'utf8');
+      }
+      const envVars = this.config.parseEnvFile(envContent);
+
+      // Global settings
+      if (data.global) {
+        if (data.global.maxRetries !== undefined) envVars.KEYPROXY_MAX_RETRIES = String(data.global.maxRetries);
+        if (data.global.retryDelayMs !== undefined) envVars.KEYPROXY_RETRY_DELAY_MS = String(data.global.retryDelayMs);
+        if (data.global.retryBackoff !== undefined) envVars.KEYPROXY_RETRY_BACKOFF = String(data.global.retryBackoff);
+      }
+
+      // Per-provider overrides
+      if (data.perProvider) {
+        // Clear existing per-provider retry settings
+        for (const key of Object.keys(envVars)) {
+          if (key.endsWith('_MAX_RETRIES') && !key.startsWith('KEYPROXY_')) delete envVars[key];
+          if (key.endsWith('_RETRY_DELAY_MS') && !key.startsWith('KEYPROXY_')) delete envVars[key];
+          if (key.endsWith('_RETRY_BACKOFF') && !key.startsWith('KEYPROXY_')) delete envVars[key];
+        }
+        for (const [prov, settings] of Object.entries(data.perProvider)) {
+          const provUpper = prov.toUpperCase();
+          if (settings.maxRetries !== undefined && settings.maxRetries !== null) {
+            envVars[`${provUpper}_MAX_RETRIES`] = String(settings.maxRetries);
+          }
+          if (settings.retryDelayMs !== undefined && settings.retryDelayMs !== null) {
+            envVars[`${provUpper}_RETRY_DELAY_MS`] = String(settings.retryDelayMs);
+          }
+          if (settings.retryBackoff !== undefined && settings.retryBackoff !== null) {
+            envVars[`${provUpper}_RETRY_BACKOFF`] = String(settings.retryBackoff);
+          }
+        }
+      }
+
+      this.writeEnvFile(envVars);
+      this.config.loadConfig();
+      this.reinitializeClients();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to update retry config: ' + error.message);
     }
   }
 
@@ -1691,7 +1777,7 @@ $form.Dispose()
     // Reinitialize legacy clients for backward compatibility
     if (this.config.hasGeminiKeys()) {
       const geminiKeyRotator = new this.KeyRotator(this.config.getGeminiApiKeys(), 'gemini', null, this.historyManager);
-      this.geminiClient = new this.GeminiClient(geminiKeyRotator, this.config.getGeminiBaseUrl());
+      this.geminiClient = new this.GeminiClient(geminiKeyRotator, this.config.getGeminiBaseUrl(), 'gemini', this.config.getRetryConfig('gemini'));
       console.log('[SERVER] Legacy Gemini client reinitialized');
     } else {
       this.geminiClient = null;
@@ -1700,7 +1786,7 @@ $form.Dispose()
 
     if (this.config.hasOpenaiKeys()) {
       const openaiKeyRotator = new this.KeyRotator(this.config.getOpenaiApiKeys(), 'openai', null, this.historyManager);
-      this.openaiClient = new this.OpenAIClient(openaiKeyRotator, this.config.getOpenaiBaseUrl());
+      this.openaiClient = new this.OpenAIClient(openaiKeyRotator, this.config.getOpenaiBaseUrl(), 'openai', this.config.getRetryConfig('openai'));
       console.log('[SERVER] Legacy OpenAI client reinitialized');
     } else {
       this.openaiClient = null;

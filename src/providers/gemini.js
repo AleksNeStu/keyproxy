@@ -2,10 +2,15 @@ const https = require('https');
 const { URL } = require('url');
 
 class GeminiClient {
-  constructor(keyRotator, baseUrl = 'https://generativelanguage.googleapis.com', providerName = 'gemini') {
+  constructor(keyRotator, baseUrl = 'https://generativelanguage.googleapis.com', providerName = 'gemini', retryConfig = null) {
     this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
     this.providerName = providerName;
+    this.retryConfig = retryConfig || { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };
+  }
+
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   async makeRequest(method, path, body, headers = {}, customStatusCodes = null, streaming = false) {
@@ -45,9 +50,12 @@ class GeminiClient {
     const failedKeys = [];
 
     const rotationStatusCodes = customStatusCodes || new Set([429]);
+    const { maxRetries, retryDelayMs, retryBackoff } = this.retryConfig;
 
     let apiKey;
-    while ((apiKey = requestContext.getNextKey()) !== null) {
+    let attempt = 0;
+    while ((apiKey = requestContext.getNextKey()) !== null && attempt < maxRetries) {
+      attempt++;
       const maskedKey = this.maskApiKey(apiKey);
 
       console.log(`[GEMINI::${maskedKey}] Attempting ${method} ${path}${streaming ? ' (streaming)' : ''}`);
@@ -63,6 +71,9 @@ class GeminiClient {
             this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
             failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
             lastResponse = { statusCode: response.statusCode, headers: response.headers, data: '' };
+            const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
+            console.log(`[GEMINI] Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
+            await this.sleep(delay);
             continue;
           }
 
@@ -80,6 +91,9 @@ class GeminiClient {
             this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
             failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
             lastResponse = response;
+            const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
+            console.log(`[GEMINI] Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
+            await this.sleep(delay);
             continue;
           }
 
@@ -93,6 +107,8 @@ class GeminiClient {
         console.log(`[GEMINI::${maskedKey}] Request failed: ${error.message}`);
         failedKeys.push({ key: maskedKey, status: null, reason: error.message });
         lastError = error;
+        const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
+        await this.sleep(delay);
         continue;
       }
     }
