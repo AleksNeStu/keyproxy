@@ -28,9 +28,7 @@ class Config {
     }
 
     // Determine rootEnvPath from local env or default
-    const rootEnvPath = envVars.EXTERNAL_ENV_PATH 
-      ? path.resolve(process.cwd(), envVars.EXTERNAL_ENV_PATH) 
-      : path.resolve(process.cwd(), '../../.env');
+    const rootEnvPath = this.resolveGlobalEnvPath(envVars);
 
     // 2. Load global env and merge (local takes priority for settings, but keys accumulate)
     if (fs.existsSync(rootEnvPath)) {
@@ -482,6 +480,132 @@ class Config {
       }
     }
     return keys;
+  }
+
+  // Multi-env support
+  resolveGlobalEnvPath(localEnvVars) {
+    // Check for multi-env: ENV_FILES + ACTIVE_ENV
+    if (localEnvVars.ENV_FILES) {
+      const activeEnv = localEnvVars.ACTIVE_ENV || Object.keys(this.parseEnvFiles(localEnvVars.ENV_FILES))[0];
+      const envFiles = this.parseEnvFiles(localEnvVars.ENV_FILES);
+      if (envFiles[activeEnv]) {
+        return path.resolve(process.cwd(), envFiles[activeEnv]);
+      }
+    }
+    // Fallback to legacy EXTERNAL_ENV_PATH
+    if (localEnvVars.EXTERNAL_ENV_PATH) {
+      return path.resolve(process.cwd(), localEnvVars.EXTERNAL_ENV_PATH);
+    }
+    return path.resolve(process.cwd(), '../../.env');
+  }
+
+  parseEnvFiles(envFilesStr) {
+    const result = {};
+    if (!envFilesStr) return result;
+    envFilesStr.split(',').map(s => s.trim()).filter(Boolean).forEach(entry => {
+      const colonIdx = entry.indexOf(':');
+      if (colonIdx > 0) {
+        const name = entry.substring(0, colonIdx).trim();
+        const filePath = entry.substring(colonIdx + 1).trim();
+        if (name && filePath) result[name] = filePath;
+      }
+    });
+    return result;
+  }
+
+  getEnvFiles() {
+    const localEnvPath = path.join(process.cwd(), '.env');
+    if (!fs.existsSync(localEnvPath)) return { files: {}, active: 'default' };
+    const content = fs.readFileSync(localEnvPath, 'utf8');
+    const vars = this.parseEnvFile(content);
+    return {
+      files: this.parseEnvFiles(vars.ENV_FILES),
+      active: vars.ACTIVE_ENV || 'default',
+      legacyPath: vars.EXTERNAL_ENV_PATH || null
+    };
+  }
+
+  setActiveEnv(name) {
+    const localEnvPath = path.join(process.cwd(), '.env');
+    const content = fs.readFileSync(localEnvPath, 'utf8');
+    const vars = this.parseEnvFile(content);
+    const files = this.parseEnvFiles(vars.ENV_FILES);
+
+    if (!files[name]) {
+      throw new Error(`Unknown env: ${name}`);
+    }
+
+    vars.ACTIVE_ENV = name;
+    this.writeLocalEnv(vars);
+    this.loadConfig();
+  }
+
+  addEnvFile(name, filePath) {
+    const localEnvPath = path.join(process.cwd(), '.env');
+    const content = fs.readFileSync(localEnvPath, 'utf8');
+    const vars = this.parseEnvFile(content);
+
+    const files = this.parseEnvFiles(vars.ENV_FILES);
+    files[name] = filePath;
+
+    vars.ENV_FILES = Object.entries(files).map(([n, p]) => `${n}:${p}`).join(',');
+    this.writeLocalEnv(vars);
+  }
+
+  removeEnvFile(name) {
+    const localEnvPath = path.join(process.cwd(), '.env');
+    const content = fs.readFileSync(localEnvPath, 'utf8');
+    const vars = this.parseEnvFile(content);
+
+    const files = this.parseEnvFiles(vars.ENV_FILES);
+    if (!files[name]) return;
+
+    delete files[name];
+    vars.ENV_FILES = Object.entries(files).map(([n, p]) => `${n}:${p}`).join(',');
+
+    if (vars.ACTIVE_ENV === name) {
+      const remaining = Object.keys(files);
+      vars.ACTIVE_ENV = remaining.length > 0 ? remaining[0] : '';
+    }
+
+    this.writeLocalEnv(vars);
+  }
+
+  writeLocalEnv(vars) {
+    const localEnvPath = path.join(process.cwd(), '.env');
+    const lines = [];
+    const addedKeys = new Set();
+
+    // Read existing file to preserve comments and order
+    if (fs.existsSync(localEnvPath)) {
+      const content = fs.readFileSync(localEnvPath, 'utf8');
+      for (const line of content.split('\n')) {
+        const trimmed = line.trim();
+        if (trimmed === '' || trimmed.startsWith('#')) {
+          lines.push(line);
+          continue;
+        }
+        const eqIdx = trimmed.indexOf('=');
+        if (eqIdx === -1) {
+          lines.push(line);
+          continue;
+        }
+        const key = trimmed.substring(0, eqIdx).trim();
+        if (vars.hasOwnProperty(key)) {
+          lines.push(`${key}=${vars[key]}`);
+          addedKeys.add(key);
+        }
+      }
+    }
+
+    // Add new keys not in original file
+    for (const [key, value] of Object.entries(vars)) {
+      if (!addedKeys.has(key)) {
+        lines.push(`${key}=${value}`);
+      }
+    }
+
+    fs.writeFileSync(localEnvPath, lines.join('\n'), 'utf8');
   }
 }
 

@@ -790,6 +790,14 @@ class ProxyServer {
       await this.handleUpdateRetryConfig(res, body);
     } else if (path === '/admin/api/settings' && req.method === 'POST') {
       await this.handleUpdateSettings(res, body);
+    } else if (path === '/admin/api/env-files' && req.method === 'GET') {
+      await this.handleGetEnvFiles(res);
+    } else if (path === '/admin/api/env-files' && req.method === 'POST') {
+      await this.handleAddEnvFile(res, body);
+    } else if (path === '/admin/api/env-files' && req.method === 'DELETE') {
+      await this.handleRemoveEnvFile(res, body);
+    } else if (path === '/admin/api/switch-env' && req.method === 'POST') {
+      await this.handleSwitchEnv(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -1685,6 +1693,85 @@ $form.Dispose()
     } catch (error) {
       this.sendError(res, 500, 'Failed to change password: ' + error.message);
     }
+  }
+
+  async handleGetEnvFiles(res) {
+    try {
+      const data = this.config.getEnvFiles();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to get env files: ' + error.message);
+    }
+  }
+
+  async handleAddEnvFile(res, body) {
+    try {
+      const { name, path: filePath } = JSON.parse(body);
+      if (!name || !filePath) {
+        this.sendError(res, 400, 'Missing name or path');
+        return;
+      }
+      if (!fs.existsSync(filePath)) {
+        this.sendError(res, 400, 'File does not exist: ' + filePath);
+        return;
+      }
+      this.config.addEnvFile(name, filePath);
+      const data = this.config.getEnvFiles();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, ...data }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to add env file: ' + error.message);
+    }
+  }
+
+  async handleRemoveEnvFile(res, body) {
+    try {
+      const { name } = JSON.parse(body);
+      if (!name) {
+        this.sendError(res, 400, 'Missing name');
+        return;
+      }
+      this.config.removeEnvFile(name);
+      const data = this.config.getEnvFiles();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, ...data }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to remove env file: ' + error.message);
+    }
+  }
+
+  async handleSwitchEnv(res, body) {
+    try {
+      const { name } = JSON.parse(body);
+      if (!name) {
+        this.sendError(res, 400, 'Missing env name');
+        return;
+      }
+      this.config.setActiveEnv(name);
+      this.reinitializeClients();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        success: true,
+        providers: this.getProviderStats()
+      }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to switch env: ' + error.message);
+    }
+  }
+
+  getProviderStats() {
+    const providers = [];
+    for (const [name, config] of this.config.providers.entries()) {
+      providers.push({
+        name,
+        apiType: config.apiType,
+        keyCount: config.keys.length,
+        baseUrl: config.baseUrl,
+        disabled: config.disabled || false
+      });
+    }
+    return providers;
   }
 
   async handleFsList(res, queryPath) {

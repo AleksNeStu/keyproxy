@@ -611,41 +611,26 @@
                         </div>
                         <div class="border border-border rounded p-4 bg-muted/30">
                             <div class="mb-3">
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">Active Global .env Path</label>
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">Active Global .env</label>
                                 <div class="flex items-center space-x-2">
-                                    <svg class="w-4 h-4 text-muted-foreground flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                                    </svg>
-                                    <span class="text-xs font-mono text-foreground break-all" id="resolvedEnvPathDisplay">Loading...</span>
-                                    <button onclick="copyToClipboard(document.getElementById('resolvedEnvPathDisplay').textContent)" class="p-1 text-muted-foreground hover:text-foreground transition-colors" title="Copy path">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
-                                    </button>
+                                    <select id="envFileSelect" onchange="switchEnv()" class="input-field px-2 py-1.5 text-sm rounded flex-1">
+                                        <option value="">Loading...</option>
+                                    </select>
+                                    <span class="text-xs font-mono text-muted-foreground break-all" id="resolvedEnvPathDisplay"></span>
                                 </div>
                             </div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-2">Override Path (EXTERNAL_ENV_PATH)</label>
-                            <div class="flex items-center space-x-2">
-                                <input
-                                    type="text"
-                                    id="externalEnvPath"
-                                    class="input-field w-full md:w-3/4 lg:w-1/2 px-2 py-1.5 text-sm rounded transition-colors"
-                                    placeholder="e.g. ../../.env (relative) or C:\path\to\.env (absolute)"
-                                >
-                                <button
-                                    onclick="selectEnvFile()"
-                                    class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center justify-center gap-1"
-                                    title="Open native file picker"
-                                >
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                                    Select
-                                </button>
-                                <button
-                                    onclick="saveGlobalSettings()"
-                                    class="btn btn-primary px-4 py-1.5 text-xs font-medium"
-                                >
-                                    Save
-                                </button>
-                            </div>
-                            <p class="text-[11px] text-muted-foreground mt-1">Select the global <code class="bg-muted px-1 rounded">.env</code> file holding your master API keys.</p>
+                            <div id="envFileList" class="space-y-1 mb-3"></div>
+                            <details class="text-xs">
+                                <summary class="text-muted-foreground cursor-pointer hover:text-foreground">Manage env files</summary>
+                                <div class="mt-2 flex items-center space-x-2">
+                                    <input type="text" id="newEnvName" class="input-field w-1/3 px-2 py-1 text-sm rounded" placeholder="Name (e.g. staging)">
+                                    <input type="text" id="newEnvPath" class="input-field flex-1 px-2 py-1 text-sm rounded" placeholder="Path to .env">
+                                    <button onclick="selectEnvFile()" class="btn btn-secondary px-2 py-1 text-xs" title="Browse">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                                    </button>
+                                    <button onclick="addEnvFile()" class="btn btn-primary px-3 py-1 text-xs font-medium">Add</button>
+                                </div>
+                            </details>
                         </div>
                     </div>
                     <!-- Existing Providers -->
@@ -1450,6 +1435,7 @@
                 }
                 renderEnvVars();
                 updateProviderPreview();
+                loadEnvFiles();
             } catch (error) {
                 showError('envError', 'Failed to load environment variables: ' + error.message);
             }
@@ -1481,10 +1467,110 @@
         }
         
         async function selectEnvFile() {
-            const currentPath = document.getElementById('externalEnvPath').value;
-            openFsBrowser(currentPath);
+            const pathInput = document.getElementById('newEnvPath');
+            openFsBrowser(pathInput ? pathInput.value : '');
         }
-        
+
+        async function loadEnvFiles() {
+            try {
+                const res = await fetch('/admin/api/env-files');
+                const data = await res.json();
+                const select = document.getElementById('envFileSelect');
+                const list = document.getElementById('envFileList');
+                const pathDisplay = document.getElementById('resolvedEnvPathDisplay');
+
+                if (!select) return;
+                select.innerHTML = '';
+
+                const files = data.files || {};
+                const names = Object.keys(files);
+
+                if (names.length === 0) {
+                    const opt = document.createElement('option');
+                    opt.value = 'legacy';
+                    opt.textContent = data.legacyPath || '../../.env (default)';
+                    select.appendChild(opt);
+                } else {
+                    names.forEach(name => {
+                        const opt = document.createElement('option');
+                        opt.value = name;
+                        opt.textContent = name;
+                        if (name === data.active) opt.selected = true;
+                        select.appendChild(opt);
+                    });
+                }
+
+                if (pathDisplay) {
+                    pathDisplay.textContent = files[data.active] || data.legacyPath || '';
+                }
+
+                if (list) {
+                    list.innerHTML = '';
+                    names.forEach(name => {
+                        const div = document.createElement('div');
+                        div.className = 'flex items-center justify-between text-xs py-1';
+                        div.innerHTML = `<span class="font-medium">${name}</span><span class="font-mono text-muted-foreground">${files[name]}</span>
+                            <button onclick="removeEnvFile('${name}')" class="text-red-400 hover:text-red-300 ml-2" title="Remove">&times;</button>`;
+                        list.appendChild(div);
+                    });
+                }
+            } catch (err) {
+                console.error('Failed to load env files:', err);
+            }
+        }
+
+        async function switchEnv() {
+            const select = document.getElementById('envFileSelect');
+            const name = select.value;
+            if (!name || name === 'legacy') return;
+            try {
+                const res = await fetch('/admin/api/switch-env', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    loadEnvVars();
+                }
+            } catch (err) {
+                console.error('Failed to switch env:', err);
+            }
+        }
+
+        async function addEnvFile() {
+            const name = document.getElementById('newEnvName').value.trim();
+            const filePath = document.getElementById('newEnvPath').value.trim();
+            if (!name || !filePath) return;
+            try {
+                const res = await fetch('/admin/api/env-files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, path: filePath })
+                });
+                if (res.ok) {
+                    document.getElementById('newEnvName').value = '';
+                    document.getElementById('newEnvPath').value = '';
+                    loadEnvFiles();
+                }
+            } catch (err) {
+                console.error('Failed to add env file:', err);
+            }
+        }
+
+        async function removeEnvFile(name) {
+            if (!confirm(`Remove "${name}" from env list?`)) return;
+            try {
+                const res = await fetch('/admin/api/env-files', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) loadEnvFiles();
+            } catch (err) {
+                console.error('Failed to remove env file:', err);
+            }
+        }
+
         let originalValues = {};
         let keyUsageData = {};
         let keyHistoryData = {};
