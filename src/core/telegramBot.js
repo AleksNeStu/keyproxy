@@ -1336,6 +1336,20 @@ class TelegramBot {
       req.end();
     });
   }
+
+  async broadcastMessage(text) {
+    if (!this.bot || !this.token) return;
+    const users = this.allowedUsers;
+    if (!users || users.size === 0) return;
+
+    for (const chatId of users) {
+      try {
+        await this.sendMessage(chatId, text);
+      } catch (err) {
+        console.error(`[TELEGRAM] Broadcast to ${chatId} failed:`, err.message);
+      }
+    }
+  }
 }
 
 module.exports = TelegramBot;

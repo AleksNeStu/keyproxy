@@ -32,6 +32,7 @@ class ProxyServer {
     this.GeminiClient = require('./providers/gemini');
     this.OpenAIClient = require('./providers/openai');
     this.HealthMonitor = require('./core/healthCheck');
+    this.Notifier = require('./core/notifier');
 
     // Key rotation history (persistent across restarts)
     const KeyHistoryManager = require('./core/keyHistory');
@@ -72,6 +73,14 @@ class ProxyServer {
       // Start health monitor
       this.healthMonitor = new this.HealthMonitor(this);
       this.healthMonitor.start();
+
+      // Initialize notifier
+      this.notifier = new this.Notifier(this);
+      this.notifier.configure({
+        slackWebhookUrl: this.config.envVars.SLACK_WEBHOOK_URL,
+        slackNotifyOn: this.config.envVars.SLACK_NOTIFY_ON,
+        telegramNotifyOn: this.config.envVars.TELEGRAM_NOTIFY_ON
+      });
     });
 
     this.server.on('error', (error) => {
@@ -320,6 +329,17 @@ class ProxyServer {
           const responseTime = Date.now() - startTime;
           const error = response.statusCode >= 400 ? `HTTP ${response.statusCode}` : null;
           this.logApiRequest(requestId, req.method, path, providerName, response.statusCode, responseTime, error, clientIp, keyInfo);
+        }
+
+        // Notify on all keys exhausted
+        if (keyInfo && keyInfo.failedKeys && response.statusCode === 429) {
+          const client = this.providerClients.get(providerName);
+          if (client && client.keyRotator && client.keyRotator.apiKeys.length > 0 &&
+              keyInfo.failedKeys.length >= client.keyRotator.apiKeys.length) {
+            if (this.notifier) {
+              this.notifier.send(`All keys exhausted for provider '${providerName}' (${keyInfo.failedKeys.length}/${client.keyRotator.apiKeys.length})`, 'failures');
+            }
+          }
         }
 
         this.logApiResponse(requestId, response, body);
@@ -809,6 +829,12 @@ class ProxyServer {
       await this.handleHealthCheckAll(res);
     } else if (path === '/admin/api/health/reset' && req.method === 'POST') {
       await this.handleHealthReset(res, body);
+    } else if (path === '/admin/api/notifications' && req.method === 'GET') {
+      await this.handleGetNotifications(res);
+    } else if (path === '/admin/api/notifications' && req.method === 'POST') {
+      await this.handleUpdateNotifications(res, body);
+    } else if (path === '/admin/api/notifications/test' && req.method === 'POST') {
+      await this.handleTestNotification(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -1835,6 +1861,60 @@ $form.Dispose()
       res.end(JSON.stringify({ success: true }));
     } catch (error) {
       this.sendError(res, 500, 'Failed to reset provider: ' + error.message);
+    }
+  }
+
+  async handleGetNotifications(res) {
+    const envVars = this.config.envVars;
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      slackWebhookUrl: envVars.SLACK_WEBHOOK_URL || '',
+      slackNotifyOn: envVars.SLACK_NOTIFY_ON || '',
+      telegramNotifyOn: envVars.TELEGRAM_NOTIFY_ON || ''
+    }));
+  }
+
+  async handleUpdateNotifications(res, body) {
+    try {
+      const { slackWebhookUrl, slackNotifyOn, telegramNotifyOn } = JSON.parse(body);
+      const envPath = path.join(process.cwd(), '.env');
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const envVars = this.config.parseEnvFile(envContent);
+
+      if (slackWebhookUrl !== undefined) envVars.SLACK_WEBHOOK_URL = slackWebhookUrl;
+      if (slackNotifyOn !== undefined) envVars.SLACK_NOTIFY_ON = slackNotifyOn;
+      if (telegramNotifyOn !== undefined) envVars.TELEGRAM_NOTIFY_ON = telegramNotifyOn;
+
+      this.writeEnvFile(envVars);
+      this.config.loadConfig();
+
+      if (this.notifier) {
+        this.notifier.configure({
+          slackWebhookUrl: this.config.envVars.SLACK_WEBHOOK_URL,
+          slackNotifyOn: this.config.envVars.SLACK_NOTIFY_ON,
+          telegramNotifyOn: this.config.envVars.TELEGRAM_NOTIFY_ON
+        });
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to update notifications: ' + error.message);
+    }
+  }
+
+  async handleTestNotification(res, body) {
+    try {
+      const { channel } = JSON.parse(body || '{}');
+      if (!this.notifier) {
+        this.sendError(res, 503, 'Notifier not initialized');
+        return;
+      }
+      const result = await this.notifier.testChannel(channel);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: result }));
+    } catch (error) {
+      this.sendError(res, 500, 'Test failed: ' + error.message);
     }
   }
 
