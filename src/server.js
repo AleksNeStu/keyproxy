@@ -3,6 +3,7 @@ const { URL } = require('url');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const Auth = require('./core/auth');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -773,6 +774,10 @@ class ProxyServer {
       await this.handleToggleProvider(res, body);
     } else if (path === '/admin/api/toggle-sync-env' && req.method === 'POST') {
       await this.handleToggleSyncEnv(res, body);
+    } else if (path === '/admin/api/upgrade-password' && req.method === 'POST') {
+      await this.handleUpgradePassword(res);
+    } else if (path === '/admin/api/change-password' && req.method === 'POST') {
+      await this.handleChangePassword(res, body);
     } else if (path === '/admin/api/telegram' && req.method === 'GET') {
       await this.handleGetTelegramSettings(res);
     } else if (path === '/admin/api/telegram' && req.method === 'POST') {
@@ -836,7 +841,7 @@ class ProxyServer {
       const data = JSON.parse(body);
       const adminPassword = this.getAdminPassword();
 
-      if (data.password === adminPassword) {
+      if (Auth.verifyPassword(data.password, adminPassword)) {
         // Successful login - reset counters
         this.failedLoginAttempts = 0;
         this.loginBlockedUntil = null;
@@ -844,11 +849,12 @@ class ProxyServer {
 
         // Set session cookie (expires in 24 hours)
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString();
+        const upgradeAvailable = !Auth.isHash(adminPassword);
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'Set-Cookie': `adminSession=${this.adminSessionToken}; HttpOnly; Expires=${expires}; Path=/admin`
         });
-        res.end(JSON.stringify({ success: true }));
+        res.end(JSON.stringify({ success: true, passwordUpgradeAvailable: upgradeAvailable }));
       } else {
         // Failed login - increment counter
         this.failedLoginAttempts++;
@@ -1607,6 +1613,77 @@ $form.Dispose()
       res.end(JSON.stringify({ success: true }));
     } catch (error) {
       this.sendError(res, 500, 'Failed to toggle sync env: ' + error.message);
+    }
+  }
+
+  async handleUpgradePassword(res) {
+    try {
+      const adminPassword = this.getAdminPassword();
+      if (Auth.isHash(adminPassword)) {
+        this.sendError(res, 400, 'Password is already hashed');
+        return;
+      }
+
+      const hashed = Auth.hashPassword(adminPassword);
+      const envPath = path.join(process.cwd(), '.env');
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const lines = envContent.split('\n');
+      const updated = lines.map(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('ADMIN_PASSWORD=')) {
+          return `ADMIN_PASSWORD=${hashed}`;
+        }
+        return line;
+      }).join('\n');
+
+      fs.writeFileSync(envPath, updated, 'utf8');
+      this.config.loadConfig();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to upgrade password: ' + error.message);
+    }
+  }
+
+  async handleChangePassword(res, body) {
+    try {
+      const { currentPassword, newPassword } = JSON.parse(body);
+      if (!currentPassword || !newPassword) {
+        this.sendError(res, 400, 'Missing currentPassword or newPassword');
+        return;
+      }
+
+      if (newPassword.length < 6) {
+        this.sendError(res, 400, 'New password must be at least 6 characters');
+        return;
+      }
+
+      const adminPassword = this.getAdminPassword();
+      if (!Auth.verifyPassword(currentPassword, adminPassword)) {
+        this.sendError(res, 401, 'Current password is incorrect');
+        return;
+      }
+
+      const hashed = Auth.hashPassword(newPassword);
+      const envPath = path.join(process.cwd(), '.env');
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const lines = envContent.split('\n');
+      const updated = lines.map(line => {
+        const trimmed = line.trim();
+        if (trimmed.startsWith('ADMIN_PASSWORD=')) {
+          return `ADMIN_PASSWORD=${hashed}`;
+        }
+        return line;
+      }).join('\n');
+
+      fs.writeFileSync(envPath, updated, 'utf8');
+      this.config.loadConfig();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to change password: ' + error.message);
     }
   }
 
