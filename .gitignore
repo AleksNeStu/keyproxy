@@ -31,8 +31,10 @@ logs/
 *.log
 logs.jsonl
 *.jsonl
+key-history.json
 .runtime/
 sessions/
+daemon/
 
 # Misc
 *.tmp

@@ -8,12 +8,16 @@
   },
   "keywords": [
     "api-key",
-    "KeyProxyr",
+    "keyproxy",
+    "rotation",
     "proxy",
     "orchestrator",
     "mcp"
   ],
   "author": "Alex Nesterovich",
   "license": "MIT",
-  "description": "Universal API Key Orchestrator & Proxy with native MCP support. Automates rotation, health checks, and environment injection for Windows/Linux Workstations and VPS."
+  "description": "Universal API Key Orchestrator & Proxy with native MCP support. Automates rotation, health checks, and environment injection for Windows/Linux Workstations and VPS.",
+  "dependencies": {
+    "node-windows": "^1.0.0-beta.8"
+  }
 }

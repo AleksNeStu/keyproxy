@@ -1,22 +1,39 @@
 param(
     [Parameter(Position = 0, Mandatory = $true)]
-    [ValidateSet('start', 'stop', 'restart', 'status', 'logs', 'watch')]
+    [ValidateSet('install', 'uninstall', 'start', 'stop', 'restart', 'status', 'logs', 'watch')]
     [string]$Command
 )
 
-# When called from anywhere, $PSScriptRoot resolves to current directory
 $KeyProxyDir = $PSScriptRoot
 $Port = 8990
+$ServiceName = 'KeyProxy'
+$AdminUrl = "http://localhost:${Port}/admin"
 
-function Get-KeyProxyPid {
+# --- Helpers ---
+
+function Test-Admin {
+    ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+}
+
+function Assert-Admin {
+    if (-not (Test-Admin)) {
+        Write-Host "This command requires Administrator privileges. Relaunching elevated..." -ForegroundColor Yellow
+        Start-Process powershell -Verb RunAs -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $Command" -Wait
+        exit 0
+    }
+}
+
+function Get-ServiceState {
+    $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($svc) { return $svc }
+    # Check if running as standalone process (no service)
     $conns = netstat -ano 2>$null | findstr ":$Port"
     if ($conns) {
         foreach ($line in ($conns -split "`n")) {
             if ($line -match "LISTENING") {
-                $parts = ($line.Trim() -split '\s+')
-                $pidStr = $parts[-1]
+                $pidStr = (($line.Trim() -split '\s+')[-1])
                 if ($pidStr -match '^\d+$' -and [int]$pidStr -ne 0) {
-                    return [int]$pidStr
+                    return [PSCustomObject]@{ Name = "$ServiceName (process)"; Status = "Running"; StartType = "Manual"; Pid = [int]$pidStr }
                 }
             }
         }
@@ -24,99 +41,186 @@ function Get-KeyProxyPid {
     return $null
 }
 
+# --- Commands ---
+
 switch ($Command) {
+    'install' {
+        Assert-Admin
+        Write-Host "Installing KeyProxy as Windows Service..." -ForegroundColor Cyan
+
+        $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if ($svc) {
+            Write-Host "Service already exists (Status: $($svc.Status)). Use 'uninstall' first to reinstall." -ForegroundColor Yellow
+            return
+        }
+
+        # Kill standalone process if running
+        $state = Get-ServiceState
+        if ($state -and $state.Pid) {
+            Write-Host "Stopping standalone process (PID: $($state.Pid))..." -ForegroundColor Gray
+            Stop-Process -Id $state.Pid -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 1
+        }
+
+        Push-Location $KeyProxyDir
+        node service.js
+        Pop-Location
+
+        $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if ($svc) {
+            Write-Host "Service installed and started." -ForegroundColor Green
+            Write-Host "  Name: $ServiceName | Port: $Port | Admin: $AdminUrl" -ForegroundColor Gray
+        } else {
+            Write-Host "Failed to install service. Check console output above." -ForegroundColor Red
+        }
+    }
+
+    'uninstall' {
+        Assert-Admin
+        Write-Host "Removing KeyProxy Windows Service..." -ForegroundColor Cyan
+
+        $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if (-not $svc) {
+            Write-Host "Service not found. Nothing to uninstall." -ForegroundColor Yellow
+            return
+        }
+
+        if ($svc.Status -eq 'Running') {
+            Write-Host "Stopping service..." -ForegroundColor Gray
+            Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+        }
+
+        Push-Location $KeyProxyDir
+        node service.js uninstall
+        Pop-Location
+
+        $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if (-not $svc) {
+            Write-Host "Service removed." -ForegroundColor Green
+        } else {
+            Write-Host "Service still exists. Try manually: sc delete $ServiceName" -ForegroundColor Red
+        }
+    }
+
     'start' {
-        $KeyProxyPid = Get-KeyProxyPid
-        if ($KeyProxyPid) {
-            Write-Host "✅ KeyProxy already running on port $Port (PID: $KeyProxyPid)" -ForegroundColor Yellow
-        } else {
-            Write-Host "🚀 Starting KeyProxy in background..." -ForegroundColor Cyan
-            $logDir = Join-Path $KeyProxyDir "logs"
-            if (-not (Test-Path $logDir)) { New-Item -ItemType Directory -Path $logDir | Out-Null }
-
-            $ProcParams = @{
-                FilePath = "node"
-                ArgumentList = "main.js"
-                WorkingDirectory = $KeyProxyDir
-                WindowStyle = "Hidden"
-                RedirectStandardOutput = "$logDir\stdout.log"
-                RedirectStandardError = "$logDir\stderr.log"
-            }
-            Start-Process @ProcParams
-            Start-Sleep -Seconds 2
-            $newPid = Get-KeyProxyPid
-            if ($newPid) {
-                Write-Host "✅ KeyProxy started (PID: $newPid)" -ForegroundColor Green
-                Write-Host "   Admin: http://localhost:$Port/admin" -ForegroundColor Gray
+        $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if ($svc) {
+            if ($svc.Status -eq 'Running') {
+                Write-Host "Service already running." -ForegroundColor Yellow
             } else {
-                Write-Host "❌ Failed to start KeyProxy. Check: $logDir\stderr.log" -ForegroundColor Red
+                Assert-Admin
+                Start-Service -Name $ServiceName
+                Start-Sleep -Seconds 2
+                $svc = Get-Service -Name $ServiceName
+                Write-Host "Service started (Status: $($svc.Status))." -ForegroundColor Green
             }
+        } else {
+            Write-Host "Service not installed. Use 'install' first." -ForegroundColor Red
         }
+        Write-Host "  Admin: $AdminUrl" -ForegroundColor Gray
     }
+
     'stop' {
-        $KeyProxyPid = Get-KeyProxyPid
-        if ($KeyProxyPid) {
-            Write-Host "🛑 Stopping KeyProxy (PID: $KeyProxyPid)..." -ForegroundColor Cyan
-            Stop-Process -Id $KeyProxyPid -Force -ErrorAction SilentlyContinue
-            Write-Host "✅ KeyProxy stopped." -ForegroundColor Green
-        } else {
-            Write-Host "KeyProxy is not running on port $Port." -ForegroundColor Yellow
-        }
-    }
-    'restart' {
-        & $PSCommandPath stop
-        Start-Sleep -Seconds 1
-        & $PSCommandPath start
-    }
-    'status' {
-        $KeyProxyPid = Get-KeyProxyPid
-        if ($KeyProxyPid) {
-            Write-Host "✅ KeyProxy is RUNNING (PID: $KeyProxyPid, Port: $Port)" -ForegroundColor Green
-            Write-Host "   Admin: http://localhost:$Port/admin" -ForegroundColor Gray
-        } else {
-            Write-Host "🔴 KeyProxy is STOPPED" -ForegroundColor Red
-        }
-    }
-    'logs' {
-        $logFile = Join-Path $KeyProxyDir "logs\stdout.log"
-        if (-not (Test-Path $logFile)) {
-            Write-Host "Log file not found: $logFile" -ForegroundColor Yellow
-            return
-        }
-        Write-Host "Tailing KeyProxy logs... (Ctrl+C to stop)" -ForegroundColor Gray
-        Get-Content $logFile -Tail 30 -Wait
-    }
-    'watch' {
-        Write-Host "👀 KeyProxy: Watching for configuration changes... (Ctrl+C to stop)" -ForegroundColor Cyan
-        $rootEnv = Resolve-Path (Join-Path $KeyProxyDir "../../.env") -ErrorAction SilentlyContinue
-        $localEnv = Resolve-Path (Join-Path $KeyProxyDir ".env") -ErrorAction SilentlyContinue
-        
-        $filesToWatch = @()
-        if ($rootEnv) { $filesToWatch += $rootEnv.Path }
-        if ($localEnv) { $filesToWatch += $localEnv.Path }
-
-        if ($filesToWatch.Count -eq 0) {
-            Write-Host "❌ No .env files found to watch!" -ForegroundColor Red
-            return
-        }
-
-        # Get initial timestamps
-        $lastWriteTimes = @{}
-        foreach ($f in $filesToWatch) { $lastWriteTimes[$f] = (Get-Item $f).LastWriteTime }
-
-        # Start KeyProxy if not running
-        if (-not (Get-KeyProxyPid)) { & $PSCommandPath start }
-
-        while($true) {
-            Start-Sleep -Seconds 2
-            foreach ($f in $filesToWatch) {
-                $currentWriteTime = (Get-Item $f).LastWriteTime
-                if ($currentWriteTime -gt $lastWriteTimes[$f]) {
-                    Write-Host "✅ Change detected in $(Split-Path $f -Leaf). Reloading KeyProxy..." -ForegroundColor Yellow
-                    $lastWriteTimes[$f] = $currentWriteTime
-                    & $PSCommandPath restart
-                }
+        $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if ($svc) {
+            if ($svc.Status -ne 'Running') {
+                Write-Host "Service is not running (Status: $($svc.Status))." -ForegroundColor Yellow
+            } else {
+                Assert-Admin
+                Stop-Service -Name $ServiceName -Force
+                Start-Sleep -Seconds 1
+                Write-Host "Service stopped." -ForegroundColor Green
             }
+        } else {
+            Write-Host "Service not installed." -ForegroundColor Red
+        }
+    }
+
+    'restart' {
+        $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if ($svc) {
+            Assert-Admin
+            Restart-Service -Name $ServiceName -Force
+            Start-Sleep -Seconds 2
+            $svc = Get-Service -Name $ServiceName
+            Write-Host "Service restarted (Status: $($svc.Status))." -ForegroundColor Green
+        } else {
+            Write-Host "Service not installed. Use 'install' first." -ForegroundColor Red
+        }
+    }
+
+    'status' {
+        $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+        if ($svc) {
+            $statusColor = if ($svc.Status -eq 'Running') { 'Green' } else { 'Red' }
+            Write-Host "Service: $($svc.Status.ToString().ToUpper()) | StartType: $($svc.StartType) | Port: $Port" -ForegroundColor $statusColor
+            Write-Host "Admin: $AdminUrl" -ForegroundColor Gray
+
+            $conns = netstat -ano 2>$null | findstr ":$Port.*LISTENING"
+            if ($conns) {
+                $pidStr = ((($conns -split "`n")[0].Trim() -split '\s+')[-1])
+                Write-Host "PID: $pidStr" -ForegroundColor DarkGray
+            }
+        } else {
+            # Check for standalone process
+            $state = Get-ServiceState
+            if ($state) {
+                Write-Host "Process: RUNNING (PID: $($state.Pid), Port: $Port) — no service installed" -ForegroundColor Yellow
+            } else {
+                Write-Host "STOPPED — service not installed, no process running" -ForegroundColor Red
+            }
+            Write-Host "Run 'install' to set up as Windows Service." -ForegroundColor Gray
+        }
+    }
+
+    'logs' {
+        $logDir = Join-Path $KeyProxyDir "logs"
+        $logFile = Join-Path $logDir "stdout.log"
+        $errFile = Join-Path $logDir "stderr.log"
+
+        # node-windows uses daemon output
+        $daemonLog = Join-Path $KeyProxyDir "daemon\keyproxy.err.log"
+        $daemonOut = Join-Path $KeyProxyDir "daemon\keyproxy.out.log"
+
+        if (Test-Path $daemonOut) {
+            Write-Host "=== Service log (last 40 lines) ===" -ForegroundColor Cyan
+            Get-Content $daemonOut -Tail 40
+        } elseif (Test-Path $logFile) {
+            Write-Host "=== Process log (last 40 lines) ===" -ForegroundColor Cyan
+            Get-Content $logFile -Tail 40
+        } else {
+            Write-Host "No logs found in $logDir or daemon/" -ForegroundColor Yellow
+        }
+
+        if (Test-Path $errFile) {
+            $errSize = (Get-Item $errFile).Length
+            if ($errSize -gt 0) {
+                Write-Host "`n=== stderr (last 10 lines) ===" -ForegroundColor Red
+                Get-Content $errFile -Tail 10
+            }
+        }
+        if (Test-Path $daemonLog) {
+            $errSize = (Get-Item $daemonLog).Length
+            if ($errSize -gt 0) {
+                Write-Host "`n=== Daemon errors (last 10 lines) ===" -ForegroundColor Red
+                Get-Content $daemonLog -Tail 10
+            }
+        }
+    }
+
+    'watch' {
+        Write-Host "Watching KeyProxy logs... (Ctrl+C to stop)" -ForegroundColor Cyan
+
+        $daemonOut = Join-Path $KeyProxyDir "daemon\keyproxy.out.log"
+        $logFile = Join-Path $KeyProxyDir "logs\stdout.log"
+
+        if (Test-Path $daemonOut) {
+            Get-Content $daemonOut -Tail 30 -Wait
+        } elseif (Test-Path $logFile) {
+            Get-Content $logFile -Tail 30 -Wait
+        } else {
+            Write-Host "No log file found. Start KeyProxy first." -ForegroundColor Red
         }
     }
 }

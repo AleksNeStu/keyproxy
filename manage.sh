@@ -67,8 +67,58 @@ case "$1" in
         echo -e "\e[90mTailing $APP_NAME logs... (Ctrl+C to stop)\e[0m"
         tail -f "$STDOUT_LOG"
         ;;
+    install)
+        # Check if running as root
+        if [ "$EUID" -ne 0 ]; then
+            echo -e "\e[31m❌ Please run as root (sudo ./manage.sh install)\e[0m"
+            exit 1
+        fi
+
+        SERVICE_FILE="/etc/systemd/system/keyproxy.service"
+        WORKING_DIR=$(pwd)
+        NODE_PATH=$(which node)
+
+        echo -e "\e[36m🛠️  Creating systemd service: $SERVICE_FILE\e[0m"
+        
+        cat <<EOF > "$SERVICE_FILE"
+[Unit]
+Description=KeyProxy - API Key Orchestrator & Proxy
+After=network.target
+
+[Service]
+Type=simple
+User=$SUDO_USER
+WorkingDirectory=$WORKING_DIR
+ExecStart=$NODE_PATH main.js
+Restart=always
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+        systemctl daemon-reload
+        systemctl enable keyproxy
+        systemctl start keyproxy
+        
+        echo -e "\e[32m✅ KeyProxy installed and started as a systemd service.\e[0m"
+        systemctl status keyproxy --no-pager
+        ;;
+    uninstall)
+        if [ "$EUID" -ne 0 ]; then
+            echo -e "\e[31m❌ Please run as root (sudo ./manage.sh uninstall)\e[0m"
+            exit 1
+        fi
+
+        echo -e "\e[36m🗑️  Removing KeyProxy systemd service...\e[0m"
+        systemctl stop keyproxy
+        systemctl disable keyproxy
+        rm -f /etc/systemd/system/keyproxy.service
+        systemctl daemon-reload
+        
+        echo -e "\e[32m✅ KeyProxy service removed.\e[0m"
+        ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status|logs}"
+        echo "Usage: $0 {start|stop|restart|status|logs|install|uninstall}"
         exit 1
         ;;
 esac

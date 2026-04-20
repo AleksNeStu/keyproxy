@@ -1,115 +1,69 @@
-# 🛰️ KeyProxy: The Universal API Key Orchestrator
+# 🛰️ KeyProxy
 
-**KeyProxy** is a lightweight, cross-platform engine designed to provide a stable, "immortal" API interface for all your AI tools and services. It acts as a smart bridge between your applications and API providers, managing the entire lifecycle of your credentials behind the scenes.
+**KeyProxy** (formerly Nest-Rotato) is a professional, cross-platform API key orchestrator and proxy. It manages rotation, health-checking, and real-time synchronization of API keys across multiple destinations (System Env, Local Files, etc.), ensuring your AI tools always have access to a healthy, high-quota key.
 
-While it is a general-purpose orchestrator for any API-based workflow, it features **deep, native integration for the Model Context Protocol (MCP)** ecosystem.
+## 🚀 Professional Workflow
 
----
-
-### 🚀 Core Capabilities
-
-* **🔄 Intelligent Rotation:** Automatically switches between keys based on usage, priority, or rate limits (429 errors).
-* **🩺 Proactive Health Monitoring:** Instantly detects and disables "dead" keys (401/403 errors) before they break your scripts or agents.
-* **🔗 Stable Proxy Endpoint:** Connect any tool (Cursor, VS Code, Python, etc.) to a single local URL; KeyProxy handles the key swapping invisibly.
-* **💉 Native Environment Injection:** Automatically syncs active keys to system environment variables on **Windows (Workstations)** and **Linux (VPS)**.
-* **📦 Infrastructure Ready:** Deployable via Docker for 24/7 uptime on remote servers.
+KeyProxy sits between your development tools (Antigravity, Cursor, CLI) and multiple API providers. It automatically:
+1. **Detects** rate limits and failures.
+2. **Rotates** to the next healthy key in the pool.
+3. **Synchronizes** the active key to your OS environment and local files instantly.
 
 ---
 
-### 🧩 Deep MCP Integration
-KeyProxy isn't just for general APIs—it’s the missing link for your **MCP infrastructure**. It solves the "manual config" headache by:
-- **Auto-updating JSON configs:** Dynamically injects fresh keys into `claude_desktop_config.json` and other MCP-hub settings.
-- **Pre-configured Templates:** Built-in support for popular MCP servers like **Brave Search, Jina Reader, Firecrawl**, and more.
-- **Agent Survival:** Ensures your AI tools (Claude, Cursor) never lose their "vision" or "tools" due to expired or exhausted API keys.
+## 🛠️ Installation & Autorun
 
----
+KeyProxy is designed to run silently in the background.
 
-### 🛠️ Use Cases
-- **Development:** Use a single endpoint for all your local AI projects.
-- **MCP Power Users:** Keep your Claude Desktop tools running without ever touching a JSON file.
-- **Production/VPS:** Provide a reliable, rotated API proxy for automated workers and bots.
-
----
-
-### 📦 Installation & Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/AleksNeStu/keyproxy.git
-cd keyproxy
-
-# Install dependencies
-npm install
-
-# Start the orchestrator
-node main.js
-```
-
-### ⚙️ How it Works: Smart Environment Sync
-
-KeyProxy does more than just proxy requests; it manages your system's "source of truth" for keys:
-
-1.  **Discovery:** It scans your `.env` for patterns like `OPENAI_API_KEY`, `OPENAI_API_KEY_1`, `OPENAI_API_KEY_2`, etc.
-2.  **Rotation:** When a key is rate-limited or fails, KeyProxy automatically switches to the next available indexed key.
-3.  **System Injection:** The **currently active and healthy key** is automatically injected into your system's root environment variable (e.g., `OPENAI_API_KEY`).
-    - **Windows:** Injected via `setx` (persists across reboots and new terminals).
-    - **Linux:** Syncs via standard environment management (perfect for VPS).
-4.  **Zero Manual Work:** Your tools (Cursor, VS Code, Python scripts) can simply read the standard `OPENAI_API_KEY` variable, and KeyProxy ensures it **always contains a working key**.
-
----
-
-### 🧩 Configuration & Patterns
-
-KeyProxy is designed for flexibility:
-
-- **Indexed Keys:** Add as many as you want:
-  ```env
-  TAVILY_API_KEY=key_zero
-  TAVILY_API_KEY_1=key_one
-  TAVILY_API_KEY_2=key_two
-  ```
-- **External Config:** Use `EXTERNAL_ENV_PATH` to point KeyProxy to a global configuration file (e.g., in your monorepo root):
-  ```env
-  EXTERNAL_ENV_PATH=../../.env
-  ```
-- **Custom Providers:** Full support for any OpenAI-compatible API (Exa, Tavily, Firecrawl, etc.) with custom base URLs.
-  - OpenAI / OpenAI-compatible APIs
-  - Anthropic (Claude)
-  - Google Gemini
-  - Specialized Search: Brave Search, Perplexity, Tavily, Exa
-
----
-
-### 🎮 Operational Management
-
-KeyProxy comes with dedicated management scripts for background execution and easy monitoring.
-
-#### **Windows (Workstation)**
-Use the provided PowerShell script for one-command operations:
+### 🪟 Windows (Powershell)
+Install as a hidden background task that starts on logon:
 ```powershell
-./manage.ps1 start    # Run KeyProxy in persistent background mode
-./manage.ps1 status   # Check if KeyProxy is running
-./manage.ps1 logs     # Tail real-time operations logs
-./manage.ps1 watch    # Auto-restart KeyProxy whenever your .env changes
-./manage.ps1 stop     # Gracefully terminate the service
+./manage.ps1 install
 ```
+*   **Status**: `./manage.ps1 status`
+*   **Logs**: `./manage.ps1 logs`
+*   **Uninstall**: `./manage.ps1 uninstall`
 
-#### **Linux (VPS)**
-Use the Bash script for stable server operations:
+### 🐧 Linux (Bash/Systemd)
+Install as a robust systemd service:
 ```bash
-chmod +x manage.sh     # First time setup
-./manage.sh start      # Launch as a background daemon
-./manage.sh status     # Check process and port health
-./manage.sh logs       # Tail output logs
-./manage.sh stop       # Kill the background process
+sudo ./manage.sh install
 ```
+*   **Status**: `./manage.sh status`
+*   **Logs**: `./manage.sh logs`
+*   **Uninstall**: sudo `./manage.sh uninstall`
 
 ---
 
-### ⚖️ License
-MIT License
+## 🔄 Modular Sync Destinations
 
-Copyright (c) 2025 Fayaz Bin Salam
-Copyright (c) 2026 AleksNeStu (KeyProxy)
+KeyProxy implements a **Destination Manager** that broadcasts the currently active "healthy" key to multiple targets simultaneously:
 
-Based on Rotato by Fayaz Bin Salam: https://github.com/p32929/rotato
+| Destination | Purpose | Advantage |
+|---|---|---|
+| **System Env** | Global availability via OS variables | Standard integration for scripts and IDEs |
+| **File Sync** | Writes to `.active_keys.env` | **Instant updates** for tools like Cursor that watch files |
+| **Web Proxy** | `http://localhost:8990` | Zero-configuration rotation for any HTTP client |
+
+---
+
+## 🧩 Supported Providers
+
+Configure your keys in the root `.env` file using the `_1`, `_2` indexing pattern. KeyProxy handles the rest:
+
+*   **Search**: Tavily, Exa, Brave Search.
+*   **LLM**: OpenAI, Gemini (Google AI), Anthropic.
+*   **Tooling**: Firecrawl, Jina, etc.
+
+For a full list of environment variable mappings, see [MAPPING.md](./docs/MAPPING.md).
+
+---
+
+## 🏛️ Admin Panel
+Access the professional dashboard for real-time monitoring:
+**`http://localhost:8990/admin`**
+
+---
+
+## ⚖️ License
+MIT License. (C) 2026 NestLab. Based on the original high-availability rotation logic from the Rotato project.

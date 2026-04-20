@@ -8,19 +8,29 @@ const execAsync = promisify(exec);
  */
 class WindowsEnv {
   /**
+   * Destination Manager Interface
+   * @param {string} name 
+   * @param {string} value 
+   */
+  async syncIfChanged(name, value) {
+    // Note: Destinations handle their own 'change' detection if needed, 
+    // but the rotator also checks it. For Windows Env, we just set it.
+    return this.setEnvVar(name, value);
+  }
+
+  /**
    * Sets a persistent environment variable using 'setx'
    * @param {string} name Variable name (e.g., OPENAI_API_KEY)
    * @param {string} value API Key value
    */
-  static async setEnvVar(name, value) {
+  async setEnvVar(name, value) {
     if (!name || !value) return;
 
     try {
       // Use setx to set the variable persistently in the user environment
-      // We use /M only if we had admin rights, but for now user scope is safer and standard
       const command = `setx ${name} "${value}"`;
       
-      const { stdout, stderr } = await execAsync(command);
+      const { stderr } = await execAsync(command);
       
       if (stderr && !stderr.includes('SUCCESS')) {
         console.error(`[SYNC-WIN] Error setting ${name}:`, stderr);
@@ -39,9 +49,19 @@ class WindowsEnv {
   /**
    * Quick check if the current platform is Windows
    */
-  static isWindows() {
+  isWindows() {
     return process.platform === 'win32';
+  }
+
+  /**
+   * Helper to derive the system env var name from provider name
+   * @param {string} providerName 
+   * @returns {string} e.g. gemini -> GEMINI_API_KEY
+   */
+  deriveEnvName(providerName) {
+    if (!providerName) return null;
+    return `${providerName.toUpperCase()}_API_KEY`;
   }
 }
 
-module.exports = WindowsEnv;
+module.exports = new WindowsEnv();

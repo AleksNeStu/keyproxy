@@ -434,9 +434,9 @@ class ProxyServer {
         console.log(`[SERVER] Provider '${providerName}' has no enabled keys`);
         return null;
       }
-      const SystemSync = require('./utils/systemSync');
+      const WindowsEnv = require('./destinations/windowsEnv');
       const systemEnvName = this.config?.envVars?.ENABLE_SYSTEM_SYNC === 'true'
-        ? SystemSync.deriveEnvName(providerName)
+        ? WindowsEnv.deriveEnvName(providerName)
         : null;
       const keyRotator = new this.KeyRotator(enabledKeys, provider.apiType, systemEnvName, this.historyManager);
       // Sync provider keys into history (add fresh entries, remove stale ones)
@@ -765,6 +765,12 @@ class ProxyServer {
       await this.handleReorderKeys(res, body);
     } else if (path === '/admin/api/key-usage' && req.method === 'GET') {
       await this.handleGetKeyUsage(res);
+    } else if (path === '/admin/api/key-history' && req.method === 'GET') {
+      await this.handleGetKeyHistory(res);
+    } else if (path.startsWith('/admin/api/key-history/') && req.method === 'GET') {
+      await this.handleGetKeyHistory(res, path.split('/').pop());
+    } else if (path.startsWith('/admin/api/key-history/reset/') && req.method === 'POST') {
+      await this.handleResetKeyHistory(res, path.split('/').pop());
     } else if (path === '/admin/api/toggle-key' && req.method === 'POST') {
       await this.handleToggleKey(res, body);
     } else if (path === '/admin/api/toggle-provider' && req.method === 'POST') {
@@ -1357,37 +1363,59 @@ $form.Dispose()
   }
 
   /**
-   * Get key usage statistics for all providers
+   * Get key usage statistics for all providers (includes history status)
    */
   async handleGetKeyUsage(res) {
     try {
       const usage = {};
 
-      const mapStats = (stats) => stats.map(s => ({
-        key: s.key,
-        fullKey: s.fullKey,
-        usageCount: s.usageCount
-      }));
-
       // Get usage from provider clients
       for (const [providerName, client] of this.providerClients.entries()) {
-        if (client.keyKeyProxyr) {
-          usage[providerName] = mapStats(client.keyKeyProxyr.getKeyUsageStats());
+        if (client.keyRotator) {
+          usage[providerName] = client.keyRotator.getKeyUsageStats(providerName);
         }
       }
 
       // Legacy clients
-      if (this.geminiClient && this.geminiClient.keyKeyProxyr && !usage['gemini']) {
-        usage['gemini'] = mapStats(this.geminiClient.keyKeyProxyr.getKeyUsageStats());
+      if (this.geminiClient && this.geminiClient.keyRotator && !usage['gemini']) {
+        usage['gemini'] = this.geminiClient.keyRotator.getKeyUsageStats('gemini');
       }
-      if (this.openaiClient && this.openaiClient.keyKeyProxyr && !usage['openai']) {
-        usage['openai'] = mapStats(this.openaiClient.keyKeyProxyr.getKeyUsageStats());
+      if (this.openaiClient && this.openaiClient.keyRotator && !usage['openai']) {
+        usage['openai'] = this.openaiClient.keyRotator.getKeyUsageStats('openai');
       }
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify(usage));
     } catch (error) {
       this.sendError(res, 500, 'Failed to get key usage');
+    }
+  }
+
+  /**
+   * Get key rotation history for all providers or a specific one
+   */
+  async handleGetKeyHistory(res, providerName = null) {
+    try {
+      const history = providerName
+        ? { [providerName]: this.historyManager.getProviderHistory(providerName) }
+        : this.historyManager.getAllHistory();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(history));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to get key history');
+    }
+  }
+
+  /**
+   * Reset key rotation history for a specific provider
+   */
+  async handleResetKeyHistory(res, providerName) {
+    try {
+      this.historyManager.resetProvider(providerName);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to reset key history');
     }
   }
 
@@ -1662,17 +1690,17 @@ $form.Dispose()
     
     // Reinitialize legacy clients for backward compatibility
     if (this.config.hasGeminiKeys()) {
-      const geminiKeyKeyProxyr = new this.KeyKeyProxyr(this.config.getGeminiApiKeys(), 'gemini');
-      this.geminiClient = new this.GeminiClient(geminiKeyKeyProxyr, this.config.getGeminiBaseUrl());
+      const geminiKeyRotator = new this.KeyRotator(this.config.getGeminiApiKeys(), 'gemini', null, this.historyManager);
+      this.geminiClient = new this.GeminiClient(geminiKeyRotator, this.config.getGeminiBaseUrl());
       console.log('[SERVER] Legacy Gemini client reinitialized');
     } else {
       this.geminiClient = null;
       console.log('[SERVER] Legacy Gemini client disabled (no keys available)');
     }
-    
+
     if (this.config.hasOpenaiKeys()) {
-      const openaiKeyKeyProxyr = new this.KeyKeyProxyr(this.config.getOpenaiApiKeys(), 'openai');
-      this.openaiClient = new this.OpenAIClient(openaiKeyKeyProxyr, this.config.getOpenaiBaseUrl());
+      const openaiKeyRotator = new this.KeyRotator(this.config.getOpenaiApiKeys(), 'openai', null, this.historyManager);
+      this.openaiClient = new this.OpenAIClient(openaiKeyRotator, this.config.getOpenaiBaseUrl());
       console.log('[SERVER] Legacy OpenAI client reinitialized');
     } else {
       this.openaiClient = null;
@@ -1805,6 +1833,7 @@ $form.Dispose()
 
   stop() {
     this.flushLogs(true); // Sync write before shutdown
+    if (this.historyManager) this.historyManager.flushSync(); // Persist history before shutdown
     if (this.telegramBot) this.telegramBot.stop();
     if (this.server) {
       this.server.close();

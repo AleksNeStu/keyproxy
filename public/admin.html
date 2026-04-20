@@ -166,10 +166,45 @@
         .key-row {
             background-color: var(--card);
             border: 1px solid var(--border);
+            border-left: 3px solid var(--border);
             border-radius: var(--radius);
             padding: 0.75rem;
             margin-bottom: 0.5rem;
+            transition: opacity 0.2s, border-color 0.2s;
         }
+        .key-row.key-active {
+            border-left-color: #ef4444;
+            background: rgba(239, 68, 68, 0.06);
+        }
+        .key-row.key-exhausted {
+            border-left-color: #6b7280;
+            opacity: 0.5;
+        }
+        .key-row.key-fresh {
+            border-left-color: #22c55e;
+        }
+        .key-status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 6px;
+            flex-shrink: 0;
+        }
+        .key-status-dot.dot-active { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+        .key-status-dot.dot-exhausted { background: #6b7280; }
+        .key-status-dot.dot-fresh { background: #22c55e; }
+        .key-badge {
+            font-size: 0.65rem;
+            padding: 1px 6px;
+            border-radius: 4px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .key-badge.badge-active { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .key-badge.badge-exhausted { background: rgba(107,114,128,0.15); color: #9ca3af; }
+        .key-badge.badge-fresh { background: rgba(34,197,94,0.15); color: #22c55e; }
         
         .login-container {
             background-color: var(--card);
@@ -1259,10 +1294,11 @@
         // Environment variables functionality
         async function loadEnvVars() {
             try {
-                const [envResponse, usageResponse, settingsResponse] = await Promise.all([
+                const [envResponse, usageResponse, settingsResponse, historyResponse] = await Promise.all([
                     fetch('/admin/api/env'),
                     fetch('/admin/api/key-usage').catch(() => ({ ok: false })),
-                    fetch('/admin/api/telegram').catch(() => ({ ok: false }))
+                    fetch('/admin/api/telegram').catch(() => ({ ok: false })),
+                    fetch('/admin/api/key-history').catch(() => ({ ok: false }))
                 ]);
                 const envData = await envResponse.json();
                 envVars = envData.vars || envData; // Compatibility with both old and new server versions
@@ -1280,6 +1316,9 @@
                 
                 if (usageResponse.ok) {
                     keyUsageData = await usageResponse.json();
+                }
+                if (historyResponse.ok) {
+                    keyHistoryData = await historyResponse.json();
                 }
                 if (settingsResponse.ok) {
                     const settings = await settingsResponse.json();
@@ -1324,6 +1363,7 @@
         
         let originalValues = {};
         let keyUsageData = {};
+        let keyHistoryData = {};
         
         function renderEnvVars() {
             
@@ -1755,8 +1795,22 @@
                                     const maskedKey = keyVal.length > 16 ? keyVal.substring(0, 8) + '...' + keyVal.slice(-4) : keyVal;
                                     const usageEntry = (keyUsageData[provider.name] || []).find(u => u.fullKey === keyVal);
                                     const usageDisplay = usageEntry ? usageEntry.usageCount : 0;
+                                    // Key history status
+                                    const keyStatus = usageEntry?.status || 'fresh';
+                                    const rotationReason = usageEntry?.rotationReason || null;
+                                    const rotationCount = usageEntry?.rotationCount || 0;
+                                    const statusClass = `key-${keyStatus}`;
+                                    const dotClass = `dot-${keyStatus}`;
+                                    const badgeHtml = keyStatus === 'active'
+                                        ? '<span class="key-badge badge-active">ACTIVE</span>'
+                                        : keyStatus === 'exhausted'
+                                            ? `<span class="key-badge badge-exhausted">EXHAUSTED${rotationReason ? ' ' + rotationReason : ''}</span>`
+                                            : '<span class="key-badge badge-fresh">FRESH</span>';
                                     return `
-                                    <div class="flex items-center space-x-2${isKeyDisabled ? ' opacity-50' : ''}">
+                                    <div class="flex items-center space-x-2${isKeyDisabled ? ' opacity-50' : ''} ${statusClass}" style="border-left:3px solid ${keyStatus === 'active' ? '#ef4444' : keyStatus === 'exhausted' ? '#6b7280' : '#22c55e'}; padding-left:8px; border-radius:4px;${keyStatus === 'exhausted' ? ' opacity:0.5;' : ''}">
+                                        <!-- Status dot -->
+                                        <span class="key-status-dot ${dotClass}" title="${keyStatus}"></span>
+                                        ${badgeHtml}
                                         <!-- Reorder arrows -->
                                         <div class="flex flex-col">
                                             <button onclick="moveKey('${provider.apiType}', '${provider.name}', ${keyIndex}, 'up')"
@@ -1777,8 +1831,8 @@
                                         <div class="flex-1 font-mono text-xs text-foreground bg-muted px-2 py-1 rounded${isKeyDisabled ? ' line-through' : ''}">
                                             ${maskedKey}
                                         </div>
-                                        <!-- Usage count -->
-                                        <span class="text-xs text-muted-foreground whitespace-nowrap" title="Times used">${usageDisplay} uses</span>
+                                        <!-- Usage count + rotation count -->
+                                        <span class="text-xs text-muted-foreground whitespace-nowrap" title="Times used${rotationCount > 0 ? ' / Rotations: ' + rotationCount : ''}">${usageDisplay} uses${rotationCount > 0 ? ' / ' + rotationCount + ' rot' : ''}</span>
                                         <button
                                             onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})"
                                             class="btn btn-secondary px-2 py-1 text-xs font-medium"
@@ -1815,6 +1869,10 @@
                                     </button>
                                 </div>
                                 <div id="newKeyResult_${provider.apiType}_${provider.name}" class="mt-2"></div>
+                                <!-- Reset History Button -->
+                                <div class="flex justify-end mt-1">
+                                    <button onclick="resetKeyHistory('${provider.name}')" class="text-xs text-muted-foreground hover:text-foreground underline" title="Clear rotation history for this provider">Reset History</button>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -1849,6 +1907,25 @@
                 }
             } catch (error) {
                 showErrorToast('Failed to toggle key: ' + error.message);
+            }
+        }
+
+        async function resetKeyHistory(providerName) {
+            if (!confirm('Reset rotation history for ' + providerName + '?')) return;
+            try {
+                const response = await fetch('/admin/api/key-history/reset/' + providerName, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showSuccessToast('History reset for ' + providerName);
+                    await loadEnvVars();
+                } else {
+                    showErrorToast('Failed to reset history');
+                }
+            } catch (error) {
+                showErrorToast('Error: ' + error.message);
             }
         }
 

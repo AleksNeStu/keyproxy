@@ -19,20 +19,19 @@ class KeyRotator {
   }
 
   /**
-   * Synchronize the key to system environment variables if it changed
+   * Synchronize the key to all registered destinations if it changed
    * @param {string} key 
    */
   async syncIfChanged(key) {
     if (!this.systemEnvName || !key) return;
     if (key === this.activeKey) return;
 
-    // Pointing to the new Destination module
-    const WindowsEnv = require('../destinations/windowsEnv');
+    const DestinationManager = require('../destinations/manager');
     try {
-      await WindowsEnv.setEnvVar(this.systemEnvName, key);
+      await DestinationManager.sync(this.systemEnvName, key);
       this.activeKey = key;
     } catch (error) {
-      // Error handled in windowsEnv
+      console.error(`[${this.apiType.toUpperCase()}-ROTATOR] Sync failed:`, error.message);
     }
   }
 
