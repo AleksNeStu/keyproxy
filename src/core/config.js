@@ -99,6 +99,7 @@ class Config {
       gemini: { type: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com' },
       firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev' },
       tavily: { type: 'openai', baseUrl: 'https://api.tavily.com' },
+      tavily_mcp: { type: 'openai', baseUrl: 'https://mcp.tavily.com/mcp', keyPattern: 'TAVILY' },
       context7: { type: 'openai', baseUrl: 'https://context7.com/api' },
       onref: { type: 'openai', baseUrl: 'https://ref.tools/api' }
     };
@@ -128,7 +129,8 @@ class Config {
       // 3. Known specific patterns (e.g. FIRECRAWL_API_KEY) - for backward compatibility with existing .env
       else {
         for (const [knownName, config] of Object.entries(knownDefaults)) {
-          const pattern = new RegExp(`^${knownName.toUpperCase()}_API_KEY(?:_\\d+)?$`);
+          const patternSource = config.keyPattern || knownName;
+          const pattern = new RegExp(`^${patternSource.toUpperCase()}_API_KEY(?:_\\d+)?$`);
           if (pattern.test(upperKey)) {
             if (!discovery[knownName]) discovery[knownName] = { type: config.type, keys: [], baseUrl: config.baseUrl };
             discovery[knownName].keys.push(value);
