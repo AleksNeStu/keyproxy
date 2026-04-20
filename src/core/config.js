@@ -409,6 +409,15 @@ class Config {
     return this.providers.has(providerName);
   }
 
+  // Destination sync configuration
+  getDestinationConfig() {
+    return {
+      fileSync: this.envVars.KEYPROXY_SYNC_FILE !== 'false',
+      filePath: this.envVars.KEYPROXY_SYNC_FILE_PATH || '.active_keys.env',
+      systemEnv: this.envVars.KEYPROXY_SYNC_SYSTEM === 'true',
+    };
+  }
+
   // Retry configuration
   getRetryConfig(providerName) {
     const defaults = { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };

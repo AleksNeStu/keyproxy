@@ -253,7 +253,7 @@ class ProxyServer {
       // Sync active key to Windows system environment variable if enabled
       const syncEnabled = this.config?.envVars?.ENABLE_SYSTEM_SYNC === 'true';
       if (syncEnabled && keyInfo?.actualKey && client?.keyKeyProxyr) {
-        client.keyKeyProxyr.syncIfChanged(keyInfo.actualKey).catch(() => {});
+        client.keyRotator.syncIfChanged(keyInfo.actualKey).catch(() => {});
       }
 
       if (isStreaming && response.stream) {
@@ -786,6 +786,10 @@ class ProxyServer {
       await this.handleGetRetryConfig(res);
     } else if (path === '/admin/api/retry-config' && req.method === 'POST') {
       await this.handleUpdateRetryConfig(res, body);
+    } else if (path === '/admin/api/destinations' && req.method === 'GET') {
+      await this.handleGetDestinations(res);
+    } else if (path === '/admin/api/destinations' && req.method === 'POST') {
+      await this.handleUpdateDestinations(res, body);
     } else if (path === '/admin/api/settings' && req.method === 'POST') {
       await this.handleUpdateSettings(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
@@ -1070,6 +1074,48 @@ class ProxyServer {
       res.end(JSON.stringify({ success: true }));
     } catch (error) {
       this.sendError(res, 500, 'Failed to update retry config: ' + error.message);
+    }
+  }
+
+  async handleGetDestinations(res) {
+    try {
+      const destConfig = this.config.getDestinationConfig();
+      const isWindows = process.platform === 'win32';
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        fileSync: { enabled: destConfig.fileSync, filePath: destConfig.filePath },
+        systemEnv: { enabled: destConfig.systemEnv, available: isWindows }
+      }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to get destinations: ' + error.message);
+    }
+  }
+
+  async handleUpdateDestinations(res, body) {
+    try {
+      const data = JSON.parse(body);
+      const envPath = path.join(process.cwd(), '.env');
+      let envContent = '';
+      if (fs.existsSync(envPath)) {
+        envContent = fs.readFileSync(envPath, 'utf8');
+      }
+      const envVars = this.config.parseEnvFile(envContent);
+
+      if (data.fileSync !== undefined) envVars.KEYPROXY_SYNC_FILE = String(data.fileSync);
+      if (data.filePath !== undefined) envVars.KEYPROXY_SYNC_FILE_PATH = data.filePath;
+      if (data.systemEnv !== undefined) envVars.KEYPROXY_SYNC_SYSTEM = String(data.systemEnv);
+
+      this.writeEnvFile(envVars);
+      this.config.loadConfig();
+      this.reinitializeClients();
+
+      // Re-register destinations based on new config
+      this.reinitializeDestinations();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to update destinations: ' + error.message);
     }
   }
 
@@ -1794,6 +1840,27 @@ $form.Dispose()
     }
     
     console.log(`[SERVER] ${this.config.getProviders().size} providers available for dynamic initialization`);
+  }
+
+  reinitializeDestinations() {
+    const destMgr = require('./destinations/manager');
+    destMgr.destinations = [];
+
+    const destConfig = this.config.getDestinationConfig();
+
+    if (destConfig.fileSync) {
+      const FileSync = require('./destinations/fileSync');
+      destMgr.register(new FileSync(destConfig.filePath));
+      console.log(`[SERVER] FileSync destination enabled → ${destConfig.filePath}`);
+    }
+
+    if (destConfig.systemEnv && process.platform === 'win32') {
+      const WindowsEnv = require('./destinations/windowsEnv');
+      destMgr.register(WindowsEnv);
+      console.log('[SERVER] Windows System Env destination enabled');
+    }
+
+    console.log(`[SERVER] ${destMgr.destinations.length} destination(s) active`);
   }
 
   async initTelegramBot() {

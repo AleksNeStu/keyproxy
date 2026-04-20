@@ -602,6 +602,52 @@
                     </div>
                 </div>
 
+                <!-- Key Export Destinations -->
+                <div class="section mt-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-medium text-foreground">Key Export Destinations</h3>
+                        <button onclick="saveDestinations(this)" class="btn btn-primary px-3 py-1 text-xs">Save & Reload</button>
+                    </div>
+                    <div id="destSuccess" class="hidden bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md mb-3"></div>
+                    <div class="border border-border rounded p-4 bg-muted/30">
+                        <!-- File Sync -->
+                        <div class="flex items-center justify-between mb-3 pb-3 border-b border-border">
+                            <div class="flex items-center gap-2">
+                                <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                <div>
+                                    <span class="text-xs font-medium text-foreground">File Sync</span>
+                                    <span class="text-[11px] text-muted-foreground ml-1">(.active_keys.env)</span>
+                                </div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer">
+                                <input type="checkbox" id="destFileSync" class="sr-only peer" checked>
+                                <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                            </label>
+                        </div>
+                        <div class="mb-3">
+                            <label class="block text-xs font-medium text-muted-foreground mb-1">File path</label>
+                            <input type="text" id="destFilePath" value=".active_keys.env" class="w-full px-2 py-1 text-xs border border-border rounded bg-background text-foreground font-mono">
+                        </div>
+                        <!-- Windows System Env -->
+                        <div id="destSystemEnvSection">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                    <span class="text-xs font-medium text-foreground">Windows System Variables</span>
+                                </div>
+                                <label class="relative inline-flex items-center cursor-pointer">
+                                    <input type="checkbox" id="destSystemEnv" class="sr-only peer">
+                                    <div class="w-9 h-5 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-green-500"></div>
+                                </label>
+                            </div>
+                            <div id="systemEnvWarning" class="flex items-start gap-1.5 p-2 bg-amber-50 border border-amber-200 rounded text-amber-800 text-[11px]">
+                                <svg class="w-3.5 h-3.5 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.34 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
+                                <span>Exposes API keys to all processes on this PC via <code class="bg-amber-100 px-1 rounded">setx</code>. Only enable if you need other apps to read keys from system env.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
 
                 <div class="space-y-4 pt-4">
                     <!-- Global Configuration -->
@@ -1402,6 +1448,47 @@
                 if (data.success) {
                     showSuccess('retrySuccess', 'Retry settings saved and applied');
                     await loadRetryConfig();
+                } else {
+                    alert('Failed: ' + (data.error || 'Unknown'));
+                }
+            } catch (e) {
+                alert('Save failed: ' + e.message);
+            } finally {
+                button.disabled = false;
+            }
+        }
+
+        // Destinations config
+        async function loadDestinations() {
+            try {
+                const res = await fetch('/admin/api/destinations');
+                const data = await res.json();
+                document.getElementById('destFileSync').checked = data.fileSync?.enabled !== false;
+                document.getElementById('destFilePath').value = data.fileSync?.filePath || '.active_keys.env';
+                document.getElementById('destSystemEnv').checked = data.systemEnv?.enabled === true;
+                // Hide system env section on non-Windows
+                const sysSection = document.getElementById('destSystemEnvSection');
+                if (!data.systemEnv?.available) sysSection.style.display = 'none';
+            } catch (e) { console.error('Failed to load destinations:', e); }
+        }
+
+        async function saveDestinations(button) {
+            button.disabled = true;
+            try {
+                const payload = {
+                    fileSync: document.getElementById('destFileSync').checked,
+                    filePath: document.getElementById('destFilePath').value.trim(),
+                    systemEnv: document.getElementById('destSystemEnv').checked
+                };
+                const res = await fetch('/admin/api/destinations', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showSuccess('destSuccess', 'Destination settings saved and applied');
+                    await loadDestinations();
                 } else {
                     alert('Failed: ' + (data.error || 'Unknown'));
                 }
@@ -3906,6 +3993,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     document.getElementById('adminPanel').classList.remove('hidden');
                     loadEnvVars();
                     loadRetryConfig();
+                    loadDestinations();
                     // Fix header positioning after panel is shown
                     setTimeout(adjustStickyHeaderPositioning, 100);
                 }

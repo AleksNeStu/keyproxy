@@ -10,15 +10,17 @@ function main() {
     
     // Initialize Destination Manager and register destinations
     const destMgr = require('./src/destinations/manager');
-    const FileSync = require('./src/destinations/fileSync');
-    
-    // 1. File Sync Destination (Always enabled for professional use)
-    const fileSyncPath = config.getEffectiveEnvVars().KEYPROXY_ENV_FILE || '.active_keys.env';
-    destMgr.register(new FileSync(fileSyncPath));
+    const destConfig = config.getDestinationConfig();
 
-    // 2. Windows Environment Destination (If on Windows)
-    const WindowsEnv = require('./src/destinations/windowsEnv');
-    if (WindowsEnv.isWindows()) {
+    // 1. File Sync Destination (default: enabled)
+    if (destConfig.fileSync) {
+      const FileSync = require('./src/destinations/fileSync');
+      destMgr.register(new FileSync(destConfig.filePath));
+    }
+
+    // 2. Windows Environment Destination (default: disabled for security)
+    if (destConfig.systemEnv && process.platform === 'win32') {
+      const WindowsEnv = require('./src/destinations/windowsEnv');
       destMgr.register(WindowsEnv);
     }
 
