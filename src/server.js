@@ -771,6 +771,8 @@ class ProxyServer {
       await this.handleToggleKey(res, body);
     } else if (path === '/admin/api/toggle-provider' && req.method === 'POST') {
       await this.handleToggleProvider(res, body);
+    } else if (path === '/admin/api/toggle-sync-env' && req.method === 'POST') {
+      await this.handleToggleSyncEnv(res, body);
     } else if (path === '/admin/api/telegram' && req.method === 'GET') {
       await this.handleGetTelegramSettings(res);
     } else if (path === '/admin/api/telegram' && req.method === 'POST') {
@@ -1574,6 +1576,37 @@ $form.Dispose()
       res.end(JSON.stringify({ success: true }));
     } catch (error) {
       this.sendError(res, 500, 'Failed to toggle provider: ' + error.message);
+    }
+  }
+
+  async handleToggleSyncEnv(res, body) {
+    try {
+      const { apiType, providerName, enabled } = JSON.parse(body);
+      if (!apiType || !providerName) {
+        this.sendError(res, 400, 'Missing apiType or providerName');
+        return;
+      }
+
+      const envPath = path.join(process.cwd(), '.env');
+      const envContent = fs.readFileSync(envPath, 'utf8');
+      const envVars = this.config.parseEnvFile(envContent);
+
+      const envKey = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_SYNC_ENV`;
+
+      if (enabled) {
+        envVars[envKey] = 'true';
+      } else {
+        delete envVars[envKey];
+      }
+
+      this.writeEnvFile(envVars);
+      this.config.loadConfig();
+      this.reinitializeClients();
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to toggle sync env: ' + error.message);
     }
   }
 

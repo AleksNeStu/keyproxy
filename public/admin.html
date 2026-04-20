@@ -2092,18 +2092,16 @@
             try {
                 const envKey = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_SYNC_ENV`;
                 const currentState = envVars[envKey]?.toLowerCase() === 'true';
-                const newState = !currentState;
+                const enabled = !currentState;
 
-                const envPath = '/admin/api/env';
-                const res = await fetch(envPath, {
+                const res = await fetch('/admin/api/toggle-sync-env', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ [envKey]: String(newState) })
+                    body: JSON.stringify({ apiType, providerName, enabled })
                 });
                 const data = await res.json();
                 if (data.success) {
-                    await fetch('/admin/api/reload', { method: 'POST' });
-                    showSuccessToast(newState ? `Syncing ${providerName} active key to Windows env` : `Windows env sync disabled for ${providerName}`);
+                    showSuccessToast(enabled ? `Syncing ${providerName} active key to Windows env` : `Windows env sync disabled for ${providerName}`);
                     await loadEnvVars();
                 } else {
                     showErrorToast('Failed: ' + (data.error || 'Unknown'));
