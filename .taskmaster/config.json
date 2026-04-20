@@ -1,0 +1,40 @@
+{
+  "models": {
+    "main": {
+      "provider": "zai",
+      "modelId": "glm-5.1",
+      "baseURL": "https://api.z.ai/api/coding/paas/v4/",
+      "apiKeyEnv": "ZAI_API_KEY",
+      "maxTokens": 16384,
+      "temperature": 0.1
+    },
+    "research": {
+      "provider": "zai",
+      "modelId": "glm-5.1",
+      "baseURL": "https://api.z.ai/api/coding/paas/v4/",
+      "apiKeyEnv": "ZAI_API_KEY",
+      "maxTokens": 8192,
+      "temperature": 0.05
+    },
+    "fallback": {
+      "provider": "zai",
+      "modelId": "glm-5.1",
+      "baseURL": "https://api.z.ai/api/coding/paas/v4/",
+      "apiKeyEnv": "ZAI_API_KEY",
+      "maxTokens": 4096,
+      "temperature": 0.2
+    }
+  },
+  "global": {
+    "logLevel": "warn",
+    "debug": false,
+    "defaultNumTasks": 7,
+    "defaultSubtasks": 4,
+    "defaultPriority": "medium",
+    "projectName": "KeyProxy",
+    "responseLanguage": "English",
+    "enableCodebaseAnalysis": true,
+    "enableProxy": false,
+    "anonymousTelemetry": false
+  }
+}
