@@ -4400,6 +4400,39 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
 
                 <hr class="border-border">
 
+                <!-- Notifications Section -->
+                <div>
+                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                        </svg>
+                        Notifications
+                    </h4>
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-xs font-medium text-muted-foreground mb-1">Slack Webhook URL</label>
+                            <div class="flex items-center space-x-2">
+                                <input type="text" id="slackWebhookUrl" class="input-field flex-1 px-3 py-2 rounded-md text-sm" placeholder="https://hooks.slack.com/services/...">
+                                <button onclick="testNotification('slack')" class="btn btn-secondary px-3 py-1.5 text-xs">Test</button>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-muted-foreground mb-1">Slack Events</label>
+                            <input type="text" id="slackNotifyOn" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="failures,health">
+                        </div>
+                        <div>
+                            <label class="block text-xs font-medium text-muted-foreground mb-1">Telegram Events</label>
+                            <input type="text" id="telegramNotifyOn" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="failures,health">
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="saveNotifications()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save Notifications</button>
+                            <span id="notificationStatus" class="text-xs"></span>
+                        </div>
+                    </div>
+                </div>
+
+                <hr class="border-border">
+
                 <!-- Telegram Bot Section -->
                 <div>
                     <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -4453,6 +4486,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         document.getElementById('settingsModal').classList.remove('hidden');
         loadTelegramSettings();
         checkPasswordUpgrade();
+        loadNotifications();
     }
 
     function closeSettingsModal() {
@@ -4486,6 +4520,67 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             document.getElementById('passwordChangeStatus').textContent = 'Error: ' + err.message;
             document.getElementById('passwordChangeStatus').className = 'text-xs text-red-400';
         }
+    }
+
+    async function loadNotifications() {
+        try {
+            const res = await fetch('/admin/api/notifications');
+            if (!res.ok) return;
+            const data = await res.json();
+            const urlEl = document.getElementById('slackWebhookUrl');
+            const slackEl = document.getElementById('slackNotifyOn');
+            const tgEl = document.getElementById('telegramNotifyOn');
+            if (urlEl) urlEl.value = data.slackWebhookUrl || '';
+            if (slackEl) slackEl.value = data.slackNotifyOn || '';
+            if (tgEl) tgEl.value = data.telegramNotifyOn || '';
+        } catch (err) { console.error('Failed to load notifications:', err); }
+    }
+
+    async function saveNotifications() {
+        const status = document.getElementById('notificationStatus');
+        try {
+            const res = await fetch('/admin/api/notifications', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    slackWebhookUrl: document.getElementById('slackWebhookUrl').value,
+                    slackNotifyOn: document.getElementById('slackNotifyOn').value,
+                    telegramNotifyOn: document.getElementById('telegramNotifyOn').value
+                })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                status.textContent = 'Saved';
+                status.className = 'text-xs text-green-400';
+            } else {
+                status.textContent = data.error || 'Failed';
+                status.className = 'text-xs text-red-400';
+            }
+            setTimeout(() => { status.textContent = ''; }, 3000);
+        } catch (err) {
+            status.textContent = 'Error: ' + err.message;
+            status.className = 'text-xs text-red-400';
+        }
+    }
+
+    async function testNotification(channel) {
+        const status = document.getElementById('notificationStatus');
+        status.textContent = 'Testing...';
+        status.className = 'text-xs text-amber-400';
+        try {
+            const res = await fetch('/admin/api/notifications/test', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ channel })
+            });
+            const data = await res.json();
+            status.textContent = data.success ? 'Test sent!' : 'Test failed';
+            status.className = data.success ? 'text-xs text-green-400' : 'text-xs text-red-400';
+        } catch (err) {
+            status.textContent = 'Error: ' + err.message;
+            status.className = 'text-xs text-red-400';
+        }
+        setTimeout(() => { status.textContent = ''; }, 3000);
     }
 
     async function changePassword() {
