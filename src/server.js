@@ -250,12 +250,6 @@ class ProxyServer {
       // Extract key info from response
       const keyInfo = response._keyInfo || null;
 
-      // Sync active key to Windows system environment variable if enabled
-      const syncEnabled = this.config?.envVars?.ENABLE_SYSTEM_SYNC === 'true';
-      if (syncEnabled && keyInfo?.actualKey && client?.keyKeyProxyr) {
-        client.keyRotator.syncIfChanged(keyInfo.actualKey).catch(() => {});
-      }
-
       if (isStreaming && response.stream) {
         // Streaming response - pipe directly to client
         const streamHeaders = { ...response.headers };
@@ -434,8 +428,9 @@ class ProxyServer {
         console.log(`[SERVER] Provider '${providerName}' has no enabled keys`);
         return null;
       }
+      const destConfig = this.config.getDestinationConfig();
       const WindowsEnv = require('./destinations/windowsEnv');
-      const systemEnvName = this.config?.envVars?.ENABLE_SYSTEM_SYNC === 'true'
+      const systemEnvName = destConfig.systemEnv
         ? WindowsEnv.deriveEnvName(providerName)
         : null;
       const keyRotator = new this.KeyRotator(enabledKeys, provider.apiType, systemEnvName, this.historyManager);
