@@ -31,6 +31,7 @@ class ProxyServer {
     this.KeyRotator = require('./core/keyRotator');
     this.GeminiClient = require('./providers/gemini');
     this.OpenAIClient = require('./providers/openai');
+    this.HealthMonitor = require('./core/healthCheck');
 
     // Key rotation history (persistent across restarts)
     const KeyHistoryManager = require('./core/keyHistory');
@@ -67,6 +68,10 @@ class ProxyServer {
 
       // Start Telegram bot after server is listening
       this.initTelegramBot();
+
+      // Start health monitor
+      this.healthMonitor = new this.HealthMonitor(this);
+      this.healthMonitor.start();
     });
 
     this.server.on('error', (error) => {
@@ -798,6 +803,12 @@ class ProxyServer {
       await this.handleRemoveEnvFile(res, body);
     } else if (path === '/admin/api/switch-env' && req.method === 'POST') {
       await this.handleSwitchEnv(res, body);
+    } else if (path === '/admin/api/health' && req.method === 'GET') {
+      await this.handleGetHealth(res);
+    } else if (path === '/admin/api/health/check-all' && req.method === 'POST') {
+      await this.handleHealthCheckAll(res);
+    } else if (path === '/admin/api/health/reset' && req.method === 'POST') {
+      await this.handleHealthReset(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -1774,6 +1785,59 @@ $form.Dispose()
     return providers;
   }
 
+  async handleGetHealth(res) {
+    try {
+      if (!this.healthMonitor) {
+        this.sendError(res, 503, 'Health monitor not initialized');
+        return;
+      }
+      const summary = this.healthMonitor.getSummary();
+      const statuses = this.healthMonitor.getAllStatuses();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ summary, providers: statuses }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to get health: ' + error.message);
+    }
+  }
+
+  async handleHealthCheckAll(res) {
+    try {
+      if (!this.healthMonitor) {
+        this.sendError(res, 503, 'Health monitor not initialized');
+        return;
+      }
+      await this.healthMonitor.checkAll();
+      const summary = this.healthMonitor.getSummary();
+      const statuses = this.healthMonitor.getAllStatuses();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ summary, providers: statuses }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to check health: ' + error.message);
+    }
+  }
+
+  async handleHealthReset(res, body) {
+    try {
+      const { provider } = JSON.parse(body || '{}');
+      if (!provider) {
+        this.sendError(res, 400, 'Missing provider name');
+        return;
+      }
+      if (this.historyManager) {
+        this.historyManager.resetProvider(provider);
+      }
+      // Refresh status
+      if (this.healthMonitor) {
+        this.healthMonitor.statusCache.delete(provider);
+        this.healthMonitor.checkProvider(provider);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to reset provider: ' + error.message);
+    }
+  }
+
   async handleFsList(res, queryPath) {
     try {
       let targetPath = queryPath;
@@ -2112,6 +2176,7 @@ $form.Dispose()
   stop() {
     this.flushLogs(true); // Sync write before shutdown
     if (this.historyManager) this.historyManager.flushSync(); // Persist history before shutdown
+    if (this.healthMonitor) this.healthMonitor.stop();
     if (this.telegramBot) this.telegramBot.stop();
     if (this.server) {
       this.server.close();

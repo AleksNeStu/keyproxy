@@ -1,71 +1,146 @@
 /**
- * Health Check Engine for KeyProxy
- * Periodically verifies API keys and marks them as healthy/unhealthy
+ * Health Monitor for KeyProxy
+ * Aggregates provider status from config, usage stats, history, and logs.
  */
-class HealthCheck {
-  constructor(config) {
-    this.config = config;
-    this.healthRegistry = new Map(); // Map of key -> { status, lastChecked, error }
-    this.checkInterval = 1000 * 60 * 30; // 30 minutes
+class HealthMonitor {
+  constructor(server) {
+    this.server = server;
     this.timer = null;
+    this.intervalMs = 5 * 60 * 1000; // 5 minutes
+    this.statusCache = new Map();
+    this.lastFullCheck = null;
   }
 
-  /**
-   * Starts the background health check cycle
-   */
-  start() {
-    console.log('[HEALTH] Starting periodic health check engine');
-    this.runFullCheck();
-    this.timer = setInterval(() => this.runFullCheck(), this.checkInterval);
+  start(intervalMs) {
+    if (intervalMs) this.intervalMs = intervalMs;
+    console.log(`[HEALTH] Monitor started (interval: ${this.intervalMs / 1000}s)`);
+    this.checkAll();
+    this.timer = setInterval(() => this.checkAll(), this.intervalMs);
   }
 
   stop() {
-    if (this.timer) clearInterval(this.timer);
+    if (this.timer) {
+      clearInterval(this.timer);
+      this.timer = null;
+    }
   }
 
-  /**
-   * Runs a health check for every key in every provider
-   */
-  async runFullCheck() {
-    const providers = this.config.getProviders();
-    console.log(`[HEALTH] Commencing full health check for ${providers.size} providers...`);
+  async checkAll() {
+    const providers = this.server.config.providers;
+    for (const [name] of providers.entries()) {
+      this.checkProvider(name);
+    }
+    this.lastFullCheck = new Date().toISOString();
+    console.log(`[HEALTH] Full check completed for ${providers.size} providers`);
+  }
 
-    for (const [providerName, providerConfig] of providers.entries()) {
-      for (const key of providerConfig.keys) {
-        await this.checkKey(providerName, providerConfig, key);
+  checkProvider(providerName) {
+    const config = this.server.config.getProvider(providerName);
+    if (!config) return null;
+
+    const client = this.server.providerClients.get(providerName);
+    const status = {
+      name: providerName,
+      apiType: config.apiType,
+      baseUrl: config.baseUrl,
+      disabled: config.disabled || false,
+      totalKeys: config.allKeys ? config.allKeys.length : config.keys.length,
+      enabledKeys: config.keys.length,
+      disabledKeys: (config.allKeys ? config.allKeys.length : config.keys.length) - config.keys.length,
+      lastCheckTime: new Date().toISOString(),
+      lastError: null,
+      totalRequests: 0,
+      avgResponseTime: 0,
+      failedRequests: 0,
+      status: 'unknown'
+    };
+
+    // Determine status from config
+    if (config.disabled) {
+      status.status = 'disabled';
+    } else if (config.keys.length === 0) {
+      status.status = 'failed';
+      status.lastError = 'No enabled keys';
+    }
+
+    // Aggregate from keyRotator usage stats
+    if (client && client.keyRotator) {
+      const usageStats = client.keyRotator.getKeyUsageStats(providerName);
+      let exhaustedCount = 0;
+      let freshCount = 0;
+      let activeCount = 0;
+
+      for (const stat of usageStats) {
+        status.totalRequests += stat.usageCount;
+        if (stat.status === 'exhausted') exhaustedCount++;
+        else if (stat.status === 'active') activeCount++;
+        else if (stat.status === 'fresh') freshCount++;
+      }
+
+      status.exhaustedKeys = exhaustedCount;
+      status.freshKeys = freshCount;
+      status.activeKeys = activeCount;
+
+      if (status.status !== 'disabled' && status.enabledKeys > 0) {
+        if (exhaustedCount >= status.enabledKeys) {
+          status.status = 'failed';
+          status.lastError = 'All keys exhausted';
+        } else if (exhaustedCount > 0) {
+          status.status = 'degraded';
+        } else {
+          status.status = 'active';
+        }
       }
     }
-    console.log('[HEALTH] Full check cycle completed');
-  }
 
-  /**
-   * Check a single key's health
-   */
-  async checkKey(providerName, providerConfig, key) {
-    const maskedKey = key.substring(0, 4) + '...' + key.substring(key.length - 4);
-    
-    // For now, we'll implement a simple validation check
-    // In the future, we can add provider-specific probe logic
-    try {
-      // Logic for validation goes here (e.g. GET /v1/models)
-      this.healthRegistry.set(key, { status: 'healthy', lastChecked: new Date(), error: null });
-    } catch (error) {
-      console.warn(`[HEALTH::${providerName}] Key ${maskedKey} is UNHEALTHY: ${error.message}`);
-      this.healthRegistry.set(key, { status: 'unhealthy', lastChecked: new Date(), error: error.message });
+    // Aggregate from log buffer
+    const providerLogs = this.server.logBuffer.filter(l => l.provider === providerName);
+    if (providerLogs.length > 0) {
+      const recent = providerLogs.slice(-50);
+      const totalTime = recent.reduce((sum, l) => sum + (l.responseTime || 0), 0);
+      status.avgResponseTime = Math.round(totalTime / recent.length);
+      status.failedRequests = recent.filter(l => l.statusCode >= 400).length;
+      status.lastRequestTime = recent[recent.length - 1]?.timestamp || null;
+
+      // Last error from logs
+      const errorLog = [...recent].reverse().find(l => l.statusCode >= 400);
+      if (errorLog) {
+        status.lastError = `HTTP ${errorLog.statusCode}`;
+      }
     }
+
+    this.statusCache.set(providerName, status);
+    return status;
   }
 
-  isKeyHealthy(key) {
-    if (!this.healthRegistry.has(key)) return true; // Assume healthy if not checked yet
-    return this.healthRegistry.get(key).status === 'healthy';
+  getProviderStatus(providerName) {
+    if (this.statusCache.has(providerName)) {
+      return this.statusCache.get(providerName);
+    }
+    return this.checkProvider(providerName);
   }
 
-  getRegistry() {
-    return Array.from(this.healthRegistry.entries()).map(([key, data]) => ({
-      key: key.substring(0, 4) + '...' + key.substring(key.length - 4),
-      ...data
-    }));
+  getAllStatuses() {
+    const providers = this.server.config.providers;
+    for (const [name] of providers.entries()) {
+      if (!this.statusCache.has(name)) {
+        this.checkProvider(name);
+      }
+    }
+    return Array.from(this.statusCache.values());
+  }
+
+  getSummary() {
+    const statuses = this.getAllStatuses();
+    return {
+      total: statuses.length,
+      active: statuses.filter(s => s.status === 'active').length,
+      degraded: statuses.filter(s => s.status === 'degraded').length,
+      failed: statuses.filter(s => s.status === 'failed').length,
+      disabled: statuses.filter(s => s.status === 'disabled').length,
+      lastFullCheck: this.lastFullCheck
+    };
   }
 }
 
-module.exports = HealthCheck;
+module.exports = HealthMonitor;

@@ -546,6 +546,16 @@
                             </svg>
                             <span class="text-sm">API Logs</span>
                         </button>
+                        <button
+                            onclick="showTab('management')"
+                            class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
+                            data-tab="management"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                            </svg>
+                            <span class="text-sm">Management</span>
+                        </button>
                     </nav>
                     
                     <!-- Header Notifications Area (placeholder for positioning) -->
@@ -784,6 +794,70 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Management Tab -->
+            <div id="management" class="tab-content hidden">
+                <div class="section-header">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-semibold text-foreground">Provider Management</h2>
+                            <p class="text-muted-foreground text-xs mt-1">Health monitoring and key status overview</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="refreshHealth()" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                Refresh
+                            </button>
+                            <button onclick="checkAllHealth()" class="btn btn-primary px-3 py-1.5 text-xs font-medium">Check All</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div id="healthSummary" class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div class="border border-border rounded p-3 bg-muted/30 text-center">
+                        <div class="text-2xl font-bold text-foreground" id="healthTotal">-</div>
+                        <div class="text-xs text-muted-foreground">Total</div>
+                    </div>
+                    <div class="border border-green-500/30 rounded p-3 bg-green-500/5 text-center">
+                        <div class="text-2xl font-bold text-green-400" id="healthActive">-</div>
+                        <div class="text-xs text-green-400/80">Active</div>
+                    </div>
+                    <div class="border border-amber-500/30 rounded p-3 bg-amber-500/5 text-center">
+                        <div class="text-2xl font-bold text-amber-400" id="healthDegraded">-</div>
+                        <div class="text-xs text-amber-400/80">Degraded</div>
+                    </div>
+                    <div class="border border-red-500/30 rounded p-3 bg-red-500/5 text-center">
+                        <div class="text-2xl font-bold text-red-400" id="healthFailed">-</div>
+                        <div class="text-xs text-red-400/80">Failed</div>
+                    </div>
+                </div>
+
+                <!-- Provider Table -->
+                <div class="section">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                                    <th class="pb-2 pr-3">Provider</th>
+                                    <th class="pb-2 pr-3">Status</th>
+                                    <th class="pb-2 pr-3">Type</th>
+                                    <th class="pb-2 pr-3">Keys</th>
+                                    <th class="pb-2 pr-3">Requests</th>
+                                    <th class="pb-2 pr-3">Avg RT</th>
+                                    <th class="pb-2 pr-3">Last Error</th>
+                                    <th class="pb-2">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="healthTableBody">
+                                <tr><td colspan="8" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <p class="text-xs text-muted-foreground mt-2">Auto-refreshes every 30 seconds when tab is visible. <span id="healthLastCheck"></span></p>
+            </div>
+
         </main>
 
         <!-- Footer -->
@@ -3988,8 +4062,107 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             if (tabName === 'logs') {
                 refreshLogs();
             }
+            // Load health data if management tab is selected
+            if (tabName === 'management') {
+                refreshHealth();
+            }
         }
         
+        // Health monitoring
+        let healthRefreshTimer = null;
+
+        async function refreshHealth() {
+            try {
+                const res = await fetch('/admin/api/health');
+                if (!res.ok) return;
+                const data = await res.json();
+                renderHealthSummary(data.summary);
+                renderHealthTable(data.providers);
+                if (data.summary.lastFullCheck) {
+                    document.getElementById('healthLastCheck').textContent = `Last check: ${new Date(data.summary.lastFullCheck).toLocaleTimeString()}`;
+                }
+            } catch (err) {
+                console.error('Failed to load health:', err);
+            }
+        }
+
+        async function checkAllHealth() {
+            try {
+                const res = await fetch('/admin/api/health/check-all', { method: 'POST' });
+                if (res.ok) {
+                    const data = await res.json();
+                    renderHealthSummary(data.summary);
+                    renderHealthTable(data.providers);
+                }
+            } catch (err) {
+                console.error('Failed to check health:', err);
+            }
+        }
+
+        async function resetProviderHealth(provider) {
+            try {
+                const res = await fetch('/admin/api/health/reset', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ provider })
+                });
+                if (res.ok) refreshHealth();
+            } catch (err) {
+                console.error('Failed to reset:', err);
+            }
+        }
+
+        function renderHealthSummary(summary) {
+            if (!summary) return;
+            document.getElementById('healthTotal').textContent = summary.total;
+            document.getElementById('healthActive').textContent = summary.active;
+            document.getElementById('healthDegraded').textContent = summary.degraded;
+            document.getElementById('healthFailed').textContent = summary.failed + summary.disabled;
+        }
+
+        function renderHealthTable(providers) {
+            const tbody = document.getElementById('healthTableBody');
+            if (!tbody || !providers) return;
+            tbody.innerHTML = '';
+
+            const statusBadge = (status) => {
+                const colors = {
+                    active: 'bg-green-500/20 text-green-400 border-green-500/30',
+                    degraded: 'bg-amber-500/20 text-amber-400 border-amber-500/30',
+                    failed: 'bg-red-500/20 text-red-400 border-red-500/30',
+                    disabled: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
+                    unknown: 'bg-gray-500/20 text-gray-400 border-gray-500/30'
+                };
+                return `<span class="px-2 py-0.5 rounded text-xs border ${colors[status] || colors.unknown}">${status}</span>`;
+            };
+
+            providers.forEach(p => {
+                const row = document.createElement('tr');
+                row.className = 'border-b border-border/50 hover:bg-muted/30';
+                row.innerHTML = `
+                    <td class="py-2 pr-3 font-medium text-foreground">${p.name}</td>
+                    <td class="py-2 pr-3">${statusBadge(p.status)}</td>
+                    <td class="py-2 pr-3 text-xs text-muted-foreground">${p.apiType}</td>
+                    <td class="py-2 pr-3 text-xs"><span class="text-green-400">${p.enabledKeys}</span>/<span class="text-muted-foreground">${p.totalKeys}</span>${p.exhaustedKeys ? ` <span class="text-red-400">(-${p.exhaustedKeys})</span>` : ''}</td>
+                    <td class="py-2 pr-3 text-xs text-muted-foreground">${p.totalRequests}</td>
+                    <td class="py-2 pr-3 text-xs text-muted-foreground">${p.avgResponseTime ? p.avgResponseTime + 'ms' : '-'}</td>
+                    <td class="py-2 pr-3 text-xs text-red-400">${p.lastError || '-'}</td>
+                    <td class="py-2 text-xs">
+                        <button onclick="resetProviderHealth('${p.name}')" class="text-muted-foreground hover:text-foreground" title="Reset key history">Reset</button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // Auto-refresh health tab every 30s
+        setInterval(() => {
+            const mgmtTab = document.getElementById('management');
+            if (mgmtTab && !mgmtTab.classList.contains('hidden')) {
+                refreshHealth();
+            }
+        }, 30000);
+
         // Utility functions
         function showError(elementId, message) {
             const errorDiv = document.getElementById(elementId);
