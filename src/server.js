@@ -1016,6 +1016,8 @@ class ProxyServer {
       await this.handleGetKeyHistory(res, path.split('/').pop());
     } else if (path.startsWith('/admin/api/key-history/reset/') && req.method === 'POST') {
       await this.handleResetKeyHistory(res, path.split('/').pop());
+    } else if (path === '/admin/api/key-test' && req.method === 'POST') {
+      await this.handleTestKeyRecovery(res, body);
     } else if (path === '/admin/api/toggle-key' && req.method === 'POST') {
       await this.handleToggleKey(res, body);
     } else if (path === '/admin/api/toggle-provider' && req.method === 'POST') {
@@ -1821,6 +1823,50 @@ $form.Dispose()
   }
 
   /**
+   * Manual key test with recovery counter reset.
+   * Body: { providerName: string, fullKey: string }
+   * Tests the key, and if successful, resets recovery attempts and marks as active.
+   */
+  async handleTestKeyRecovery(res, body) {
+    try {
+      const { providerName, fullKey } = JSON.parse(body);
+      if (!providerName || !fullKey) {
+        this.sendError(res, 400, 'Missing providerName or fullKey');
+        return;
+      }
+
+      const providerConfig = this.config.getProvider(providerName);
+      if (!providerConfig) {
+        this.sendError(res, 404, 'Provider not found');
+        return;
+      }
+
+      // Reset recovery attempts so auto-recovery can resume if this fails
+      this.historyManager.resetRecoveryAttempts(providerName, fullKey);
+
+      const masked = fullKey.substring(0, 4) + '...' + fullKey.substring(fullKey.length - 4);
+      console.log(`[RECOVERY] Manual test requested for key ${masked} on '${providerName}'`);
+
+      const result = await this.healthMonitor.probeKey(providerName, providerConfig, fullKey);
+
+      if (result.success) {
+        this.historyManager.recoverKey(providerName, fullKey);
+        console.log(`[RECOVERY] Manual test succeeded for key ${masked} — recovered`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: true, recovered: true, message: 'Key is healthy and recovered' }));
+      } else {
+        // Re-record exhaustion with fresh counter
+        this.historyManager.recordKeyExhausted(providerName, fullKey, 'manual-test-failed');
+        console.log(`[RECOVERY] Manual test failed for key ${masked}: ${result.error}`);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ success: false, recovered: false, error: result.error }));
+      }
+    } catch (error) {
+      this.sendError(res, 500, 'Key test failed: ' + error.message);
+    }
+  }
+
+  /**
    * Toggle a key's disabled state
    * Body: { apiType: string, providerName: string, keyIndex: number, disabled: boolean }
    */
@@ -2086,24 +2132,35 @@ $form.Dispose()
       for (const [name, config] of providers.entries()) {
         if (config.disabled) continue;
         const allKeys = config.allKeys ? config.allKeys.map(k => k.key) : config.keys;
-        const exhausted = this.historyManager.getExhaustedKeys(
-          name,
-          this.healthMonitor.recoveryCooldownMs,
-          allKeys
-        );
+        // Get all exhausted keys regardless of cooldown (use 0) and without max filter
+        const exhausted = this.historyManager.getExhaustedKeys(name, 0, allKeys, 0);
         if (exhausted.length > 0) {
-          recoveryStatus[name] = exhausted.map(e => ({
-            hash: e.hash,
-            rotatedOutAt: e.rotatedOutAt,
-            rotationReason: e.rotationReason,
-            cooldownSec: Math.round(this.healthMonitor.recoveryCooldownMs / 1000)
-          }));
+          const maxAttempts = this.healthMonitor.maxRecoveryAttempts;
+          recoveryStatus[name] = exhausted.map(e => {
+            const attempts = e.recoveryAttempts || 0;
+            const baseSec = Math.round(this.healthMonitor.backoffBaseMs / 1000);
+            const nextBackoffSec = Math.min(baseSec * Math.pow(2, attempts), this.healthMonitor.backoffMaxMs / 1000);
+            const elapsed = Date.now() - new Date(e.rotatedOutAt).getTime();
+            const nextProbeInSec = Math.max(0, Math.round(nextBackoffSec - elapsed / 1000));
+            return {
+              hash: e.hash,
+              fullKey: e.fullKey,
+              rotatedOutAt: e.rotatedOutAt,
+              rotationReason: e.rotationReason,
+              recoveryAttempts: attempts,
+              maxRecoveryAttempts: maxAttempts,
+              permanentlyExhausted: attempts >= maxAttempts,
+              nextProbeInSec: attempts >= maxAttempts ? null : nextProbeInSec
+            };
+          });
         }
       }
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         enabled: this.healthMonitor.recoveryEnabled,
-        cooldownSec: Math.round(this.healthMonitor.recoveryCooldownMs / 1000),
+        baseCooldownSec: Math.round(this.healthMonitor.backoffBaseMs / 1000),
+        maxRecoveryAttempts: this.healthMonitor.maxRecoveryAttempts,
+        backoffMaxSec: Math.round(this.healthMonitor.backoffMaxMs / 1000),
         providers: recoveryStatus
       }));
     } catch (error) {

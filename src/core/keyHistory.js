@@ -88,7 +88,9 @@ class KeyHistoryManager {
         lastUsed: null,
         rotatedOutAt: null,
         rotationReason: null,
-        rotationCount: 0
+        rotationCount: 0,
+        recoveryAttempts: 0,
+        lastRecoveryAttempt: null
       };
     }
     return provider.keys[hash];
@@ -113,10 +115,15 @@ class KeyHistoryManager {
   recordKeyExhausted(providerName, fullKey, statusCode) {
     const hash = this.hashKey(fullKey);
     const entry = this._ensureKeyEntry(providerName, hash);
+    const wasRecovery = entry.status === 'exhausted' && entry.lastRecoveryAttempt;
     entry.status = 'exhausted';
     entry.rotatedOutAt = new Date().toISOString();
     entry.rotationReason = String(statusCode);
     entry.rotationCount = (entry.rotationCount || 0) + 1;
+    if (wasRecovery) {
+      entry.recoveryAttempts = (entry.recoveryAttempts || 0) + 1;
+      entry.lastRecoveryAttempt = new Date().toISOString();
+    }
     this._scheduleSave();
   }
 
@@ -205,7 +212,7 @@ class KeyHistoryManager {
    * @param {number} cooldownMs - minimum time since exhaustion in milliseconds
    * @param {string[]} [allFullKeys] - optional: full keys to resolve hashes back
    */
-  getExhaustedKeys(providerName, cooldownMs, allFullKeys = []) {
+  getExhaustedKeys(providerName, cooldownMs, allFullKeys = [], maxRecoveryAttempts = 0) {
     const provider = this.data.providers[providerName];
     if (!provider) return [];
 
@@ -218,6 +225,8 @@ class KeyHistoryManager {
     const result = [];
     for (const [hash, entry] of Object.entries(provider.keys)) {
       if (entry.status !== 'exhausted' || !entry.rotatedOutAt) continue;
+      // Skip keys that exceeded max recovery attempts (0 = no limit)
+      if (maxRecoveryAttempts > 0 && (entry.recoveryAttempts || 0) >= maxRecoveryAttempts) continue;
       const elapsed = now - new Date(entry.rotatedOutAt).getTime();
       if (elapsed >= cooldownMs) {
         result.push({
@@ -225,7 +234,8 @@ class KeyHistoryManager {
           fullKey: hashToKey.get(hash) || null,
           rotatedOutAt: entry.rotatedOutAt,
           rotationReason: entry.rotationReason,
-          rotationCount: entry.rotationCount || 0
+          rotationCount: entry.rotationCount || 0,
+          recoveryAttempts: entry.recoveryAttempts || 0
         });
       }
     }
@@ -246,6 +256,23 @@ class KeyHistoryManager {
     entry.rotatedOutAt = null;
     entry.rotationReason = null;
     entry.lastUsed = new Date().toISOString();
+    entry.recoveryAttempts = 0;
+    entry.lastRecoveryAttempt = null;
+    this._scheduleSave();
+    return true;
+  }
+
+  /**
+   * Reset recovery attempts for a key (for manual test/reset from UI).
+   * Returns true if the key was found and reset.
+   */
+  resetRecoveryAttempts(providerName, fullKey) {
+    const hash = this.hashKey(fullKey);
+    const provider = this.data.providers[providerName];
+    if (!provider || !provider.keys[hash]) return false;
+    const entry = provider.keys[hash];
+    entry.recoveryAttempts = 0;
+    entry.lastRecoveryAttempt = null;
     this._scheduleSave();
     return true;
   }

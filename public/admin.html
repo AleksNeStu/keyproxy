@@ -2405,12 +2405,10 @@
                                         <!-- Usage count + rotation count + RPM -->
                                         <span class="text-xs text-muted-foreground whitespace-nowrap" title="Times used${rotationCount > 0 ? ' / Rotations: ' + rotationCount : ''}">${usageDisplay} uses${rotationCount > 0 ? ' / ' + rotationCount + ' rot' : ''}</span>
                                         <span class="rpm-badge text-xs px-1.5 py-0.5 rounded" data-key="${maskedKey}" data-provider="${provider.apiType}" title="Requests per minute">--rpm</span>
-                                        <button
-                                            onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})"
-                                            class="btn btn-secondary px-2 py-1 text-xs font-medium"
-                                        >
-                                            Test
-                                        </button>
+                                        ${keyStatus === 'exhausted'
+                                            ? `<button onclick="testAndRecoverKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">Test & Reset</button>`
+                                            : `<button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
+                                        }
                                         <button
                                             onclick="showDeleteKeyConfirmation('${provider.apiType}', '${provider.name}', ${keyIndex})"
                                             class="btn btn-destructive px-2 py-1 text-xs font-medium"
@@ -3570,23 +3568,23 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             // Get provider's base URL
             const baseUrlVar = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_BASE_URL`;
             const baseUrl = envVars[baseUrlVar] || null;
-            
+
             const maskedKey = apiKey.length > 16 ? apiKey.substring(0, 8) + '...' + apiKey.slice(-4) : apiKey;
             showInfoToast(`Testing API key ${maskedKey}...`);
-            
+
             try {
                 const response = await fetch('/admin/api/test', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        apiType: apiType, 
+                    body: JSON.stringify({
+                        apiType: apiType,
                         apiKey: apiKey,
                         baseUrl: baseUrl
                     })
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
                     showSuccessToast(`API key ${maskedKey} is valid!`);
                 } else {
@@ -3594,6 +3592,30 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 }
             } catch (error) {
                 showErrorToast(`API key test failed: ${error.message}`);
+            }
+        }
+
+        async function testAndRecoverKey(providerName, fullKey) {
+            const maskedKey = fullKey.length > 16 ? fullKey.substring(0, 8) + '...' + fullKey.slice(-4) : fullKey;
+            showInfoToast(`Testing & resetting recovery for ${maskedKey}...`);
+
+            try {
+                const response = await fetch('/admin/api/key-test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ providerName, fullKey })
+                });
+
+                const result = await response.json();
+
+                if (result.recovered) {
+                    showSuccessToast(`Key ${maskedKey} recovered successfully! Recovery counter reset.`);
+                    loadProviders();
+                } else {
+                    showErrorToast(`Key ${maskedKey} still failing: ${result.error}. Counter reset — will retry with fresh backoff.`);
+                }
+            } catch (error) {
+                showErrorToast(`Key test failed: ${error.message}`);
             }
         }
         

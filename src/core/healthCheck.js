@@ -10,7 +10,10 @@ class HealthMonitor {
     this.statusCache = new Map();
     this.lastFullCheck = null;
     this.recoveryEnabled = true;
-    this.recoveryCooldownMs = 5 * 60 * 1000; // 5 minutes default
+    this.recoveryCooldownMs = 5 * 60 * 1000; // 5 minutes base cooldown
+    this.maxRecoveryAttempts = 5; // Stop auto-probing after this many failed recoveries
+    this.backoffBaseMs = 5 * 60 * 1000; // Base cooldown for exponential backoff
+    this.backoffMaxMs = 60 * 60 * 1000; // Cap at 1 hour
   }
 
   start(intervalMs) {
@@ -21,8 +24,11 @@ class HealthMonitor {
     this.recoveryEnabled = envVars.KEYPROXY_RECOVERY_ENABLED !== 'false';
     const cooldownSec = parseInt(envVars.KEYPROXY_RECOVERY_COOLDOWN_SEC) || 300;
     this.recoveryCooldownMs = cooldownSec * 1000;
+    this.backoffBaseMs = this.recoveryCooldownMs;
+    this.maxRecoveryAttempts = parseInt(envVars.KEYPROXY_RECOVERY_MAX_ATTEMPTS) || 5;
+    this.backoffMaxMs = (parseInt(envVars.KEYPROXY_RECOVERY_BACKOFF_MAX_SEC) || 3600) * 1000;
 
-    console.log(`[HEALTH] Monitor started (interval: ${this.intervalMs / 1000}s, recovery: ${this.recoveryEnabled ? cooldownSec + 's cooldown' : 'disabled'})`);
+    console.log(`[HEALTH] Monitor started (interval: ${this.intervalMs / 1000}s, recovery: ${this.recoveryEnabled ? cooldownSec + 's base cooldown, max ' + this.maxRecoveryAttempts + ' attempts, backoff cap ' + (this.backoffMaxMs / 1000) + 's' : 'disabled'})`);
     this.checkAll();
     this.timer = setInterval(() => this.checkAll(), this.intervalMs);
   }
@@ -138,29 +144,52 @@ class HealthMonitor {
         ? providerConfig.allKeys.map(k => k.key)
         : providerConfig.keys;
 
-      const exhausted = historyManager.getExhaustedKeys(
+      // Get all exhausted keys including those past max attempts (for logging)
+      const allExhausted = historyManager.getExhaustedKeys(
         providerName,
-        this.recoveryCooldownMs,
-        allKeys
+        0, // no minimum cooldown for listing
+        allKeys,
+        0  // no max attempt filter
       );
 
-      for (const entry of exhausted) {
+      for (const entry of allExhausted) {
         if (!entry.fullKey) continue;
         const masked = entry.fullKey.substring(0, 4) + '...' + entry.fullKey.substring(entry.fullKey.length - 4);
-        console.log(`[RECOVERY] Probing exhausted key ${masked} for provider '${providerName}' (exhausted ${Math.round((Date.now() - new Date(entry.rotatedOutAt).getTime()) / 1000)}s ago)`);
+        const attempts = entry.recoveryAttempts || 0;
+
+        // Skip keys that exceeded max recovery attempts
+        if (attempts >= this.maxRecoveryAttempts) {
+          continue;
+        }
+
+        // Exponential backoff: base * 2^attempts, capped at max
+        const backoffMs = Math.min(this.backoffBaseMs * Math.pow(2, attempts), this.backoffMaxMs);
+        const elapsed = Date.now() - new Date(entry.rotatedOutAt).getTime();
+
+        if (elapsed < backoffMs) {
+          continue; // Not yet time to probe this key
+        }
+
+        console.log(`[RECOVERY] Probing exhausted key ${masked} for '${providerName}' (attempt ${attempts + 1}/${this.maxRecoveryAttempts}, backoff ${Math.round(backoffMs / 1000)}s, exhausted ${Math.round(elapsed / 1000)}s ago)`);
 
         const result = await this.probeKey(providerName, providerConfig, entry.fullKey);
         if (result.success) {
           historyManager.recoverKey(providerName, entry.fullKey);
-          console.log(`[RECOVERY] Key ${masked} recovered for provider '${providerName}'`);
+          console.log(`[RECOVERY] Key ${masked} recovered for '${providerName}' after ${attempts} failed attempts`);
 
           if (this.server.notifier) {
-            this.server.notifier.send(`Key ${masked} recovered for '${providerName}' after cooldown`, 'recovery');
+            this.server.notifier.send(`Key ${masked} recovered for '${providerName}' after ${attempts} failed attempts`, 'recovery');
           }
         } else {
-          // Reset the cooldown by updating rotatedOutAt to now
+          // Re-record exhaustion — this increments recoveryAttempts via the wasRecovery logic
           historyManager.recordKeyExhausted(providerName, entry.fullKey, entry.rotationReason || 'still-failing');
-          console.log(`[RECOVERY] Key ${masked} still exhausted for '${providerName}': ${result.error}`);
+          const newAttempts = attempts + 1;
+          const nextBackoff = Math.min(this.backoffBaseMs * Math.pow(2, newAttempts), this.backoffMaxMs);
+          console.log(`[RECOVERY] Key ${masked} still exhausted for '${providerName}' (attempt ${newAttempts}/${this.maxRecoveryAttempts}, next probe in ${Math.round(nextBackoff / 1000)}s): ${result.error}`);
+
+          if (newAttempts >= this.maxRecoveryAttempts && this.server.notifier) {
+            this.server.notifier.send(`Key ${masked} for '${providerName}' reached max recovery attempts (${this.maxRecoveryAttempts}). Manual test required.`, 'recovery');
+          }
         }
       }
     }
