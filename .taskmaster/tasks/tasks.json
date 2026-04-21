@@ -215,7 +215,7 @@
         "id": "17",
         "title": "Budget and quota per key with auto-disable",
         "priority": "medium",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "16"
         ],
@@ -223,7 +223,7 @@
         "details": "Files: src/core/budgetTracker.js (new), src/server.js (budget check middleware + routes), public/admin.html (budget settings per key). Config: KEYPROXY_DEFAULT_DAILY_BUDGET, KEYPROXY_DEFAULT_MONTHLY_BUDGET.",
         "testStrategy": "Set /usr/bin/bash.01 budget, make requests until key disables, verify notification sent",
         "subtasks": [],
-        "updatedAt": "2026-04-21T14:29:54.257Z"
+        "updatedAt": "2026-04-21T14:53:27.013Z"
       },
       {
         "id": "18",
@@ -266,9 +266,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:49:00.948Z",
+      "lastModified": "2026-04-21T14:53:27.013Z",
       "taskCount": 20,
-      "completedCount": 18,
+      "completedCount": 19,
       "tags": [
         "master"
       ]

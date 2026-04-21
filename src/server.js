@@ -12,6 +12,7 @@ const ConfigExporter = require('./core/configExporter');
 const { SlidingWindowCounter } = require('./core/rateTracker');
 const ResponseCache = require('./core/cache');
 const VirtualKeyManager = require('./core/virtualKeys');
+const BudgetTracker = require('./core/budgetTracker');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -76,6 +77,9 @@ class ProxyServer {
 
     // Virtual API key manager
     this.virtualKeyManager = new VirtualKeyManager();
+
+    // Budget tracker
+    this.budgetTracker = new BudgetTracker();
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
@@ -426,6 +430,7 @@ class ProxyServer {
               requestBody: body, responseBody: streamedData, apiKey: keyInfo?.actualKey, apiType
             });
             if (keyInfo?.actualKey) this.rpmTracker.record(keyInfo.actualKey);
+            this._recordBudgetSpend(keyInfo?.actualKey, body, responseBody, apiType);
           }
           console.log(`[REQ-${requestId}] Streaming response completed`);
         });
@@ -460,6 +465,7 @@ class ProxyServer {
             requestBody: body, responseBody: response.data, apiKey: keyInfo?.actualKey, apiType
           });
           if (keyInfo?.actualKey) this.rpmTracker.record(keyInfo.actualKey);
+          this._recordBudgetSpend(keyInfo?.actualKey, body, response.data, apiType);
         }
 
         // Notify on all keys exhausted
@@ -564,6 +570,20 @@ class ProxyServer {
       return apiKey;
     }
     return null;
+  }
+
+  _recordBudgetSpend(apiKey, requestBody, responseBody, apiType) {
+    if (!apiKey) return;
+    const { estimateTokens, extractModel, estimateCost } = require('./core/pricing');
+    const model = extractModel(requestBody, null);
+    const inputTokens = estimateTokens(requestBody);
+    const outputTokens = estimateTokens(responseBody);
+    const cost = estimateCost(apiType, model, inputTokens, outputTokens);
+    if (cost.totalCost > 0) {
+      const crypto = require('crypto');
+      const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').substring(0, 16);
+      this.budgetTracker.recordSpend(keyHash, cost.totalCost);
+    }
   }
 
   parseRoute(url) {
@@ -1072,6 +1092,10 @@ class ProxyServer {
       await this.handleRevokeVirtualKey(res, path);
     } else if (path.startsWith('/admin/api/virtual-keys/') && req.method === 'POST') {
       await this.handleToggleVirtualKey(res, path);
+    } else if (path === '/admin/api/budgets' && req.method === 'GET') {
+      await this.handleGetBudgets(res);
+    } else if (path === '/admin/api/budgets' && req.method === 'POST') {
+      await this.handleSetBudget(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -2387,6 +2411,31 @@ $form.Dispose()
       res.end(JSON.stringify({ success: toggled }));
     } catch (error) {
       this.sendError(res, 500, 'Virtual key toggle failed: ' + error.message);
+    }
+  }
+
+  async handleGetBudgets(res) {
+    try {
+      const statuses = this.budgetTracker.getAllStatuses();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(statuses));
+    } catch (error) {
+      this.sendError(res, 500, 'Budget query failed: ' + error.message);
+    }
+  }
+
+  async handleSetBudget(res, body) {
+    try {
+      const { keyHash, dailyLimit, monthlyLimit } = JSON.parse(body || '{}');
+      if (!keyHash) {
+        this.sendError(res, 400, 'keyHash required');
+        return;
+      }
+      this.budgetTracker.setBudget(keyHash, { dailyLimit: dailyLimit || 0, monthlyLimit: monthlyLimit || 0 });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(this.budgetTracker.getStatus(keyHash)));
+    } catch (error) {
+      this.sendError(res, 500, 'Budget set failed: ' + error.message);
     }
   }
 
