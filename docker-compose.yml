@@ -1,0 +1,20 @@
+services:
+  keyproxy:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: keyproxy
+    ports:
+      - "${PORT:-8990}:8990"
+    volumes:
+      - ./data:/app/data
+      - ./.env:/app/.env:ro
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8990/metrics"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s

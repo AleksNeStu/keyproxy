@@ -191,13 +191,13 @@
         "id": "15",
         "title": "Docker containerization with multi-stage build",
         "priority": "high",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "description": "Multi-stage Node.js 20 Alpine Dockerfile. Docker-compose with volume mounts for data/ and .env. Health check on /metrics. Non-root user. ~50MB image.",
         "details": "Files: Dockerfile (new), docker-compose.yml (new), .dockerignore (new). Docker-compose: volumes for ./data, ./.env. Port 8990. Restart unless-stopped.",
         "testStrategy": "docker compose up, verify admin panel loads, verify /metrics returns data",
         "subtasks": [],
-        "updatedAt": "2026-04-21T14:29:54.257Z"
+        "updatedAt": "2026-04-21T14:31:37.166Z"
       },
       {
         "id": "16",
@@ -266,9 +266,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:29:54.257Z",
+      "lastModified": "2026-04-21T14:31:37.166Z",
       "taskCount": 20,
-      "completedCount": 13,
+      "completedCount": 14,
       "tags": [
         "master"
       ]
