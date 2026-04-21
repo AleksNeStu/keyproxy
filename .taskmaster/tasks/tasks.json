@@ -103,13 +103,13 @@
         "description": "Build a new Analytics tab in the admin panel that tracks request count, estimated token usage, average latency, and cost per key per provider. Persist daily aggregates to data/analytics.json. Include charts: requests over time (line), latency distribution (bar), cost breakdown per provider (pie), top keys by usage (table). Add cost estimation based on built-in provider pricing tables (OpenAI: $5/M tokens GPT-4o, Gemini: $1.25/M tokens, etc). Support date range filtering (7d, 30d, all).",
         "details": "Files: src/core/analytics.js (new — AnalyticsTracker class with persist/aggregate/query methods), src/server.js (4 analytics API routes), public/admin.html (new Analytics tab with charts using Canvas API or lightweight chart lib). Pricing tables in src/core/pricing.js (new). Data: data/analytics.json rotated daily.",
         "testStrategy": "1) Make 50+ requests through proxy, 2) Verify analytics.json has per-key/per-provider data, 3) Verify Analytics tab shows correct charts, 4) Verify cost estimates match expected pricing",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "3"
         ],
         "priority": "high",
         "subtasks": [],
-        "updatedAt": "2026-04-21T10:00:00.000Z"
+        "updatedAt": "2026-04-21T13:51:09.654Z"
       },
       {
         "id": "9",
@@ -178,9 +178,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T13:39:23.690Z",
+      "lastModified": "2026-04-21T13:51:09.654Z",
       "taskCount": 13,
-      "completedCount": 8,
+      "completedCount": 9,
       "tags": [
         "master"
       ]

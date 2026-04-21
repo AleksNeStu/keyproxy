@@ -566,6 +566,16 @@
                             </svg>
                             <span class="text-sm">Management</span>
                         </button>
+                        <button
+                            onclick="showTab('analytics')"
+                            class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
+                            data-tab="analytics"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                            </svg>
+                            <span class="text-sm">Analytics</span>
+                        </button>
                     </nav>
                     
                     <!-- Header Notifications Area (placeholder for positioning) -->
@@ -870,6 +880,103 @@
                     </div>
                 </div>
                 <p class="text-xs text-muted-foreground mt-2">Auto-refreshes every 30 seconds when tab is visible. <span id="healthLastCheck"></span></p>
+            </div>
+
+            <!-- Analytics Tab -->
+            <div id="analytics" class="tab-content hidden">
+                <div class="section-header">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-semibold text-foreground">Usage Analytics</h2>
+                            <p class="text-sm text-muted-foreground">Request tracking, token estimation, and cost breakdown</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <select id="analyticsRange" onchange="loadAnalytics()" class="px-3 py-1.5 bg-background border border-border rounded-md text-sm">
+                                <option value="7d">Last 7 days</option>
+                                <option value="30d">Last 30 days</option>
+                                <option value="all">All time</option>
+                            </select>
+                            <button onclick="loadAnalytics()" class="px-3 py-1.5 bg-secondary text-secondary-foreground rounded-md text-sm hover:bg-secondary/80">Refresh</button>
+                            <button onclick="resetAnalytics()" class="px-3 py-1.5 bg-destructive text-destructive-foreground rounded-md text-sm hover:bg-destructive/80">Reset</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div class="bg-card border border-border rounded-lg p-4">
+                        <div class="text-xs text-muted-foreground uppercase tracking-wide">Total Requests</div>
+                        <div id="analyticsTotalReqs" class="text-2xl font-bold mt-1">0</div>
+                    </div>
+                    <div class="bg-card border border-border rounded-lg p-4">
+                        <div class="text-xs text-muted-foreground uppercase tracking-wide">Avg Latency</div>
+                        <div id="analyticsAvgLatency" class="text-2xl font-bold mt-1">0ms</div>
+                    </div>
+                    <div class="bg-card border border-border rounded-lg p-4">
+                        <div class="text-xs text-muted-foreground uppercase tracking-wide">Est. Cost</div>
+                        <div id="analyticsTotalCost" class="text-2xl font-bold mt-1">$0.00</div>
+                    </div>
+                    <div class="bg-card border border-border rounded-lg p-4">
+                        <div class="text-xs text-muted-foreground uppercase tracking-wide">Error Rate</div>
+                        <div id="analyticsErrorRate" class="text-2xl font-bold mt-1">0%</div>
+                    </div>
+                </div>
+
+                <!-- Charts Row -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <!-- Requests Over Time -->
+                    <div class="bg-card border border-border rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-foreground mb-3">Requests Over Time</h3>
+                        <canvas id="chartRequests" width="500" height="200" class="w-full"></canvas>
+                    </div>
+                    <!-- Cost Per Provider (Pie-like bar) -->
+                    <div class="bg-card border border-border rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-foreground mb-3">Cost Breakdown by Provider</h3>
+                        <canvas id="chartCost" width="500" height="200" class="w-full"></canvas>
+                    </div>
+                </div>
+
+                <!-- Provider Table -->
+                <div class="bg-card border border-border rounded-lg p-4 mb-6">
+                    <h3 class="text-sm font-medium text-foreground mb-3">Per-Provider Breakdown</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="border-b border-border">
+                                <tr>
+                                    <th class="text-left py-2 pr-4">Provider</th>
+                                    <th class="text-right py-2 pr-4">Requests</th>
+                                    <th class="text-right py-2 pr-4">Errors</th>
+                                    <th class="text-right py-2 pr-4">Avg Latency</th>
+                                    <th class="text-right py-2 pr-4">Est. Tokens (In/Out)</th>
+                                    <th class="text-right py-2">Est. Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analyticsProviderTable">
+                                <tr><td colspan="6" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Top Keys Table -->
+                <div class="bg-card border border-border rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-foreground mb-3">Top Keys by Usage</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="border-b border-border">
+                                <tr>
+                                    <th class="text-left py-2 pr-4">Key</th>
+                                    <th class="text-right py-2 pr-4">Requests</th>
+                                    <th class="text-right py-2 pr-4">Errors</th>
+                                    <th class="text-right py-2">Est. Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analyticsKeysTable">
+                                <tr><td colspan="4" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
         </main>
@@ -4218,6 +4325,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             if (tabName === 'management') {
                 refreshHealth();
             }
+            // Load analytics data if analytics tab is selected
+            if (tabName === 'analytics') {
+                loadAnalytics();
+            }
         }
         
         // Health monitoring
@@ -4943,6 +5054,176 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         const i = Math.floor(Math.log(bytes) / Math.log(k));
         return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
     }
+
+    // ─── Analytics ────────────────────────────────────────
+    let analyticsData = null;
+
+    async function loadAnalytics() {
+        const range = document.getElementById('analyticsRange')?.value || '7d';
+        try {
+            const resp = await fetch(`/admin/api/analytics?range=${range}`, { headers: authHeaders() });
+            if (!resp.ok) throw new Error(await resp.text());
+            analyticsData = await resp.json();
+            renderAnalytics(analyticsData);
+        } catch (err) {
+            console.error('Analytics load error:', err);
+        }
+    }
+
+    async function resetAnalytics() {
+        if (!confirm('Reset all analytics data? This cannot be undone.')) return;
+        try {
+            await fetch('/admin/api/analytics/reset', { method: 'POST', headers: authHeaders() });
+            loadAnalytics();
+            showInfoToast('Analytics data reset');
+        } catch (err) {
+            showErrorToast('Reset failed: ' + err.message);
+        }
+    }
+
+    function renderAnalytics(data) {
+        // Summary cards
+        document.getElementById('analyticsTotalReqs').textContent = data.totalRequests.toLocaleString();
+        document.getElementById('analyticsAvgLatency').textContent = data.avgLatencyMs + 'ms';
+        document.getElementById('analyticsTotalCost').textContent = '$' + data.totalCost.toFixed(4);
+        const errRate = data.totalRequests > 0 ? ((data.totalErrors / data.totalRequests) * 100).toFixed(1) : '0';
+        document.getElementById('analyticsErrorRate').textContent = errRate + '%';
+
+        // Provider table
+        const provBody = document.getElementById('analyticsProviderTable');
+        const provEntries = Object.entries(data.providers);
+        if (provEntries.length === 0) {
+            provBody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-muted-foreground">No data yet</td></tr>';
+        } else {
+            provBody.innerHTML = provEntries.map(([name, p]) => {
+                const avgLat = p.requests > 0 ? Math.round(p.latencyMs / p.requests) : 0;
+                const inK = (p.estimatedInputTokens / 1000).toFixed(1);
+                const outK = (p.estimatedOutputTokens / 1000).toFixed(1);
+                return `<tr class="border-b border-border/50">
+                    <td class="py-2 pr-4 font-medium">${esc(name)}</td>
+                    <td class="text-right py-2 pr-4">${p.requests.toLocaleString()}</td>
+                    <td class="text-right py-2 pr-4 ${p.errors > 0 ? 'text-red-500' : ''}">${p.errors}</td>
+                    <td class="text-right py-2 pr-4">${avgLat}ms</td>
+                    <td class="text-right py-2 pr-4">${inK}K / ${outK}K</td>
+                    <td class="text-right py-2">$${p.estimatedCost.toFixed(4)}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        // Top keys table
+        const keysBody = document.getElementById('analyticsKeysTable');
+        if (data.topKeys.length === 0) {
+            keysBody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-muted-foreground">No data yet</td></tr>';
+        } else {
+            keysBody.innerHTML = data.topKeys.map(k => `<tr class="border-b border-border/50">
+                <td class="py-2 pr-4 font-mono text-xs">${esc(k.key)}</td>
+                <td class="text-right py-2 pr-4">${k.requests.toLocaleString()}</td>
+                <td class="text-right py-2 pr-4 ${k.errors > 0 ? 'text-red-500' : ''}">${k.errors}</td>
+                <td class="text-right py-2">$${k.estimatedCost.toFixed(4)}</td>
+            </tr>`).join('');
+        }
+
+        // Draw charts
+        drawRequestsChart(data.dailyRequests);
+        drawCostChart(data.providers);
+    }
+
+    function drawRequestsChart(dailyRequests) {
+        const canvas = document.getElementById('chartRequests');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width = canvas.offsetWidth || 500;
+        const H = canvas.height = canvas.offsetHeight || 200;
+        ctx.clearRect(0, 0, W, H);
+
+        if (!dailyRequests || dailyRequests.length === 0) {
+            ctx.fillStyle = '#888';
+            ctx.font = '13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('No data', W / 2, H / 2);
+            return;
+        }
+
+        const maxVal = Math.max(...dailyRequests.map(d => d.count), 1);
+        const padL = 40, padB = 30, padT = 10, padR = 10;
+        const chartW = W - padL - padR;
+        const chartH = H - padT - padB;
+
+        // Y axis
+        ctx.strokeStyle = '#333';
+        ctx.fillStyle = '#888';
+        ctx.font = '10px sans-serif';
+        ctx.textAlign = 'right';
+        for (let i = 0; i <= 4; i++) {
+            const y = padT + chartH - (chartH * i / 4);
+            ctx.beginPath();
+            ctx.moveTo(padL, y);
+            ctx.lineTo(W - padR, y);
+            ctx.strokeStyle = '#222';
+            ctx.stroke();
+            ctx.fillText(Math.round(maxVal * i / 4), padL - 4, y + 3);
+        }
+
+        // Bars
+        const barW = Math.max(4, chartW / dailyRequests.length - 2);
+        ctx.fillStyle = '#3b82f6';
+        dailyRequests.forEach((d, i) => {
+            const x = padL + (chartW / dailyRequests.length) * i + 1;
+            const barH = (d.count / maxVal) * chartH;
+            ctx.fillRect(x, padT + chartH - barH, barW, barH);
+
+            // Date label
+            if (dailyRequests.length <= 14 || i % Math.ceil(dailyRequests.length / 14) === 0) {
+                ctx.fillStyle = '#888';
+                ctx.font = '9px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(d.date.slice(5), x + barW / 2, H - 5);
+                ctx.fillStyle = '#3b82f6';
+            }
+        });
+    }
+
+    function drawCostChart(providers) {
+        const canvas = document.getElementById('chartCost');
+        if (!canvas) return;
+        const ctx = canvas.getContext('2d');
+        const W = canvas.width = canvas.offsetWidth || 500;
+        const H = canvas.height = canvas.offsetHeight || 200;
+        ctx.clearRect(0, 0, W, H);
+
+        const entries = Object.entries(providers).filter(([, p]) => p.estimatedCost > 0);
+        if (entries.length === 0) {
+            ctx.fillStyle = '#888';
+            ctx.font = '13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('No cost data', W / 2, H / 2);
+            return;
+        }
+
+        const totalCost = entries.reduce((s, [, p]) => s + p.estimatedCost, 0);
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
+        const pad = 20;
+        const chartW = W - pad * 2;
+        const chartH = H - pad * 2;
+
+        // Horizontal bar chart
+        entries.sort((a, b) => b[1].estimatedCost - a[1].estimatedCost);
+        const barH = Math.min(30, (chartH - entries.length * 4) / entries.length);
+
+        entries.forEach(([name, p], i) => {
+            const y = pad + i * (barH + 4);
+            const w = Math.max(2, (p.estimatedCost / totalCost) * chartW * 0.7);
+            ctx.fillStyle = colors[i % colors.length];
+            ctx.fillRect(pad, y, w, barH);
+
+            ctx.fillStyle = '#ccc';
+            ctx.font = '11px sans-serif';
+            ctx.textAlign = 'left';
+            ctx.fillText(`${name}  $${p.estimatedCost.toFixed(4)}`, pad + w + 6, y + barH / 2 + 4);
+        });
+    }
+
+    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 </script>
 <!-- File Browser Modal -->
 <div id="fsBrowserModal" class="fixed inset-0 z-[60] hidden">

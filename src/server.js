@@ -5,6 +5,7 @@ const path = require('path');
 const crypto = require('crypto');
 const Auth = require('./core/auth');
 const MetricsCollector = require('./core/metrics');
+const AnalyticsTracker = require('./core/analytics');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -41,6 +42,9 @@ class ProxyServer {
 
     // Prometheus metrics collector
     this.metrics = new MetricsCollector();
+
+    // Analytics tracker (usage, cost estimation)
+    this.analytics = new AnalyticsTracker();
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
@@ -330,6 +334,10 @@ class ProxyServer {
             if (response.statusCode >= 400) {
               this.metrics.incCounter('keyproxy_errors_total', { provider: providerName, type: response.statusCode >= 500 ? 'server' : 'client' });
             }
+            this.analytics.recordRequest({
+              provider: providerName, statusCode: response.statusCode, latencyMs: responseTime,
+              requestBody: body, responseBody: streamedData, apiKey: keyInfo?.actualKey, apiType
+            });
           }
           console.log(`[REQ-${requestId}] Streaming response completed`);
         });
@@ -351,6 +359,10 @@ class ProxyServer {
           if (response.statusCode >= 400) {
             this.metrics.incCounter('keyproxy_errors_total', { provider: providerName, type: response.statusCode >= 500 ? 'server' : 'client' });
           }
+          this.analytics.recordRequest({
+            provider: providerName, statusCode: response.statusCode, latencyMs: responseTime,
+            requestBody: body, responseBody: response.data, apiKey: keyInfo?.actualKey, apiType
+          });
         }
 
         // Notify on all keys exhausted
@@ -865,6 +877,10 @@ class ProxyServer {
       await this.handleUpdateNotifications(res, body);
     } else if (path === '/admin/api/notifications/test' && req.method === 'POST') {
       await this.handleTestNotification(res, body);
+    } else if (path === '/admin/api/analytics' && req.method === 'GET') {
+      await this.handleGetAnalytics(res, params);
+    } else if (path === '/admin/api/analytics/reset' && req.method === 'POST') {
+      await this.handleResetAnalytics(res);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -1978,6 +1994,27 @@ $form.Dispose()
       res.end(JSON.stringify({ success: result }));
     } catch (error) {
       this.sendError(res, 500, 'Test failed: ' + error.message);
+    }
+  }
+
+  async handleGetAnalytics(res, params) {
+    try {
+      const range = params?.range || '7d';
+      const data = this.analytics.query(range);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data));
+    } catch (error) {
+      this.sendError(res, 500, 'Analytics query failed: ' + error.message);
+    }
+  }
+
+  async handleResetAnalytics(res) {
+    try {
+      this.analytics.reset();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Reset failed: ' + error.message);
     }
   }
 
