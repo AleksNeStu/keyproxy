@@ -229,13 +229,13 @@
         "id": "18",
         "title": "Weighted load balancing with configurable strategies",
         "priority": "medium",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "description": "Add weight property to keys (default: 1). Three strategies: round-robin (current), weighted-random, least-used. Config per provider via env. Admin UI to set weights.",
         "details": "Files: src/core/keyRotator.js (add weighted selection strategies), src/server.js (strategy config routes), public/admin.html (weight editor with slider). Config: {TYPE}_{PROVIDER}_LB_STRATEGY=round-robin|weighted-random|least-used.",
         "testStrategy": "Set weights 3:1, make 100 requests, verify ~75/25 distribution",
         "subtasks": [],
-        "updatedAt": "2026-04-21T14:29:54.257Z"
+        "updatedAt": "2026-04-21T14:40:28.100Z"
       },
       {
         "id": "19",
@@ -266,9 +266,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:36:54.407Z",
+      "lastModified": "2026-04-21T14:40:28.101Z",
       "taskCount": 20,
-      "completedCount": 15,
+      "completedCount": 16,
       "tags": [
         "master"
       ]

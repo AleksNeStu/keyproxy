@@ -1,19 +1,22 @@
 class KeyRotator {
-  constructor(apiKeys, apiType = 'unknown', systemEnvName = null, historyManager = null) {
+  constructor(apiKeys, apiType = 'unknown', systemEnvName = null, historyManager = null, strategy = 'round-robin') {
     this.apiKeys = [...apiKeys];
     this.apiType = apiType;
     this.systemEnvName = systemEnvName;
     this.historyManager = historyManager;
+    this.strategy = strategy; // 'round-robin', 'weighted-random', 'least-used'
     this.activeKey = null; // Currently synced system-wide key
     this.lastFailedKey = null; // Track the key that failed in the last request
     this.keyUsageCount = new Map(); // Track per-key usage count
+    this.keyWeights = new Map(); // Per-key weight for weighted-random
     this.onRotation = null; // Callback: (providerName, statusCode) => void
-    // Initialize usage counts for all keys
+    // Initialize usage counts and default weights for all keys
     for (const key of this.apiKeys) {
       this.keyUsageCount.set(key, 0);
+      this.keyWeights.set(key, 1);
     }
 
-    let logMsg = `[${apiType.toUpperCase()}-ROTATOR] Initialized with ${this.apiKeys.length} API keys`;
+    let logMsg = `[${apiType.toUpperCase()}-ROTATOR] Initialized with ${this.apiKeys.length} API keys (strategy: ${strategy})`;
     if (systemEnvName) logMsg += ` (Syncing to System Env: ${systemEnvName})`;
     if (historyManager) logMsg += ` (History tracking enabled)`;
     console.log(logMsg);
@@ -41,7 +44,7 @@ class KeyRotator {
    * @returns {RequestKeyContext} A new context for managing keys for a single request
    */
   createRequestContext() {
-    return new RequestKeyContext(this.apiKeys, this.apiType, this.lastFailedKey);
+    return new RequestKeyContext(this.apiKeys, this.apiType, this.lastFailedKey, this.strategy, this.keyUsageCount, this.keyWeights);
   }
 
   /**
@@ -128,21 +131,72 @@ class KeyRotator {
  * Each request gets its own context to try all available keys with smart shuffling
  */
 class RequestKeyContext {
-  constructor(apiKeys, apiType, lastFailedKey = null) {
+  constructor(apiKeys, apiType, lastFailedKey = null, strategy = 'round-robin', usageCounts = null, weights = null) {
     this.originalApiKeys = [...apiKeys];
     this.apiType = apiType;
+    this.strategy = strategy;
+    this.usageCounts = usageCounts;
+    this.weights = weights;
     this.currentIndex = 0;
     this.triedKeys = new Set();
     this.rateLimitedKeys = new Set();
     this.lastFailedKeyForThisRequest = null;
-    
-    // Apply smart shuffling: shuffle keys but move last failed key to end
-    this.apiKeys = this.smartShuffle(apiKeys, lastFailedKey);
-    
+
+    // Apply strategy-specific key ordering
+    this.apiKeys = this.orderKeys(apiKeys, lastFailedKey);
+
     if (lastFailedKey) {
       const maskedKey = this.maskApiKey(lastFailedKey);
-      console.log(`[${this.apiType.toUpperCase()}] Smart shuffle applied - last failed key ${maskedKey} moved to end`);
+      console.log(`[${this.apiType.toUpperCase()}] Strategy: ${strategy} - last failed key ${maskedKey} deprioritized`);
     }
+  }
+
+  /**
+   * Order keys according to the configured strategy.
+   */
+  orderKeys(keys, lastFailedKey) {
+    let ordered;
+    if (this.strategy === 'least-used' && this.usageCounts) {
+      ordered = [...keys].sort((a, b) => {
+        return (this.usageCounts.get(a) || 0) - (this.usageCounts.get(b) || 0);
+      });
+    } else if (this.strategy === 'weighted-random' && this.weights) {
+      ordered = this.weightedShuffle(keys);
+    } else {
+      ordered = this.smartShuffle(keys, lastFailedKey);
+    }
+
+    // Move last failed key to end regardless of strategy
+    if (lastFailedKey && ordered.includes(lastFailedKey)) {
+      const idx = ordered.indexOf(lastFailedKey);
+      ordered.splice(idx, 1);
+      ordered.push(lastFailedKey);
+    }
+    return ordered;
+  }
+
+  /**
+   * Weighted random shuffle — keys with higher weight appear earlier.
+   */
+  weightedShuffle(keys) {
+    const items = keys.map(k => ({
+      key: k,
+      weight: this.weights?.get(k) || 1
+    }));
+    const result = [];
+    while (items.length > 0) {
+      const totalWeight = items.reduce((s, i) => s + i.weight, 0);
+      let r = Math.random() * totalWeight;
+      for (let i = 0; i < items.length; i++) {
+        r -= items[i].weight;
+        if (r <= 0) {
+          result.push(items[i].key);
+          items.splice(i, 1);
+          break;
+        }
+      }
+    }
+    return result;
   }
   
   /**

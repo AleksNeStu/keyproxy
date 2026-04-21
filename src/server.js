@@ -576,7 +576,9 @@ class ProxyServer {
       const systemEnvName = this.config.envVars[syncEnvVar]?.toLowerCase() === 'true'
         ? WindowsEnv.deriveEnvName(providerName)
         : null;
-      const keyRotator = new this.KeyRotator(enabledKeys, provider.apiType, systemEnvName, this.historyManager);
+      const lbStrategyKey = `${provider.apiType.toUpperCase()}_${providerName.toUpperCase().replace(/-/g, '_')}_LB_STRATEGY`;
+      const lbStrategy = this.config.envVars[lbStrategyKey] || 'round-robin';
+      const keyRotator = new this.KeyRotator(enabledKeys, provider.apiType, systemEnvName, this.historyManager, lbStrategy);
       keyRotator.onRotation = (provName, statusCode) => {
         this.metrics.incCounter('keyproxy_key_rotations_total', { provider: provName });
       };
