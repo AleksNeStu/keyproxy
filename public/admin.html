@@ -2357,6 +2357,79 @@
                                 </div>
                             </div>
                         </div>
+                        ${(() => {
+                            const port = window.location.port || '8990';
+                            const mcpMap = {
+                                tavily_mcp: {
+                                    label: 'search-tavily',
+                                    transport: 'stdio',
+                                    command: 'npx',
+                                    args: ['mcp-remote', \`http://localhost:\${port}/tavily_mcp/?tavilyApiKey=YOUR_ACCESS_KEY\`],
+                                    note: 'Uses mcp-remote to proxy MCP protocol. Replace YOUR_ACCESS_KEY with the provider access key, or remove the query param if no access key.'
+                                },
+                                firecrawl: {
+                                    label: 'doc-firecrawl',
+                                    transport: 'stdio',
+                                    command: 'npx',
+                                    args: ['-y', 'firecrawl-mcp'],
+                                    env: { FIRECRAWL_API_URL: \`http://localhost:\${port}/firecrawl\` },
+                                    note: 'Set FIRECRAWL_API_URL to the proxy endpoint. The proxy injects the real API key.'
+                                },
+                                context7: {
+                                    label: 'doc-context7',
+                                    transport: 'stdio',
+                                    command: 'npx',
+                                    args: ['-y', '@upstreamapi/context7-mcp'],
+                                    env: { CONTEXT7_API_URL: \`http://localhost:\${port}/context7\` },
+                                    note: 'Override the API URL to route through the proxy.'
+                                },
+                                exa: {
+                                    label: 'search-exa',
+                                    transport: 'stdio',
+                                    command: 'npx',
+                                    args: ['-y', 'exa-mcp-server'],
+                                    env: { EXA_API_URL: \`http://localhost:\${port}/exa\` },
+                                    note: 'Override the API URL to route through the proxy.'
+                                },
+                                jina: {
+                                    label: 'search-jina-reader',
+                                    transport: 'stdio',
+                                    command: 'npx',
+                                    args: ['-y', '@jina/reader-mcp'],
+                                    env: { JINA_API_URL: \`http://localhost:\${port}/jina\` },
+                                    note: 'Override the API URL to route through the proxy.'
+                                }
+                            };
+                            const mcp = mcpMap[provider.name];
+                            if (!mcp) return '';
+                            const configJson = JSON.stringify({
+                                [mcp.label]: {
+                                    type: mcp.transport,
+                                    command: mcp.command,
+                                    args: mcp.args,
+                                    ...(mcp.env ? { env: mcp.env } : {})
+                                }
+                            }, null, 2);
+                            return \`
+                            <div class="mt-3 border border-blue-500/20 rounded-lg overflow-hidden">
+                                <button onclick="this.nextElementSibling.classList.toggle('hidden');this.querySelector('.chevron').classList.toggle('rotate-180')"
+                                    class="w-full flex items-center justify-between px-3 py-2 bg-blue-500/5 hover:bg-blue-500/10 transition-colors text-left">
+                                    <div class="flex items-center space-x-2">
+                                        <span class="text-xs font-semibold text-blue-400">MCP Configuration</span>
+                                        <span class="text-[10px] px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20">.claude.json</span>
+                                    </div>
+                                    <svg class="w-4 h-4 text-blue-400 chevron transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                                </button>
+                                <div class="hidden px-3 py-3 space-y-2 bg-blue-500/5">
+                                    <pre class="bg-black/30 text-green-400 text-[11px] font-mono p-3 rounded overflow-x-auto leading-relaxed"><code>\${configJson.replace(/</g, '&lt;')}</code></pre>
+                                    <div class="flex items-center justify-between">
+                                        <span class="text-[10px] text-muted-foreground">\${mcp.note}</span>
+                                        <button onclick="navigator.clipboard.writeText(this.closest('.space-y-2').querySelector('code').textContent);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy',2000)"
+                                            class="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-300 border border-blue-500/20 hover:bg-blue-500/20 transition-colors">Copy</button>
+                                    </div>
+                                </div>
+                            </div>\`;
+                        })()}
                         <div>
                             <label class="block text-muted-foreground mb-1 text-xs">API Keys</label>
                             <div class="space-y-1">
