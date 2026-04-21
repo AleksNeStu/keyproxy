@@ -203,13 +203,13 @@
         "id": "16",
         "title": "Virtual API keys with scoped access",
         "priority": "high",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "description": "Generate vk-xxxx virtual keys stored in data/virtual-keys.json. Each maps to: allowed providers, models, rate limit, expiry. Auth middleware checks virtual keys. Admin CRUD UI.",
         "details": "Files: src/core/virtualKeys.js (new — VirtualKeyManager), src/server.js (auth middleware + 5 CRUD routes), public/admin.html (virtual key manager section). Keys stored hashed. Support: provider whitelist, model whitelist, RPM limit, expiry date.",
         "testStrategy": "Create virtual key for openai only, use it to call openai (success) and gemini (reject)",
         "subtasks": [],
-        "updatedAt": "2026-04-21T14:29:54.257Z"
+        "updatedAt": "2026-04-21T14:49:00.947Z"
       },
       {
         "id": "17",
@@ -266,9 +266,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:44:37.234Z",
+      "lastModified": "2026-04-21T14:49:00.948Z",
       "taskCount": 20,
-      "completedCount": 17,
+      "completedCount": 18,
       "tags": [
         "master"
       ]

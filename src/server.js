@@ -11,6 +11,7 @@ const CircuitBreaker = require('./core/circuitBreaker');
 const ConfigExporter = require('./core/configExporter');
 const { SlidingWindowCounter } = require('./core/rateTracker');
 const ResponseCache = require('./core/cache');
+const VirtualKeyManager = require('./core/virtualKeys');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -72,6 +73,9 @@ class ProxyServer {
     const cacheMax = parseInt(config.envVars?.KEYPROXY_CACHE_MAX_ENTRIES) || 1000;
     this.responseCache = new ResponseCache(cacheMax, cacheTtl * 1000);
     this.responseCache.enabled = cacheEnabled;
+
+    // Virtual API key manager
+    this.virtualKeyManager = new VirtualKeyManager();
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
@@ -231,6 +235,33 @@ class ProxyServer {
       }
 
       const { providerName, apiType, path, provider, legacy } = routeInfo;
+
+      // Virtual key authentication check
+      const vkToken = this._extractVirtualKey(req);
+      if (vkToken) {
+        const vkConfig = this.virtualKeyManager.validate(vkToken);
+        if (!vkConfig) {
+          console.log(`[REQ-${requestId}] Virtual key rejected`);
+          this.sendError(res, 401, 'Invalid or expired virtual key');
+          return;
+        }
+        if (vkConfig.allowedProviders.length > 0 && !vkConfig.allowedProviders.includes(providerName)) {
+          console.log(`[REQ-${requestId}] Virtual key not authorized for provider '${providerName}'`);
+          this.sendError(res, 403, `Virtual key not authorized for '${providerName}'`);
+          return;
+        }
+        if (vkConfig.allowedModels.length > 0) {
+          try {
+            const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+            if (parsed.model && !vkConfig.allowedModels.some(m => parsed.model.includes(m) || m.includes(parsed.model))) {
+              this.sendError(res, 403, `Virtual key not authorized for model '${parsed.model}'`);
+              return;
+            }
+          } catch {}
+        }
+        req._virtualKey = vkConfig;
+        console.log(`[REQ-${requestId}] Virtual key '${vkConfig.name}' authenticated`);
+      }
 
       // Check if provider is disabled
       if (provider && provider.disabled) {
@@ -510,15 +541,29 @@ class ProxyServer {
   readRequestBody(req) {
     return new Promise((resolve) => {
       let body = '';
-      
+
       req.on('data', (chunk) => {
         body += chunk;
       });
-      
+
       req.on('end', () => {
         resolve(body || null);
       });
     });
+  }
+
+  _extractVirtualKey(req) {
+    // Check Authorization: Bearer vk-xxx
+    const auth = req.headers['authorization'];
+    if (auth && auth.startsWith('Bearer vk-')) {
+      return auth.substring(7);
+    }
+    // Check x-api-key: vk-xxx
+    const apiKey = req.headers['x-api-key'];
+    if (apiKey && apiKey.startsWith('vk-')) {
+      return apiKey;
+    }
+    return null;
   }
 
   parseRoute(url) {
@@ -1019,6 +1064,14 @@ class ProxyServer {
       await this.handleClearCache(res);
     } else if (path === '/admin/api/cache/config' && req.method === 'POST') {
       await this.handleCacheConfig(res, body);
+    } else if (path === '/admin/api/virtual-keys' && req.method === 'GET') {
+      await this.handleListVirtualKeys(res);
+    } else if (path === '/admin/api/virtual-keys' && req.method === 'POST') {
+      await this.handleCreateVirtualKey(res, body);
+    } else if (path.startsWith('/admin/api/virtual-keys/') && req.method === 'DELETE') {
+      await this.handleRevokeVirtualKey(res, path);
+    } else if (path.startsWith('/admin/api/virtual-keys/') && req.method === 'POST') {
+      await this.handleToggleVirtualKey(res, path);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -2284,6 +2337,56 @@ $form.Dispose()
       res.end(JSON.stringify(this.responseCache.getStats()));
     } catch (error) {
       this.sendError(res, 500, 'Cache config failed: ' + error.message);
+    }
+  }
+
+  async handleListVirtualKeys(res) {
+    try {
+      const keys = this.virtualKeyManager.list();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(keys));
+    } catch (error) {
+      this.sendError(res, 500, 'Virtual key list failed: ' + error.message);
+    }
+  }
+
+  async handleCreateVirtualKey(res, body) {
+    try {
+      const { name, allowedProviders, allowedModels, rpmLimit, expiresAt } = JSON.parse(body || '{}');
+      const result = this.virtualKeyManager.create({
+        name, allowedProviders: allowedProviders || [],
+        allowedModels: allowedModels || [],
+        rpmLimit: rpmLimit || 0,
+        expiresAt: expiresAt || null
+      });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (error) {
+      this.sendError(res, 500, 'Virtual key creation failed: ' + error.message);
+    }
+  }
+
+  async handleRevokeVirtualKey(res, urlPath) {
+    try {
+      const parts = urlPath.split('/');
+      const id = parts[parts.length - 1];
+      const deleted = this.virtualKeyManager.revoke(id);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: deleted }));
+    } catch (error) {
+      this.sendError(res, 500, 'Virtual key revoke failed: ' + error.message);
+    }
+  }
+
+  async handleToggleVirtualKey(res, urlPath) {
+    try {
+      const parts = urlPath.split('/');
+      const id = parts[parts.length - 1];
+      const toggled = this.virtualKeyManager.toggle(id);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: toggled }));
+    } catch (error) {
+      this.sendError(res, 500, 'Virtual key toggle failed: ' + error.message);
     }
   }
 
