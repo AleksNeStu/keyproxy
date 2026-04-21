@@ -9,11 +9,20 @@ class HealthMonitor {
     this.intervalMs = 5 * 60 * 1000; // 5 minutes
     this.statusCache = new Map();
     this.lastFullCheck = null;
+    this.recoveryEnabled = true;
+    this.recoveryCooldownMs = 5 * 60 * 1000; // 5 minutes default
   }
 
   start(intervalMs) {
     if (intervalMs) this.intervalMs = intervalMs;
-    console.log(`[HEALTH] Monitor started (interval: ${this.intervalMs / 1000}s)`);
+
+    // Read recovery config from env
+    const envVars = this.server.config.envVars;
+    this.recoveryEnabled = envVars.KEYPROXY_RECOVERY_ENABLED !== 'false';
+    const cooldownSec = parseInt(envVars.KEYPROXY_RECOVERY_COOLDOWN_SEC) || 300;
+    this.recoveryCooldownMs = cooldownSec * 1000;
+
+    console.log(`[HEALTH] Monitor started (interval: ${this.intervalMs / 1000}s, recovery: ${this.recoveryEnabled ? cooldownSec + 's cooldown' : 'disabled'})`);
     this.checkAll();
     this.timer = setInterval(() => this.checkAll(), this.intervalMs);
   }
@@ -32,6 +41,10 @@ class HealthMonitor {
     }
     this.lastFullCheck = new Date().toISOString();
     console.log(`[HEALTH] Full check completed for ${providers.size} providers`);
+
+    if (this.recoveryEnabled) {
+      await this.recoverExhaustedKeys();
+    }
   }
 
   checkProvider(providerName) {
@@ -111,6 +124,65 @@ class HealthMonitor {
 
     this.statusCache.set(providerName, status);
     return status;
+  }
+
+  async recoverExhaustedKeys() {
+    const providers = this.server.config.providers;
+    const historyManager = this.server.historyManager;
+    if (!historyManager) return;
+
+    for (const [providerName, providerConfig] of providers.entries()) {
+      if (providerConfig.disabled) continue;
+
+      const allKeys = providerConfig.allKeys
+        ? providerConfig.allKeys.map(k => k.key)
+        : providerConfig.keys;
+
+      const exhausted = historyManager.getExhaustedKeys(
+        providerName,
+        this.recoveryCooldownMs,
+        allKeys
+      );
+
+      for (const entry of exhausted) {
+        if (!entry.fullKey) continue;
+        const masked = entry.fullKey.substring(0, 4) + '...' + entry.fullKey.substring(entry.fullKey.length - 4);
+        console.log(`[RECOVERY] Probing exhausted key ${masked} for provider '${providerName}' (exhausted ${Math.round((Date.now() - new Date(entry.rotatedOutAt).getTime()) / 1000)}s ago)`);
+
+        const result = await this.probeKey(providerName, providerConfig, entry.fullKey);
+        if (result.success) {
+          historyManager.recoverKey(providerName, entry.fullKey);
+          console.log(`[RECOVERY] Key ${masked} recovered for provider '${providerName}'`);
+
+          if (this.server.notifier) {
+            this.server.notifier.send(`Key ${masked} recovered for '${providerName}' after cooldown`, 'recovery');
+          }
+        } else {
+          // Reset the cooldown by updating rotatedOutAt to now
+          historyManager.recordKeyExhausted(providerName, entry.fullKey, entry.rotationReason || 'still-failing');
+          console.log(`[RECOVERY] Key ${masked} still exhausted for '${providerName}': ${result.error}`);
+        }
+      }
+    }
+  }
+
+  async probeKey(providerName, providerConfig, apiKey) {
+    try {
+      if (providerConfig.apiType === 'gemini') {
+        return await this.server.testGeminiKey(apiKey, providerConfig.baseUrl);
+      } else if (providerConfig.apiType === 'openai') {
+        // Skip probe for providers without /models endpoint
+        const skipDomains = ['firecrawl.dev', 'context7.com', 'ref.tools', 'tavily.com', 'jina.ai'];
+        const baseUrl = providerConfig.baseUrl || '';
+        if (skipDomains.some(d => baseUrl.includes(d))) {
+          return { success: true };
+        }
+        return await this.server.testOpenaiKey(apiKey, providerConfig.baseUrl);
+      }
+      return { success: false, error: 'Unknown apiType' };
+    } catch (err) {
+      return { success: false, error: err.message };
+    }
   }
 
   getProviderStatus(providerName) {

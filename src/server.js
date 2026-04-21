@@ -825,6 +825,8 @@ class ProxyServer {
       await this.handleSwitchEnv(res, body);
     } else if (path === '/admin/api/reorder-env-files' && req.method === 'POST') {
       await this.handleReorderEnvFiles(res, body);
+    } else if (path === '/admin/api/recovery-status' && req.method === 'GET') {
+      await this.handleGetRecoveryStatus(res);
     } else if (path === '/admin/api/health' && req.method === 'GET') {
       await this.handleGetHealth(res);
     } else if (path === '/admin/api/health/check-all' && req.method === 'POST') {
@@ -1807,6 +1809,42 @@ $form.Dispose()
       res.end(JSON.stringify({ success: true, ...data }));
     } catch (error) {
       this.sendError(res, 500, 'Failed to reorder env files: ' + error.message);
+    }
+  }
+
+  async handleGetRecoveryStatus(res) {
+    try {
+      if (!this.healthMonitor) {
+        this.sendError(res, 503, 'Health monitor not initialized');
+        return;
+      }
+      const recoveryStatus = {};
+      const providers = this.config.providers;
+      for (const [name, config] of providers.entries()) {
+        if (config.disabled) continue;
+        const allKeys = config.allKeys ? config.allKeys.map(k => k.key) : config.keys;
+        const exhausted = this.historyManager.getExhaustedKeys(
+          name,
+          this.healthMonitor.recoveryCooldownMs,
+          allKeys
+        );
+        if (exhausted.length > 0) {
+          recoveryStatus[name] = exhausted.map(e => ({
+            hash: e.hash,
+            rotatedOutAt: e.rotatedOutAt,
+            rotationReason: e.rotationReason,
+            cooldownSec: Math.round(this.healthMonitor.recoveryCooldownMs / 1000)
+          }));
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        enabled: this.healthMonitor.recoveryEnabled,
+        cooldownSec: Math.round(this.healthMonitor.recoveryCooldownMs / 1000),
+        providers: recoveryStatus
+      }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to get recovery status: ' + error.message);
     }
   }
 

@@ -199,6 +199,58 @@ class KeyHistoryManager {
   }
 
   /**
+   * Get exhausted keys for a provider that are past the cooldown period.
+   * Returns array of { hash, fullKey (if mapped), rotatedOutAt, rotationReason }
+   * @param {string} providerName
+   * @param {number} cooldownMs - minimum time since exhaustion in milliseconds
+   * @param {string[]} [allFullKeys] - optional: full keys to resolve hashes back
+   */
+  getExhaustedKeys(providerName, cooldownMs, allFullKeys = []) {
+    const provider = this.data.providers[providerName];
+    if (!provider) return [];
+
+    const now = Date.now();
+    const hashToKey = new Map();
+    for (const key of allFullKeys) {
+      hashToKey.set(this.hashKey(key), key);
+    }
+
+    const result = [];
+    for (const [hash, entry] of Object.entries(provider.keys)) {
+      if (entry.status !== 'exhausted' || !entry.rotatedOutAt) continue;
+      const elapsed = now - new Date(entry.rotatedOutAt).getTime();
+      if (elapsed >= cooldownMs) {
+        result.push({
+          hash,
+          fullKey: hashToKey.get(hash) || null,
+          rotatedOutAt: entry.rotatedOutAt,
+          rotationReason: entry.rotationReason,
+          rotationCount: entry.rotationCount || 0
+        });
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Mark a previously exhausted key as recovered (active again)
+   */
+  recoverKey(providerName, fullKey) {
+    const hash = this.hashKey(fullKey);
+    const provider = this.data.providers[providerName];
+    if (!provider || !provider.keys[hash]) return false;
+    const entry = provider.keys[hash];
+    if (entry.status !== 'exhausted') return false;
+
+    entry.status = 'active';
+    entry.rotatedOutAt = null;
+    entry.rotationReason = null;
+    entry.lastUsed = new Date().toISOString();
+    this._scheduleSave();
+    return true;
+  }
+
+  /**
    * Build a lookup map: hash -> status for a provider (convenience for UI)
    */
   getStatusMap(providerName, allFullKeys) {

@@ -20,7 +20,9 @@
         "details": "Files: src/core/config.js (getEnvFiles, setActiveEnv, addEnvFile, removeEnvFile), src/server.js (4 new API routes), public/admin.html (dropdown + add/remove form). Reuse existing selectEnvFile() file picker.",
         "testStrategy": "",
         "status": "done",
-        "dependencies": ["1"],
+        "dependencies": [
+          "1"
+        ],
         "priority": "medium",
         "subtasks": [],
         "updatedAt": "2026-04-20T21:38:28.956Z"
@@ -32,7 +34,9 @@
         "details": "Files: src/core/healthCheck.js (rewrite), src/server.js (4 health API routes + instantiate HealthMonitor), public/admin.html (new Management tab). Data sources: config.providers, providerClients, key-history.json, logBuffer. Status: active/degraded/failed/disabled.",
         "testStrategy": "",
         "status": "done",
-        "dependencies": ["1"],
+        "dependencies": [
+          "1"
+        ],
         "priority": "medium",
         "subtasks": [],
         "updatedAt": "2026-04-20T21:49:29.916Z"
@@ -44,7 +48,9 @@
         "details": "Files: src/core/notifier.js (new), src/core/slackNotifier.js (new), src/core/telegramBot.js (add broadcastMessage), src/server.js (instantiate Notifier, notification API routes, wire events), public/admin.html (Notifications section in Settings). Config: SLACK_WEBHOOK_URL, SLACK_NOTIFY_ON, TELEGRAM_NOTIFY_ON.",
         "testStrategy": "",
         "status": "done",
-        "dependencies": ["3"],
+        "dependencies": [
+          "3"
+        ],
         "priority": "low",
         "subtasks": [],
         "updatedAt": "2026-04-20T21:58:28.614Z"
@@ -56,7 +62,9 @@
         "details": "",
         "testStrategy": "",
         "status": "done",
-        "dependencies": ["2"],
+        "dependencies": [
+          "2"
+        ],
         "priority": "medium",
         "subtasks": [],
         "updatedAt": "2026-04-21T08:47:36.378Z"
@@ -68,7 +76,9 @@
         "details": "",
         "testStrategy": "",
         "status": "done",
-        "dependencies": ["1"],
+        "dependencies": [
+          "1"
+        ],
         "priority": "high",
         "subtasks": [],
         "updatedAt": "2026-04-21T08:47:36.378Z"
@@ -79,11 +89,13 @@
         "description": "Periodically retest API keys that were rotated out due to rate limits (429/402/403). After a configurable cooldown period (default: 5 minutes, env: KEYPROXY_RECOVERY_COOLDOWN_SEC), the HealthMonitor should probe the key with a lightweight test request. If it succeeds, mark the key as recovered and re-enable it in the rotation pool. Wire recovery events into the Notifier system (key X recovered after N minutes). Show recovery status in admin UI Management tab.",
         "details": "Files: src/core/healthCheck.js (add recovery scan in check cycle), src/core/keyRotator.js (add recoverKey method), src/core/keyHistory.js (add recovery state tracking), src/server.js (recovery API endpoint), public/admin.html (recovery badge in key table). Config: KEYPROXY_RECOVERY_COOLDOWN_SEC=300, KEYPROXY_RECOVERY_ENABLED=true.",
         "testStrategy": "1) Let a key get 429'd, 2) Wait cooldown period, 3) Verify key is auto-tested, 4) Verify key reappears in rotation pool",
-        "status": "pending",
-        "dependencies": ["3"],
+        "status": "done",
+        "dependencies": [
+          "3"
+        ],
         "priority": "high",
         "subtasks": [],
-        "updatedAt": "2026-04-21T10:00:00.000Z"
+        "updatedAt": "2026-04-21T13:29:30.043Z"
       },
       {
         "id": "8",
@@ -92,7 +104,9 @@
         "details": "Files: src/core/analytics.js (new — AnalyticsTracker class with persist/aggregate/query methods), src/server.js (4 analytics API routes), public/admin.html (new Analytics tab with charts using Canvas API or lightweight chart lib). Pricing tables in src/core/pricing.js (new). Data: data/analytics.json rotated daily.",
         "testStrategy": "1) Make 50+ requests through proxy, 2) Verify analytics.json has per-key/per-provider data, 3) Verify Analytics tab shows correct charts, 4) Verify cost estimates match expected pricing",
         "status": "pending",
-        "dependencies": ["3"],
+        "dependencies": [
+          "3"
+        ],
         "priority": "high",
         "subtasks": [],
         "updatedAt": "2026-04-21T10:00:00.000Z"
@@ -104,7 +118,9 @@
         "details": "Files: src/core/fallbackRouter.js (new — FallbackRouter class with chain resolution and retry logic), src/server.js (wire fallback into handleRequest after all-keys-exhausted), src/core/config.js (parse FALLBACK env vars), public/admin.html (fallback config section in Settings). Config: {TYPE}_{PROVIDER}_FALLBACK={fallback_provider}, {TYPE}_{PROVIDER}_FALLBACK_MODEL={model_name}. Max fallback depth: 2.",
         "testStrategy": "1) Configure fallback: groq → openai, 2) Disable all groq keys, 3) Send request to groq, 4) Verify it falls back to openai, 5) Verify response comes from openai",
         "status": "pending",
-        "dependencies": ["7"],
+        "dependencies": [
+          "7"
+        ],
         "priority": "medium",
         "subtasks": [],
         "updatedAt": "2026-04-21T10:00:00.000Z"
@@ -128,7 +144,9 @@
         "details": "Files: src/core/circuitBreaker.js (new — CircuitBreaker class with closed/open/half-open states), src/server.js (instantiate per provider, check before routing), src/core/healthCheck.js (report circuit state), public/admin.html (circuit status badge in Management tab, force-close button). Config: KEYPROXY_CB_THRESHOLD=5, KEYPROXY_CB_TIMEOUT_SEC=30.",
         "testStrategy": "1) Simulate 5 consecutive failures for a provider, 2) Verify circuit opens, 3) Verify next request gets 503 immediately, 4) Wait timeout, 5) Verify half-open state, 6) Verify successful probe closes circuit",
         "status": "pending",
-        "dependencies": ["3"],
+        "dependencies": [
+          "3"
+        ],
         "priority": "medium",
         "subtasks": [],
         "updatedAt": "2026-04-21T10:00:00.000Z"
@@ -160,10 +178,12 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T10:00:00.000Z",
+      "lastModified": "2026-04-21T13:29:30.044Z",
       "taskCount": 13,
-      "completedCount": 6,
-      "tags": ["master"]
+      "completedCount": 7,
+      "tags": [
+        "master"
+      ]
     }
   }
 }
