@@ -9,6 +9,7 @@ const AnalyticsTracker = require('./core/analytics');
 const FallbackRouter = require('./core/fallbackRouter');
 const CircuitBreaker = require('./core/circuitBreaker');
 const ConfigExporter = require('./core/configExporter');
+const { SlidingWindowCounter } = require('./core/rateTracker');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -59,6 +60,10 @@ class ProxyServer {
 
     // Config exporter/importer
     this.configExporter = new ConfigExporter(config);
+
+    // Per-key RPM tracker (sliding window)
+    this.rpmTracker = new SlidingWindowCounter();
+    this._rpmPruneTimer = setInterval(() => this.rpmTracker.prune(), 60000);
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
@@ -364,6 +369,7 @@ class ProxyServer {
               provider: providerName, statusCode: response.statusCode, latencyMs: responseTime,
               requestBody: body, responseBody: streamedData, apiKey: keyInfo?.actualKey, apiType
             });
+            if (keyInfo?.actualKey) this.rpmTracker.record(keyInfo.actualKey);
           }
           console.log(`[REQ-${requestId}] Streaming response completed`);
         });
@@ -397,6 +403,7 @@ class ProxyServer {
             provider: providerName, statusCode: response.statusCode, latencyMs: responseTime,
             requestBody: body, responseBody: response.data, apiKey: keyInfo?.actualKey, apiType
           });
+          if (keyInfo?.actualKey) this.rpmTracker.record(keyInfo.actualKey);
         }
 
         // Notify on all keys exhausted
@@ -964,6 +971,8 @@ class ProxyServer {
       await this.handleExportConfig(res, body);
     } else if (path === '/admin/api/import-config' && req.method === 'POST') {
       await this.handleImportConfig(res, body);
+    } else if (path === '/admin/api/rpm' && req.method === 'GET') {
+      await this.handleGetRpm(res);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -2188,6 +2197,16 @@ $form.Dispose()
       res.end(JSON.stringify(result));
     } catch (error) {
       this.sendError(res, 500, 'Import failed: ' + error.message);
+    }
+  }
+
+  async handleGetRpm(res) {
+    try {
+      const rpmData = this.rpmTracker.getAllRpm();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(rpmData));
+    } catch (error) {
+      this.sendError(res, 500, 'RPM query failed: ' + error.message);
     }
   }
 

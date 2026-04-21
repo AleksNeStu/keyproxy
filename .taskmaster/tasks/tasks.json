@@ -169,18 +169,18 @@
         "description": "Track requests-per-minute per API key using a sliding window counter (last 60 seconds). Display current RPM in the admin UI next to each key. Add optional warning badges when a key approaches known provider rate limits (e.g., OpenAI free tier: 3 RPM, Gemini free: 15 RPM). Display as a heatmap bar in the key table (green → yellow → red). No enforcement — purely informational to help users distribute load. Configurable provider rate limit presets in src/core/rateLimits.js.",
         "details": "Files: src/core/rateTracker.js (new — SlidingWindowCounter class), src/core/keyRotator.js (increment tracker on each request), src/server.js (API route for per-key RPM data), public/admin.html (RPM badge in key table, tooltip with provider limit). Rate limit presets: OpenAI free=3, OpenAI paid=500, Gemini free=15, Groq=30, etc.",
         "testStrategy": "1) Make 10 rapid requests with same key, 2) Verify RPM counter shows ~10, 3) Wait 60s, 4) Verify RPM drops to 0, 5) Verify UI shows correct RPM badge color",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "low",
         "subtasks": [],
-        "updatedAt": "2026-04-21T10:00:00.000Z"
+        "updatedAt": "2026-04-21T14:15:35.262Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:09:38.186Z",
+      "lastModified": "2026-04-21T14:15:35.263Z",
       "taskCount": 13,
-      "completedCount": 12,
+      "completedCount": 13,
       "tags": [
         "master"
       ]

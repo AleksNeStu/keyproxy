@@ -205,6 +205,12 @@
         .key-badge.badge-active { background: rgba(239,68,68,0.15); color: #ef4444; }
         .key-badge.badge-exhausted { background: rgba(107,114,128,0.15); color: #9ca3af; }
         .key-badge.badge-fresh { background: rgba(34,197,94,0.15); color: #22c55e; }
+
+        .rpm-badge { font-family: monospace; min-width: 50px; text-align: center; }
+        .rpm-green { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .rpm-yellow { background: rgba(234,179,8,0.15); color: #eab308; }
+        .rpm-orange { background: rgba(249,115,22,0.15); color: #f97316; }
+        .rpm-red { background: rgba(239,68,68,0.15); color: #ef4444; }
         
         .login-container {
             background-color: var(--card);
@@ -1910,9 +1916,11 @@
         let keyHistoryData = {};
         
         function renderEnvVars() {
-            
+
             // Render providers
             renderProviders();
+            // Load RPM data after render
+            loadRpmBadges();
         }
 
         function renderProviders() {
@@ -2394,8 +2402,9 @@
                                         <div class="flex-1 font-mono text-xs text-foreground bg-muted px-2 py-1 rounded${isKeyDisabled ? ' line-through' : ''}">
                                             ${maskedKey}
                                         </div>
-                                        <!-- Usage count + rotation count -->
+                                        <!-- Usage count + rotation count + RPM -->
                                         <span class="text-xs text-muted-foreground whitespace-nowrap" title="Times used${rotationCount > 0 ? ' / Rotations: ' + rotationCount : ''}">${usageDisplay} uses${rotationCount > 0 ? ' / ' + rotationCount + ' rot' : ''}</span>
+                                        <span class="rpm-badge text-xs px-1.5 py-0.5 rounded" data-key="${maskedKey}" data-provider="${provider.apiType}" title="Requests per minute">--rpm</span>
                                         <button
                                             onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})"
                                             class="btn btn-secondary px-2 py-1 text-xs font-medium"
@@ -5456,6 +5465,46 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
     }
 
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+    // ─── RPM Badge Loader ────────────────────────────
+    async function loadRpmBadges() {
+        try {
+            const res = await fetch('/admin/api/rpm', { headers: authHeaders() });
+            if (!res.ok) return;
+            const rpmData = await res.json();
+            document.querySelectorAll('.rpm-badge').forEach(badge => {
+                const key = badge.dataset.key;
+                const rpm = rpmData[key];
+                if (rpm !== undefined && rpm > 0) {
+                    badge.textContent = rpm + ' rpm';
+                    const providerType = badge.dataset.provider || '';
+                    const heat = getRpmHeatColor(rpm, providerType);
+                    badge.className = `rpm-badge text-xs px-1.5 py-0.5 rounded rpm-${heat}`;
+                } else {
+                    badge.textContent = '0 rpm';
+                    badge.className = 'rpm-badge text-xs px-1.5 py-0.5 rounded rpm-green';
+                }
+            });
+        } catch {}
+    }
+
+    function getRpmHeatColor(rpm, providerType) {
+        const limits = { openai: 3, gemini: 15, groq: 30, anthropic: 5 };
+        const limit = limits[providerType] || 999;
+        const pct = rpm / limit;
+        if (pct >= 1) return 'red';
+        if (pct >= 0.75) return 'orange';
+        if (pct >= 0.5) return 'yellow';
+        return 'green';
+    }
+
+    // Refresh RPM badges every 15s when API Keys tab is visible
+    setInterval(() => {
+        const envTab = document.getElementById('environment');
+        if (envTab && !envTab.classList.contains('hidden')) {
+            loadRpmBadges();
+        }
+    }, 15000);
 </script>
 <!-- File Browser Modal -->
 <div id="fsBrowserModal" class="fixed inset-0 z-[60] hidden">
