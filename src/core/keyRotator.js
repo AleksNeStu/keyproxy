@@ -7,6 +7,7 @@ class KeyRotator {
     this.activeKey = null; // Currently synced system-wide key
     this.lastFailedKey = null; // Track the key that failed in the last request
     this.keyUsageCount = new Map(); // Track per-key usage count
+    this.onRotation = null; // Callback: (providerName, statusCode) => void
     // Initialize usage counts for all keys
     for (const key of this.apiKeys) {
       this.keyUsageCount.set(key, 0);
@@ -72,8 +73,12 @@ class KeyRotator {
    * Called by client classes after markKeyAsRateLimited().
    */
   recordRotationEvent(providerName, fullKey, statusCode) {
-    if (!this.historyManager) return;
-    this.historyManager.recordKeyExhausted(providerName, fullKey, statusCode);
+    if (this.historyManager) {
+      this.historyManager.recordKeyExhausted(providerName, fullKey, statusCode);
+    }
+    if (this.onRotation) {
+      this.onRotation(providerName, statusCode);
+    }
   }
 
   /**

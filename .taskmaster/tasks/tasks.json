@@ -131,11 +131,11 @@
         "description": "Add a standard /metrics endpoint exposing KeyProxy statistics in Prometheus text exposition format. Metrics: keyproxy_providers_total (gauge), keyproxy_keys_active_per_provider (gauge), keyproxy_requests_total (counter with labels: provider, status), keyproxy_request_duration_seconds (histogram), keyproxy_key_rotations_total (counter with label: provider), keyproxy_errors_total (counter with labels: provider, type). No npm dependencies — build Prometheus format strings manually.",
         "details": "Files: src/core/metrics.js (new — MetricsCollector class with Prometheus text format output), src/server.js (add /metrics route, wire counters into request handler and key rotator), public/admin.html (no UI changes needed). Endpoint is unauthenticated (read-only metrics). Format: standard Prometheus text exposition format v0.0.4.",
         "testStrategy": "1) Start server, 2) curl localhost:8990/metrics, 3) Verify all metric names present, 4) Make API requests, 5) Verify counters increment, 6) Verify format passes promtool check metrics",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "medium",
         "subtasks": [],
-        "updatedAt": "2026-04-21T10:00:00.000Z"
+        "updatedAt": "2026-04-21T13:39:23.690Z"
       },
       {
         "id": "11",
@@ -178,9 +178,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T13:29:30.044Z",
+      "lastModified": "2026-04-21T13:39:23.690Z",
       "taskCount": 13,
-      "completedCount": 7,
+      "completedCount": 8,
       "tags": [
         "master"
       ]

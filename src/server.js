@@ -4,6 +4,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const Auth = require('./core/auth');
+const MetricsCollector = require('./core/metrics');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -37,6 +38,9 @@ class ProxyServer {
     // Key rotation history (persistent across restarts)
     const KeyHistoryManager = require('./core/keyHistory');
     this.historyManager = new KeyHistoryManager();
+
+    // Prometheus metrics collector
+    this.metrics = new MetricsCollector();
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
@@ -152,6 +156,14 @@ class ProxyServer {
       if (req.url === '/' || req.url === '') {
         res.writeHead(302, { 'Location': '/admin' });
         res.end();
+        return;
+      }
+
+      // Prometheus metrics endpoint (unauthenticated, read-only)
+      if (req.url === '/metrics' && req.method === 'GET') {
+        this.updateMetrics();
+        res.writeHead(200, { 'Content-Type': 'text/plain; version=0.0.4; charset=utf-8' });
+        res.end(this.metrics.render());
         return;
       }
 
@@ -313,6 +325,11 @@ class ProxyServer {
             const responseTime = Date.now() - startTime;
             const error = response.statusCode >= 400 ? `HTTP ${response.statusCode}` : null;
             this.logApiRequest(requestId, req.method, path, providerName, response.statusCode, responseTime, error, clientIp, keyInfo);
+            this.metrics.incCounter('keyproxy_requests_total', { provider: providerName, status: String(response.statusCode) });
+            this.metrics.observeHistogram('keyproxy_request_duration_seconds', { provider: providerName }, responseTime / 1000);
+            if (response.statusCode >= 400) {
+              this.metrics.incCounter('keyproxy_errors_total', { provider: providerName, type: response.statusCode >= 500 ? 'server' : 'client' });
+            }
           }
           console.log(`[REQ-${requestId}] Streaming response completed`);
         });
@@ -329,6 +346,11 @@ class ProxyServer {
           const responseTime = Date.now() - startTime;
           const error = response.statusCode >= 400 ? `HTTP ${response.statusCode}` : null;
           this.logApiRequest(requestId, req.method, path, providerName, response.statusCode, responseTime, error, clientIp, keyInfo);
+          this.metrics.incCounter('keyproxy_requests_total', { provider: providerName, status: String(response.statusCode) });
+          this.metrics.observeHistogram('keyproxy_request_duration_seconds', { provider: providerName }, responseTime / 1000);
+          if (response.statusCode >= 400) {
+            this.metrics.incCounter('keyproxy_errors_total', { provider: providerName, type: response.statusCode >= 500 ? 'server' : 'client' });
+          }
         }
 
         // Notify on all keys exhausted
@@ -348,12 +370,13 @@ class ProxyServer {
     } catch (error) {
       console.log(`[REQ-${requestId}] Request handling error: ${error.message}`);
       console.log(`[REQ-${requestId}] Response: 500 Internal Server Error`);
-      
+
       if (isApiCall) {
         const responseTime = Date.now() - startTime;
         this.logApiRequest(requestId, req.method, req.url, 'unknown', 500, responseTime, error.message, clientIp);
+        this.metrics.incCounter('keyproxy_errors_total', { provider: 'unknown', type: 'internal' });
       }
-      
+
       this.sendError(res, 500, 'Internal server error');
     }
   }
@@ -460,6 +483,9 @@ class ProxyServer {
         ? WindowsEnv.deriveEnvName(providerName)
         : null;
       const keyRotator = new this.KeyRotator(enabledKeys, provider.apiType, systemEnvName, this.historyManager);
+      keyRotator.onRotation = (provName, statusCode) => {
+        this.metrics.incCounter('keyproxy_key_rotations_total', { provider: provName });
+      };
       // Sync provider keys into history (add fresh entries, remove stale ones)
       const allKeys = provider.allKeys ? provider.allKeys.map(k => k.key) : enabledKeys;
       this.historyManager.syncProviderKeys(providerName, allKeys);
@@ -2287,6 +2313,35 @@ $form.Dispose()
       }));
     } catch (error) {
       this.sendError(res, 500, 'Failed to update telegram settings: ' + error.message);
+    }
+  }
+
+  updateMetrics() {
+    const providers = this.config.getProviders();
+    this.metrics.setGauge('keyproxy_providers_total', {}, providers.size);
+
+    for (const [name, config] of providers.entries()) {
+      const totalKeys = config.allKeys ? config.allKeys.length : config.keys.length;
+      const enabledKeys = config.keys.length;
+      const disabledKeys = totalKeys - enabledKeys;
+      const disabled = config.disabled || false;
+
+      this.metrics.setGauge('keyproxy_keys_total', { provider: name, state: 'enabled' }, enabledKeys);
+      this.metrics.setGauge('keyproxy_keys_total', { provider: name, state: 'disabled' }, disabledKeys);
+
+      if (this.historyManager) {
+        let exhausted = 0;
+        let active = 0;
+        for (const key of config.keys) {
+          const status = this.historyManager.getKeyStatus(name, key);
+          if (status.status === 'exhausted') exhausted++;
+          else if (status.status === 'active') active++;
+        }
+        this.metrics.setGauge('keyproxy_keys_by_status', { provider: name, status: 'exhausted' }, exhausted);
+        this.metrics.setGauge('keyproxy_keys_by_status', { provider: name, status: 'active' }, active);
+      }
+
+      this.metrics.setGauge('keyproxy_provider_enabled', { provider: name }, disabled ? 0 : 1);
     }
   }
 
