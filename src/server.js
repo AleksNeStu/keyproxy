@@ -6,6 +6,7 @@ const crypto = require('crypto');
 const Auth = require('./core/auth');
 const MetricsCollector = require('./core/metrics');
 const AnalyticsTracker = require('./core/analytics');
+const FallbackRouter = require('./core/fallbackRouter');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -45,6 +46,9 @@ class ProxyServer {
 
     // Analytics tracker (usage, cost estimation)
     this.analytics = new AnalyticsTracker();
+
+    // Fallback router (cross-provider failover)
+    this.fallbackRouter = null; // Initialized in start() after config loads
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
@@ -89,6 +93,9 @@ class ProxyServer {
         slackNotifyOn: this.config.envVars.SLACK_NOTIFY_ON,
         telegramNotifyOn: this.config.envVars.TELEGRAM_NOTIFY_ON
       });
+
+      // Initialize fallback router
+      this.fallbackRouter = new FallbackRouter(this.config);
     });
 
     this.server.on('error', (error) => {
@@ -100,6 +107,7 @@ class ProxyServer {
     const requestId = Math.random().toString(36).substring(2, 11);
     const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress;
     const startTime = Date.now();
+    let fallbackAttempted = false;
 
     // Set CORS headers for all responses - accept all origins
     res.setHeader('Access-Control-Allow-Origin', '*');
@@ -372,6 +380,43 @@ class ProxyServer {
               keyInfo.failedKeys.length >= client.keyRotator.apiKeys.length) {
             if (this.notifier) {
               this.notifier.send(`All keys exhausted for provider '${providerName}' (${keyInfo.failedKeys.length}/${client.keyRotator.apiKeys.length})`, 'failures');
+            }
+
+            // Try fallback provider if configured
+            if (this.fallbackRouter && !fallbackAttempted) {
+              fallbackAttempted = true;
+              const fallback = this.fallbackRouter.getFallback(providerName);
+              if (fallback) {
+                const fbProvider = this.config.getProvider(fallback.provider);
+                if (fbProvider && !fbProvider.disabled) {
+                  console.log(`[REQ-${requestId}] Attempting fallback: ${providerName} → ${fallback.provider}`);
+                  try {
+                    const fbClient = await this.getProviderClient(fallback.provider, fbProvider, false);
+                    if (fbClient) {
+                      const fbBody = this.fallbackRouter.prepareBody(body, fallback);
+                      const fbResponse = await fbClient.makeRequest(req.method, path, fbBody, headers, customStatusCodes, isStreaming);
+                      const fbKeyInfo = fbResponse._keyInfo || null;
+
+                      if (fbResponse.statusCode < 400) {
+                        console.log(`[REQ-${requestId}] Fallback succeeded via ${fallback.provider} (${fbResponse.statusCode})`);
+                        this.metrics.incCounter('keyproxy_requests_total', { provider: fallback.provider, status: String(fbResponse.statusCode) });
+                        this.metrics.incCounter('keyproxy_fallback_requests_total', { from: providerName, to: fallback.provider });
+                        const fbResponseTime = Date.now() - startTime;
+                        this.analytics.recordRequest({
+                          provider: fallback.provider, statusCode: fbResponse.statusCode, latencyMs: fbResponseTime,
+                          requestBody: fbBody, responseBody: fbResponse.data, apiKey: fbKeyInfo?.actualKey, apiType: fbProvider.apiType
+                        });
+                        this.logApiResponse(requestId, fbResponse, fbBody);
+                        this.sendResponse(res, fbResponse);
+                        return;
+                      }
+                      console.log(`[REQ-${requestId}] Fallback ${fallback.provider} returned ${fbResponse.statusCode}, serving original response`);
+                    }
+                  } catch (fbErr) {
+                    console.log(`[REQ-${requestId}] Fallback ${fallback.provider} failed: ${fbErr.message}`);
+                  }
+                }
+              }
             }
           }
         }
@@ -881,6 +926,10 @@ class ProxyServer {
       await this.handleGetAnalytics(res, params);
     } else if (path === '/admin/api/analytics/reset' && req.method === 'POST') {
       await this.handleResetAnalytics(res);
+    } else if (path === '/admin/api/fallbacks' && req.method === 'GET') {
+      await this.handleGetFallbacks(res);
+    } else if (path === '/admin/api/fallbacks' && req.method === 'POST') {
+      await this.handleSetFallback(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -2015,6 +2064,33 @@ $form.Dispose()
       res.end(JSON.stringify({ success: true }));
     } catch (error) {
       this.sendError(res, 500, 'Reset failed: ' + error.message);
+    }
+  }
+
+  async handleGetFallbacks(res) {
+    try {
+      const chains = this.fallbackRouter ? this.fallbackRouter.getAllChains() : {};
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(chains));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to get fallbacks: ' + error.message);
+    }
+  }
+
+  async handleSetFallback(res, body) {
+    try {
+      const { provider, fallbackProvider, fallbackModel } = JSON.parse(body || '{}');
+      if (!provider || !fallbackProvider) {
+        this.sendError(res, 400, 'provider and fallbackProvider required');
+        return;
+      }
+      if (this.fallbackRouter) {
+        this.fallbackRouter.setFallback(provider, fallbackProvider, fallbackModel || null);
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to set fallback: ' + error.message);
     }
   }
 

@@ -4739,6 +4739,36 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                         </div>
                     </div>
                 </div>
+
+                <hr class="border-border">
+
+                <!-- Fallback Routing Section -->
+                <div>
+                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                        Fallback Routing
+                    </h4>
+                    <p class="text-xs text-muted-foreground mb-3">When a provider's keys are exhausted, retry on a fallback provider.</p>
+                    <div id="fallbackList" class="space-y-2 mb-3"></div>
+                    <div class="flex items-end gap-2">
+                        <div class="flex-1">
+                            <label class="block text-xs text-muted-foreground mb-1">Provider</label>
+                            <select id="fbFromProvider" class="input-field w-full px-3 py-2 rounded-md text-sm"></select>
+                        </div>
+                        <span class="text-muted-foreground pb-2">&rarr;</span>
+                        <div class="flex-1">
+                            <label class="block text-xs text-muted-foreground mb-1">Fallback to</label>
+                            <select id="fbToProvider" class="input-field w-full px-3 py-2 rounded-md text-sm"></select>
+                        </div>
+                        <div class="flex-1">
+                            <label class="block text-xs text-muted-foreground mb-1">Model (optional)</label>
+                            <input id="fbModel" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="auto">
+                        </div>
+                        <button onclick="addFallback()" class="btn btn-primary px-3 py-2 text-xs">Add</button>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -4750,6 +4780,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         loadTelegramSettings();
         checkPasswordUpgrade();
         loadNotifications();
+        loadFallbacks();
     }
 
     function closeSettingsModal() {
@@ -4877,6 +4908,77 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         } catch (err) {
             status.textContent = 'Error: ' + err.message;
             status.className = 'text-xs text-red-400';
+        }
+    }
+
+    // ─── Fallback Routing ────────────────────────────
+    async function loadFallbacks() {
+        try {
+            const res = await fetch('/admin/api/fallbacks', { headers: authHeaders() });
+            const chains = await res.json();
+            const list = document.getElementById('fallbackList');
+            if (!list) return;
+
+            const entries = Object.entries(chains);
+            if (entries.length === 0) {
+                list.innerHTML = '<p class="text-xs text-muted-foreground">No fallback chains configured.</p>';
+            } else {
+                list.innerHTML = entries.map(([from, to]) =>
+                    `<div class="flex items-center gap-2 bg-muted/30 rounded-md px-3 py-2 text-sm">
+                        <span class="font-medium">${esc(from)}</span>
+                        <span class="text-muted-foreground">&rarr;</span>
+                        <span class="font-medium">${esc(to.provider)}</span>
+                        ${to.model ? `<span class="text-xs text-muted-foreground">(model: ${esc(to.model)})</span>` : ''}
+                        <button onclick="removeFallback('${esc(from)}')" class="ml-auto text-red-400 hover:text-red-300 text-xs">Remove</button>
+                    </div>`
+                ).join('');
+            }
+
+            // Populate provider selects
+            populateFallbackSelects();
+        } catch (err) {
+            console.error('Failed to load fallbacks:', err);
+        }
+    }
+
+    function populateFallbackSelects() {
+        const fromSel = document.getElementById('fbFromProvider');
+        const toSel = document.getElementById('fbToProvider');
+        if (!fromSel || !toSel) return;
+
+        const providers = Object.keys(window._providerConfig || {});
+        const opts = providers.map(p => `<option value="${p}">${p}</option>`).join('');
+        fromSel.innerHTML = opts || '<option disabled>No providers</option>';
+        toSel.innerHTML = opts || '<option disabled>No providers</option>';
+    }
+
+    async function addFallback() {
+        const from = document.getElementById('fbFromProvider')?.value;
+        const to = document.getElementById('fbToProvider')?.value;
+        const model = document.getElementById('fbModel')?.value;
+        if (!from || !to) return;
+        try {
+            await fetch('/admin/api/fallbacks', {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider: from, fallbackProvider: to, fallbackModel: model || null })
+            });
+            loadFallbacks();
+        } catch (err) {
+            showErrorToast('Failed: ' + err.message);
+        }
+    }
+
+    async function removeFallback(provider) {
+        try {
+            await fetch('/admin/api/fallbacks', {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, fallbackProvider: null })
+            });
+            loadFallbacks();
+        } catch (err) {
+            showErrorToast('Failed: ' + err.message);
         }
     }
 

@@ -117,13 +117,13 @@
         "description": "Enable cross-provider failover: when a provider's keys are exhausted, automatically retry the request on a configured fallback provider. Define fallback chains via env config: {PROVIDER}_FALLBACK=fallback_name and optional {PROVIDER}_FALLBACK_MODEL=model_id. Example: OPENAI_GROQ_FALLBACK=openai_claude means if groq keys exhaust, try openai with the same payload. Admin UI to configure fallback chains per provider with a dependency visualizer.",
         "details": "Files: src/core/fallbackRouter.js (new — FallbackRouter class with chain resolution and retry logic), src/server.js (wire fallback into handleRequest after all-keys-exhausted), src/core/config.js (parse FALLBACK env vars), public/admin.html (fallback config section in Settings). Config: {TYPE}_{PROVIDER}_FALLBACK={fallback_provider}, {TYPE}_{PROVIDER}_FALLBACK_MODEL={model_name}. Max fallback depth: 2.",
         "testStrategy": "1) Configure fallback: groq → openai, 2) Disable all groq keys, 3) Send request to groq, 4) Verify it falls back to openai, 5) Verify response comes from openai",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "7"
         ],
         "priority": "medium",
         "subtasks": [],
-        "updatedAt": "2026-04-21T10:00:00.000Z"
+        "updatedAt": "2026-04-21T13:58:20.667Z"
       },
       {
         "id": "10",
@@ -178,9 +178,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T13:51:09.654Z",
+      "lastModified": "2026-04-21T13:58:20.668Z",
       "taskCount": 13,
-      "completedCount": 9,
+      "completedCount": 10,
       "tags": [
         "master"
       ]
