@@ -444,6 +444,14 @@ class TelegramBot {
       const chunks = [];
       let finished = false;
 
+      const timer = setTimeout(() => {
+        if (!finished) {
+          finished = true;
+          reject(new Error('Internal request timeout (60s)'));
+        }
+      }, 60000);
+      if (timer.unref) timer.unref();
+
       const res = {
         setHeader(key, val) { resHeaders[key.toLowerCase()] = val; },
         writeHead(code, hdrs) {
@@ -461,6 +469,7 @@ class TelegramBot {
         end(data) {
           if (finished) return;
           finished = true;
+          clearTimeout(timer);
           if (data) chunks.push(Buffer.isBuffer(data) ? data : Buffer.from(data));
           resolve({
             statusCode,
@@ -473,9 +482,14 @@ class TelegramBot {
       };
 
       try {
-        this.server.handleRequest(req, res);
+        const result = this.server.handleRequest(req, res);
+        if (result && typeof result.catch === 'function') {
+          result.catch(err => {
+            if (!finished) { finished = true; clearTimeout(timer); reject(err); }
+          });
+        }
       } catch (err) {
-        reject(err);
+        if (!finished) { finished = true; clearTimeout(timer); reject(err); }
       }
     });
   }
@@ -740,10 +754,18 @@ class TelegramBot {
   // ─── Chat ───
 
   async handleChat(chatId, text) {
-    const selection = this.userModels.get(chatId);
+    let selection = this.userModels.get(chatId);
     if (!selection) {
-      await this.sendMessage(chatId, 'No model selected. Use /models to select a provider and model first.');
-      return;
+      // Auto-assign default model (zhipuai / glm-4-flash)
+      const defaultProvider = this.server.config.getProvider('zhipuai');
+      if (defaultProvider && defaultProvider.keys.length > 0 && !defaultProvider.disabled) {
+        selection = { provider: 'zhipuai', model: 'glm-4-flash', apiType: 'openai' };
+        this.userModels.set(chatId, selection);
+        await this.sendMessage(chatId, `Auto-selected *glm-4-flash* via *zhipuai*. Use /models to change.`, { parse_mode: 'Markdown' });
+      } else {
+        await this.sendMessage(chatId, 'No model selected. Use /models to select a provider and model first.');
+        return;
+      }
     }
 
     // Build conversation history

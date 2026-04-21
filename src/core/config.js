@@ -94,7 +94,7 @@ class Config {
   autoDiscoverGlobalKeys(rootVars, localVars) {
     // Known service defaults
     const knownDefaults = {
-      gemini: { type: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com' },
+      gemini: { type: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
       firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev' },
       tavily: { type: 'openai', baseUrl: 'https://api.tavily.com' },
       tavily_mcp: { type: 'openai', baseUrl: 'https://mcp.tavily.com/mcp', keyPattern: 'TAVILY' },
@@ -105,7 +105,7 @@ class Config {
       jina: { type: 'openai', baseUrl: 'https://api.jina.ai' },
       groq: { type: 'openai', baseUrl: 'https://api.groq.com/openai/v1' },
       mistral: { type: 'openai', baseUrl: 'https://api.mistral.ai/v1' },
-      zhipuai: { type: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4' },
+      zhipuai: { type: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', keyPattern: '(ZHIPUAI|GLM)' },
       siliconflow: { type: 'openai', baseUrl: 'https://api.siliconflow.cn/v1' },
       searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1' },
     };
