@@ -4772,6 +4772,34 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                         <button onclick="addFallback()" class="btn btn-primary px-3 py-2 text-xs">Add</button>
                     </div>
                 </div>
+
+                <hr class="border-border">
+
+                <!-- Import/Export Section -->
+                <div>
+                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                        </svg>
+                        Import / Export Configuration
+                    </h4>
+                    <div class="space-y-3">
+                        <div class="flex items-center gap-2">
+                            <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                <input type="checkbox" id="exportIncludeSecrets" class="rounded">
+                                Include API keys (secrets)
+                            </label>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="exportConfig()" class="btn btn-secondary px-4 py-1.5 text-xs">Export JSON</button>
+                            <label class="btn btn-secondary px-4 py-1.5 text-xs cursor-pointer">
+                                Import JSON
+                                <input type="file" accept=".json" onchange="importConfig(event)" class="hidden">
+                            </label>
+                        </div>
+                        <div id="importExportStatus" class="text-xs"></div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -5024,6 +5052,64 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         } catch (err) {
             showErrorToast('Failed: ' + err.message);
         }
+    }
+
+    // ─── Import/Export ────────────────────────────────
+    async function exportConfig() {
+        const status = document.getElementById('importExportStatus');
+        const includeSecrets = document.getElementById('exportIncludeSecrets')?.checked || false;
+        try {
+            status.textContent = 'Exporting...';
+            const res = await fetch('/admin/api/export-config', {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ includeSecrets })
+            });
+            const data = await res.json();
+            const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `keyproxy-config-${new Date().toISOString().slice(0,10)}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            status.textContent = 'Exported!';
+            status.className = 'text-xs text-green-400';
+        } catch (err) {
+            status.textContent = 'Export failed: ' + err.message;
+            status.className = 'text-xs text-red-400';
+        }
+        setTimeout(() => { status.textContent = ''; }, 4000);
+    }
+
+    async function importConfig(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        const status = document.getElementById('importExportStatus');
+        try {
+            const text = await file.text();
+            const importData = JSON.parse(text);
+            const mode = confirm('Merge with existing config? (Cancel = Replace all)') ? 'merge' : 'replace';
+            status.textContent = 'Importing...';
+            const res = await fetch('/admin/api/import-config', {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ config: importData, mode })
+            });
+            const result = await res.json();
+            if (result.success) {
+                status.textContent = `Imported ${result.providersImported} providers (${mode}). Reload to apply.`;
+                status.className = 'text-xs text-green-400';
+            } else {
+                status.textContent = result.error || 'Import failed';
+                status.className = 'text-xs text-red-400';
+            }
+        } catch (err) {
+            status.textContent = 'Import failed: ' + err.message;
+            status.className = 'text-xs text-red-400';
+        }
+        event.target.value = '';
+        setTimeout(() => { status.textContent = ''; }, 5000);
     }
 
     // Close on Escape

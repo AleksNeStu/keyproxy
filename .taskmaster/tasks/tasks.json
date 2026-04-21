@@ -157,11 +157,11 @@
         "description": "Add export/import functionality to backup and restore all KeyProxy configuration. Export generates a JSON file containing: providers, keys, env settings, notification config, health check config, fallback chains. Import merges or replaces current config. Useful for migrating between workstations or disaster recovery. Admin UI: Export button downloads JSON, Import button with file picker + merge/replace choice + confirmation. Sensitive fields (API keys) are optionally included or excluded via toggle.",
         "details": "Files: src/core/configExporter.js (new — export/import logic), src/server.js (2 API routes: POST /admin/api/export-config, POST /admin/api/import-config), public/admin.html (import/export section in Settings modal). Export format: { version, exportedAt, config: { envVars, providers }, includeSecrets: bool }. Import: validate JSON, merge or replace, write .env, reload.",
         "testStrategy": "1) Export config, 2) Verify JSON contains all providers/settings, 3) Delete a provider, 4) Import with merge, 5) Verify provider restored, 6) Import with replace, 7) Verify clean slate",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "priority": "low",
         "subtasks": [],
-        "updatedAt": "2026-04-21T10:00:00.000Z"
+        "updatedAt": "2026-04-21T14:09:38.185Z"
       },
       {
         "id": "13",
@@ -178,9 +178,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:05:04.507Z",
+      "lastModified": "2026-04-21T14:09:38.186Z",
       "taskCount": 13,
-      "completedCount": 11,
+      "completedCount": 12,
       "tags": [
         "master"
       ]

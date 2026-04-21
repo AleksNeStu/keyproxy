@@ -8,6 +8,7 @@ const MetricsCollector = require('./core/metrics');
 const AnalyticsTracker = require('./core/analytics');
 const FallbackRouter = require('./core/fallbackRouter');
 const CircuitBreaker = require('./core/circuitBreaker');
+const ConfigExporter = require('./core/configExporter');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -55,6 +56,9 @@ class ProxyServer {
     const cbThreshold = parseInt(config.envVars?.KEYPROXY_CB_THRESHOLD) || 5;
     const cbTimeoutMs = (parseInt(config.envVars?.KEYPROXY_CB_TIMEOUT_SEC) || 30) * 1000;
     this.circuitBreaker = new CircuitBreaker(cbThreshold, cbTimeoutMs);
+
+    // Config exporter/importer
+    this.configExporter = new ConfigExporter(config);
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
@@ -956,6 +960,10 @@ class ProxyServer {
       await this.handleGetCircuitBreaker(res);
     } else if (path.startsWith('/admin/api/circuit-breaker/') && req.method === 'POST') {
       await this.handleCircuitBreakerAction(res, path, body);
+    } else if (path === '/admin/api/export-config' && req.method === 'POST') {
+      await this.handleExportConfig(res, body);
+    } else if (path === '/admin/api/import-config' && req.method === 'POST') {
+      await this.handleImportConfig(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -2133,7 +2141,6 @@ $form.Dispose()
   async handleCircuitBreakerAction(res, urlPath, body) {
     try {
       const parts = urlPath.split('/');
-      // /admin/api/circuit-breaker/{provider}/{action}
       const provider = parts[4];
       const action = parts[5];
 
@@ -2155,6 +2162,32 @@ $form.Dispose()
       res.end(JSON.stringify({ success: true }));
     } catch (error) {
       this.sendError(res, 500, 'Circuit breaker action failed: ' + error.message);
+    }
+  }
+
+  async handleExportConfig(res, body) {
+    try {
+      const { includeSecrets } = JSON.parse(body || '{}');
+      const data = this.configExporter.exportConfig(!!includeSecrets);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(data, null, 2));
+    } catch (error) {
+      this.sendError(res, 500, 'Export failed: ' + error.message);
+    }
+  }
+
+  async handleImportConfig(res, body) {
+    try {
+      const { config: importData, mode } = JSON.parse(body || '{}');
+      if (!importData) {
+        this.sendError(res, 400, 'Config data required');
+        return;
+      }
+      const result = this.configExporter.importConfig(importData, mode || 'merge');
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (error) {
+      this.sendError(res, 500, 'Import failed: ' + error.message);
     }
   }
 
