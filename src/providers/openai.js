@@ -2,11 +2,12 @@ const https = require('https');
 const { URL } = require('url');
 
 class OpenAIClient {
-  constructor(keyRotator, baseUrl = 'https://api.openai.com', providerName = 'openai', retryConfig = null) {
+  constructor(keyRotator, baseUrl = 'https://api.openai.com', providerName = 'openai', retryConfig = null, timeoutMs = 60000) {
     this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
     this.providerName = providerName;
     this.retryConfig = retryConfig || { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };
+    this.timeoutMs = timeoutMs;
   }
 
   sleep(ms) {
@@ -181,6 +182,10 @@ class OpenAIClient {
         });
       });
 
+      req.setTimeout(this.timeoutMs, () => {
+        req.destroy(new Error(`Request timeout (${this.timeoutMs}ms)`));
+      });
+
       req.on('error', (error) => {
         const maskedKey = this.maskApiKey(apiKey);
         console.log(`[OPENAI::${maskedKey}] HTTP request error: ${error.message}`);
@@ -207,6 +212,10 @@ class OpenAIClient {
           headers: res.headers,
           stream: res
         });
+      });
+
+      req.setTimeout(this.timeoutMs, () => {
+        req.destroy(new Error(`Streaming request timeout (${this.timeoutMs}ms)`));
       });
 
       req.on('error', (error) => {

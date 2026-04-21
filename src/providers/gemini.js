@@ -2,11 +2,12 @@ const https = require('https');
 const { URL } = require('url');
 
 class GeminiClient {
-  constructor(keyRotator, baseUrl = 'https://generativelanguage.googleapis.com', providerName = 'gemini', retryConfig = null) {
+  constructor(keyRotator, baseUrl = 'https://generativelanguage.googleapis.com', providerName = 'gemini', retryConfig = null, timeoutMs = 60000) {
     this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
     this.providerName = providerName;
     this.retryConfig = retryConfig || { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };
+    this.timeoutMs = timeoutMs;
   }
 
   sleep(ms) {
@@ -217,6 +218,10 @@ class GeminiClient {
         });
       });
 
+      req.setTimeout(this.timeoutMs, () => {
+        req.destroy(new Error(`Request timeout (${this.timeoutMs}ms)`));
+      });
+
       req.on('error', (error) => {
         const maskedKey = this.maskApiKey(apiKey);
         console.log(`[GEMINI::${maskedKey}] HTTP request error: ${error.message}`);
@@ -242,6 +247,10 @@ class GeminiClient {
           headers: res.headers,
           stream: res
         });
+      });
+
+      req.setTimeout(this.timeoutMs, () => {
+        req.destroy(new Error(`Streaming request timeout (${this.timeoutMs}ms)`));
       });
 
       req.on('error', (error) => {

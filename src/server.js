@@ -459,15 +459,19 @@ class ProxyServer {
       }
     } catch (error) {
       console.log(`[REQ-${requestId}] Request handling error: ${error.message}`);
-      console.log(`[REQ-${requestId}] Response: 500 Internal Server Error`);
+
+      const isTimeout = error.message?.includes('timeout');
+      const statusCode = isTimeout ? 504 : 500;
+      const statusText = isTimeout ? 'Gateway Timeout' : 'Internal Server Error';
+      console.log(`[REQ-${requestId}] Response: ${statusCode} ${statusText}`);
 
       if (isApiCall) {
         const responseTime = Date.now() - startTime;
-        this.logApiRequest(requestId, req.method, req.url, 'unknown', 500, responseTime, error.message, clientIp);
-        this.metrics.incCounter('keyproxy_errors_total', { provider: 'unknown', type: 'internal' });
+        this.logApiRequest(requestId, req.method, req.url, 'unknown', statusCode, responseTime, error.message, clientIp);
+        this.metrics.incCounter('keyproxy_errors_total', { provider: 'unknown', type: isTimeout ? 'timeout' : 'internal' });
       }
 
-      this.sendError(res, 500, 'Internal server error');
+      this.sendError(res, statusCode, isTimeout ? 'Gateway timeout — upstream did not respond in time' : 'Internal server error');
     }
   }
 
@@ -580,12 +584,14 @@ class ProxyServer {
       const allKeys = provider.allKeys ? provider.allKeys.map(k => k.key) : enabledKeys;
       this.historyManager.syncProviderKeys(providerName, allKeys);
       const retryConfig = this.config.getRetryConfig(providerName);
+      const timeoutKey = `${provider.apiType.toUpperCase()}_${providerName.toUpperCase().replace(/-/g, '_')}_TIMEOUT_MS`;
+      const timeoutMs = parseInt(this.config.envVars[timeoutKey]) || 60000;
       let client;
 
       if (provider.apiType === 'openai') {
-        client = new this.OpenAIClient(keyRotator, provider.baseUrl, providerName, retryConfig);
+        client = new this.OpenAIClient(keyRotator, provider.baseUrl, providerName, retryConfig, timeoutMs);
       } else if (provider.apiType === 'gemini') {
-        client = new this.GeminiClient(keyRotator, provider.baseUrl, providerName, retryConfig);
+        client = new this.GeminiClient(keyRotator, provider.baseUrl, providerName, retryConfig, timeoutMs);
       } else {
         return null;
       }

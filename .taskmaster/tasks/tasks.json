@@ -241,13 +241,13 @@
         "id": "19",
         "title": "Request timeout with per-provider configuration",
         "priority": "medium",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "description": "Add timeout to https.request (default 60s). Per-provider config via env. On timeout emit 504 Gateway Timeout. Wire into circuit breaker.",
         "details": "Files: src/providers/openai.js (add timeout param), src/providers/gemini.js (add timeout param), src/server.js (pass timeout config to clients). Config: {TYPE}_{PROVIDER}_TIMEOUT_MS=60000.",
         "testStrategy": "Set 5s timeout, point at slow endpoint, verify 504 response",
         "subtasks": [],
-        "updatedAt": "2026-04-21T14:29:54.257Z"
+        "updatedAt": "2026-04-21T14:36:54.406Z"
       },
       {
         "id": "20",
@@ -266,9 +266,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:31:37.166Z",
+      "lastModified": "2026-04-21T14:36:54.407Z",
       "taskCount": 20,
-      "completedCount": 14,
+      "completedCount": 15,
       "tags": [
         "master"
       ]
