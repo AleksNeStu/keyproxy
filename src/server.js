@@ -7,6 +7,7 @@ const Auth = require('./core/auth');
 const MetricsCollector = require('./core/metrics');
 const AnalyticsTracker = require('./core/analytics');
 const FallbackRouter = require('./core/fallbackRouter');
+const CircuitBreaker = require('./core/circuitBreaker');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -49,6 +50,11 @@ class ProxyServer {
 
     // Fallback router (cross-provider failover)
     this.fallbackRouter = null; // Initialized in start() after config loads
+
+    // Circuit breaker (per-provider)
+    const cbThreshold = parseInt(config.envVars?.KEYPROXY_CB_THRESHOLD) || 5;
+    const cbTimeoutMs = (parseInt(config.envVars?.KEYPROXY_CB_TIMEOUT_SEC) || 30) * 1000;
+    this.circuitBreaker = new CircuitBreaker(cbThreshold, cbTimeoutMs);
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
@@ -259,6 +265,14 @@ class ProxyServer {
 
       let response;
 
+      // Circuit breaker check
+      const cbCheck = this.circuitBreaker.check(providerName);
+      if (!cbCheck.allowed) {
+        console.log(`[REQ-${requestId}] Circuit breaker OPEN for '${providerName}' - returning 503`);
+        this.sendError(res, 503, `Provider '${providerName}' circuit breaker is open. Retry later.`);
+        return;
+      }
+
       // Get or create client for this provider
       const client = await this.getProviderClient(providerName, provider, legacy);
       if (!client) {
@@ -364,6 +378,14 @@ class ProxyServer {
           this.logApiRequest(requestId, req.method, path, providerName, response.statusCode, responseTime, error, clientIp, keyInfo);
           this.metrics.incCounter('keyproxy_requests_total', { provider: providerName, status: String(response.statusCode) });
           this.metrics.observeHistogram('keyproxy_request_duration_seconds', { provider: providerName }, responseTime / 1000);
+
+          // Circuit breaker tracking
+          if (response.statusCode >= 500 || response.statusCode === 429) {
+            this.circuitBreaker.recordFailure(providerName);
+          } else {
+            this.circuitBreaker.recordSuccess(providerName);
+          }
+
           if (response.statusCode >= 400) {
             this.metrics.incCounter('keyproxy_errors_total', { provider: providerName, type: response.statusCode >= 500 ? 'server' : 'client' });
           }
@@ -930,6 +952,10 @@ class ProxyServer {
       await this.handleGetFallbacks(res);
     } else if (path === '/admin/api/fallbacks' && req.method === 'POST') {
       await this.handleSetFallback(res, body);
+    } else if (path === '/admin/api/circuit-breaker' && req.method === 'GET') {
+      await this.handleGetCircuitBreaker(res);
+    } else if (path.startsWith('/admin/api/circuit-breaker/') && req.method === 'POST') {
+      await this.handleCircuitBreakerAction(res, path, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -2091,6 +2117,44 @@ $form.Dispose()
       res.end(JSON.stringify({ success: true }));
     } catch (error) {
       this.sendError(res, 500, 'Failed to set fallback: ' + error.message);
+    }
+  }
+
+  async handleGetCircuitBreaker(res) {
+    try {
+      const states = this.circuitBreaker.getAllStates();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(states));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to get circuit breaker states: ' + error.message);
+    }
+  }
+
+  async handleCircuitBreakerAction(res, urlPath, body) {
+    try {
+      const parts = urlPath.split('/');
+      // /admin/api/circuit-breaker/{provider}/{action}
+      const provider = parts[4];
+      const action = parts[5];
+
+      if (!provider || !action) {
+        this.sendError(res, 400, 'Provider and action required');
+        return;
+      }
+
+      if (action === 'force-close') {
+        this.circuitBreaker.forceClose(provider);
+      } else if (action === 'force-open') {
+        this.circuitBreaker.forceOpen(provider);
+      } else {
+        this.sendError(res, 400, 'Unknown action: ' + action);
+        return;
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Circuit breaker action failed: ' + error.message);
     }
   }
 

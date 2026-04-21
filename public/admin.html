@@ -865,6 +865,7 @@
                                 <tr class="border-b border-border text-left text-xs text-muted-foreground">
                                     <th class="pb-2 pr-3">Provider</th>
                                     <th class="pb-2 pr-3">Status</th>
+                                    <th class="pb-2 pr-3">Circuit</th>
                                     <th class="pb-2 pr-3">Type</th>
                                     <th class="pb-2 pr-3">Keys</th>
                                     <th class="pb-2 pr-3">Requests</th>
@@ -874,7 +875,7 @@
                                 </tr>
                             </thead>
                             <tbody id="healthTableBody">
-                                <tr><td colspan="8" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
+                                <tr><td colspan="9" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -4405,6 +4406,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 row.innerHTML = `
                     <td class="py-2 pr-3 font-medium text-foreground">${p.name}</td>
                     <td class="py-2 pr-3">${statusBadge(p.status)}</td>
+                    <td class="py-2 pr-3" id="cb-${p.name}">${statusBadge('unknown')}</td>
                     <td class="py-2 pr-3 text-xs text-muted-foreground">${p.apiType}</td>
                     <td class="py-2 pr-3 text-xs"><span class="text-green-400">${p.enabledKeys}</span>/<span class="text-muted-foreground">${p.totalKeys}</span>${p.exhaustedKeys ? ` <span class="text-red-400">(-${p.exhaustedKeys})</span>` : ''}</td>
                     <td class="py-2 pr-3 text-xs text-muted-foreground">${p.totalRequests}</td>
@@ -4416,6 +4418,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 `;
                 tbody.appendChild(row);
             });
+            loadCircuitBreakerStates();
         }
 
         // Auto-refresh health tab every 30s
@@ -4977,6 +4980,47 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 body: JSON.stringify({ provider, fallbackProvider: null })
             });
             loadFallbacks();
+        } catch (err) {
+            showErrorToast('Failed: ' + err.message);
+        }
+    }
+
+    // ─── Circuit Breaker ────────────────────────────
+    async function loadCircuitBreakerStates() {
+        try {
+            const res = await fetch('/admin/api/circuit-breaker', { headers: authHeaders() });
+            if (!res.ok) return;
+            const states = await res.json();
+            const cbColors = {
+                closed: 'bg-green-500/20 text-green-400 border-green-500/30',
+                open: 'bg-red-500/20 text-red-400 border-red-500/30',
+                'half-open': 'bg-amber-500/20 text-amber-400 border-amber-500/30'
+            };
+            for (const [name, state] of Object.entries(states)) {
+                const td = document.getElementById('cb-' + name);
+                if (!td) continue;
+                const color = cbColors[state.state] || cbColors.closed;
+                let html = `<span class="px-2 py-0.5 rounded text-xs border ${color}">${state.state}</span>`;
+                if (state.state === 'open') {
+                    html += ` <button onclick="forceCloseCircuit('${name}')" class="text-xs text-blue-400 hover:text-blue-300 ml-1">force-close</button>`;
+                } else if (state.state === 'closed' && state.failures > 0) {
+                    html += ` <span class="text-xs text-muted-foreground">(${state.failures}/${state.threshold})</span>`;
+                }
+                td.innerHTML = html;
+            }
+        } catch (err) {
+            console.error('CB load error:', err);
+        }
+    }
+
+    async function forceCloseCircuit(provider) {
+        try {
+            await fetch(`/admin/api/circuit-breaker/${provider}/force-close`, {
+                method: 'POST',
+                headers: authHeaders()
+            });
+            loadCircuitBreakerStates();
+            showInfoToast(`Circuit for ${provider} force-closed`);
         } catch (err) {
             showErrorToast('Failed: ' + err.message);
         }
