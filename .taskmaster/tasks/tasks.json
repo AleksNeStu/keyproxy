@@ -179,13 +179,13 @@
         "id": "14",
         "title": "Response caching with cache-control headers",
         "priority": "high",
-        "status": "pending",
+        "status": "done",
         "dependencies": [],
         "description": "In-memory LRU cache for repeated identical requests. Keyed by hash(provider+model+messages). TTL-based expiry. X-Cache HIT/MISS headers. Admin toggle per provider. Zero npm deps.",
         "details": "Files: src/core/cache.js (new — LRUCache class with TTL), src/server.js (cache lookup before routing, cache store after response), public/admin.html (cache settings in Settings). Config: KEYPROXY_CACHE_ENABLED=true, KEYPROXY_CACHE_TTL_SEC=300, KEYPROXY_CACHE_MAX_ENTRIES=1000.",
         "testStrategy": "Send same request twice, verify second returns X-Cache: HIT and is faster",
         "subtasks": [],
-        "updatedAt": "2026-04-21T14:29:54.257Z"
+        "updatedAt": "2026-04-21T14:44:37.234Z"
       },
       {
         "id": "15",
@@ -266,9 +266,9 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:40:28.101Z",
+      "lastModified": "2026-04-21T14:44:37.234Z",
       "taskCount": 20,
-      "completedCount": 16,
+      "completedCount": 17,
       "tags": [
         "master"
       ]

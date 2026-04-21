@@ -10,6 +10,7 @@ const FallbackRouter = require('./core/fallbackRouter');
 const CircuitBreaker = require('./core/circuitBreaker');
 const ConfigExporter = require('./core/configExporter');
 const { SlidingWindowCounter } = require('./core/rateTracker');
+const ResponseCache = require('./core/cache');
 const TelegramBot = require('./core/telegramBot');
 
 class ProxyServer {
@@ -64,6 +65,13 @@ class ProxyServer {
     // Per-key RPM tracker (sliding window)
     this.rpmTracker = new SlidingWindowCounter();
     this._rpmPruneTimer = setInterval(() => this.rpmTracker.prune(), 60000);
+
+    // Response cache
+    const cacheEnabled = config.envVars?.KEYPROXY_CACHE_ENABLED !== 'false';
+    const cacheTtl = parseInt(config.envVars?.KEYPROXY_CACHE_TTL_SEC) || 300;
+    const cacheMax = parseInt(config.envVars?.KEYPROXY_CACHE_MAX_ENTRIES) || 1000;
+    this.responseCache = new ResponseCache(cacheMax, cacheTtl * 1000);
+    this.responseCache.enabled = cacheEnabled;
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
@@ -307,6 +315,23 @@ class ProxyServer {
         console.log(`[REQ-${requestId}] Streaming request detected`);
       }
 
+      // Cache lookup (non-streaming, GET/POST only)
+      if (!isStreaming && (req.method === 'POST' || req.method === 'GET') && this.responseCache.enabled) {
+        const cached = this.responseCache.get(providerName, req.method, path, body);
+        if (cached) {
+          console.log(`[REQ-${requestId}] Cache HIT for ${providerName}`);
+          const responseTime = Date.now() - startTime;
+          this.logApiRequest(requestId, req.method, path, providerName, cached.statusCode, responseTime, null, clientIp);
+          this.metrics.incCounter('keyproxy_requests_total', { provider: providerName, status: String(cached.statusCode) });
+          this.metrics.incCounter('keyproxy_cache_hits_total', { provider: providerName });
+          const cacheHeaders = { ...cached.headers, 'X-Cache': 'HIT', 'X-Cache-Age': Math.round((Date.now() - cached.cachedAt) / 1000) + 's' };
+          res.writeHead(cached.statusCode, cacheHeaders);
+          res.end(cached.data);
+          return;
+        }
+        console.log(`[REQ-${requestId}] Cache MISS for ${providerName}`);
+      }
+
       response = await client.makeRequest(req.method, path, body, headers, customStatusCodes, isStreaming);
 
       // Extract key info from response
@@ -455,6 +480,13 @@ class ProxyServer {
         }
 
         this.logApiResponse(requestId, response, body);
+
+        // Cache successful non-streaming responses
+        if (!isStreaming && response.statusCode < 400 && this.responseCache.enabled) {
+          this.responseCache.set(providerName, req.method, path, body, response);
+          res.setHeader('X-Cache', 'MISS');
+        }
+
         this.sendResponse(res, response);
       }
     } catch (error) {
@@ -981,6 +1013,12 @@ class ProxyServer {
       await this.handleImportConfig(res, body);
     } else if (path === '/admin/api/rpm' && req.method === 'GET') {
       await this.handleGetRpm(res);
+    } else if (path === '/admin/api/cache' && req.method === 'GET') {
+      await this.handleGetCacheStats(res);
+    } else if (path === '/admin/api/cache' && req.method === 'DELETE') {
+      await this.handleClearCache(res);
+    } else if (path === '/admin/api/cache/config' && req.method === 'POST') {
+      await this.handleCacheConfig(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -2215,6 +2253,37 @@ $form.Dispose()
       res.end(JSON.stringify(rpmData));
     } catch (error) {
       this.sendError(res, 500, 'RPM query failed: ' + error.message);
+    }
+  }
+
+  async handleGetCacheStats(res) {
+    try {
+      const stats = this.responseCache.getStats();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(stats));
+    } catch (error) {
+      this.sendError(res, 500, 'Cache stats failed: ' + error.message);
+    }
+  }
+
+  async handleClearCache(res) {
+    try {
+      this.responseCache.clear();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Cache clear failed: ' + error.message);
+    }
+  }
+
+  async handleCacheConfig(res, body) {
+    try {
+      const { enabled, maxEntries, ttlMs } = JSON.parse(body || '{}');
+      this.responseCache.configure({ enabled, maxEntries, ttlMs });
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(this.responseCache.getStats()));
+    } catch (error) {
+      this.sendError(res, 500, 'Cache config failed: ' + error.message);
     }
   }
 
