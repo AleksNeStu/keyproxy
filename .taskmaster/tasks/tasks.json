@@ -174,12 +174,100 @@
         "priority": "low",
         "subtasks": [],
         "updatedAt": "2026-04-21T14:15:35.262Z"
+      },
+      {
+        "id": "14",
+        "title": "Response caching with cache-control headers",
+        "priority": "high",
+        "status": "pending",
+        "dependencies": [],
+        "description": "In-memory LRU cache for repeated identical requests. Keyed by hash(provider+model+messages). TTL-based expiry. X-Cache HIT/MISS headers. Admin toggle per provider. Zero npm deps.",
+        "details": "Files: src/core/cache.js (new — LRUCache class with TTL), src/server.js (cache lookup before routing, cache store after response), public/admin.html (cache settings in Settings). Config: KEYPROXY_CACHE_ENABLED=true, KEYPROXY_CACHE_TTL_SEC=300, KEYPROXY_CACHE_MAX_ENTRIES=1000.",
+        "testStrategy": "Send same request twice, verify second returns X-Cache: HIT and is faster",
+        "subtasks": [],
+        "updatedAt": "2026-04-21T14:29:54.257Z"
+      },
+      {
+        "id": "15",
+        "title": "Docker containerization with multi-stage build",
+        "priority": "high",
+        "status": "pending",
+        "dependencies": [],
+        "description": "Multi-stage Node.js 20 Alpine Dockerfile. Docker-compose with volume mounts for data/ and .env. Health check on /metrics. Non-root user. ~50MB image.",
+        "details": "Files: Dockerfile (new), docker-compose.yml (new), .dockerignore (new). Docker-compose: volumes for ./data, ./.env. Port 8990. Restart unless-stopped.",
+        "testStrategy": "docker compose up, verify admin panel loads, verify /metrics returns data",
+        "subtasks": [],
+        "updatedAt": "2026-04-21T14:29:54.257Z"
+      },
+      {
+        "id": "16",
+        "title": "Virtual API keys with scoped access",
+        "priority": "high",
+        "status": "pending",
+        "dependencies": [],
+        "description": "Generate vk-xxxx virtual keys stored in data/virtual-keys.json. Each maps to: allowed providers, models, rate limit, expiry. Auth middleware checks virtual keys. Admin CRUD UI.",
+        "details": "Files: src/core/virtualKeys.js (new — VirtualKeyManager), src/server.js (auth middleware + 5 CRUD routes), public/admin.html (virtual key manager section). Keys stored hashed. Support: provider whitelist, model whitelist, RPM limit, expiry date.",
+        "testStrategy": "Create virtual key for openai only, use it to call openai (success) and gemini (reject)",
+        "subtasks": [],
+        "updatedAt": "2026-04-21T14:29:54.257Z"
+      },
+      {
+        "id": "17",
+        "title": "Budget and quota per key with auto-disable",
+        "priority": "medium",
+        "status": "pending",
+        "dependencies": [
+          "16"
+        ],
+        "description": "Per-key daily/monthly spend cap in data/budgets.json. Check before each request. Auto-disable key when cap reached. Notify via Notifier. Reset daily counters. Admin UI.",
+        "details": "Files: src/core/budgetTracker.js (new), src/server.js (budget check middleware + routes), public/admin.html (budget settings per key). Config: KEYPROXY_DEFAULT_DAILY_BUDGET, KEYPROXY_DEFAULT_MONTHLY_BUDGET.",
+        "testStrategy": "Set /usr/bin/bash.01 budget, make requests until key disables, verify notification sent",
+        "subtasks": [],
+        "updatedAt": "2026-04-21T14:29:54.257Z"
+      },
+      {
+        "id": "18",
+        "title": "Weighted load balancing with configurable strategies",
+        "priority": "medium",
+        "status": "pending",
+        "dependencies": [],
+        "description": "Add weight property to keys (default: 1). Three strategies: round-robin (current), weighted-random, least-used. Config per provider via env. Admin UI to set weights.",
+        "details": "Files: src/core/keyRotator.js (add weighted selection strategies), src/server.js (strategy config routes), public/admin.html (weight editor with slider). Config: {TYPE}_{PROVIDER}_LB_STRATEGY=round-robin|weighted-random|least-used.",
+        "testStrategy": "Set weights 3:1, make 100 requests, verify ~75/25 distribution",
+        "subtasks": [],
+        "updatedAt": "2026-04-21T14:29:54.257Z"
+      },
+      {
+        "id": "19",
+        "title": "Request timeout with per-provider configuration",
+        "priority": "medium",
+        "status": "pending",
+        "dependencies": [],
+        "description": "Add timeout to https.request (default 60s). Per-provider config via env. On timeout emit 504 Gateway Timeout. Wire into circuit breaker.",
+        "details": "Files: src/providers/openai.js (add timeout param), src/providers/gemini.js (add timeout param), src/server.js (pass timeout config to clients). Config: {TYPE}_{PROVIDER}_TIMEOUT_MS=60000.",
+        "testStrategy": "Set 5s timeout, point at slow endpoint, verify 504 response",
+        "subtasks": [],
+        "updatedAt": "2026-04-21T14:29:54.257Z"
+      },
+      {
+        "id": "20",
+        "title": "API key expiration and auto-rotation",
+        "priority": "medium",
+        "status": "pending",
+        "dependencies": [
+          "17"
+        ],
+        "description": "Optional KEY_TTL_HOURS per provider. Keys older than TTL auto-disable. Admin UI shows expiry countdown. Manual extend button. Notifier warns 24h before expiry.",
+        "details": "Files: src/core/keyRotator.js (expiry check in getNextKey), src/server.js (expiry routes + extend endpoint), public/admin.html (expiry badges + extend button). Config: {TYPE}_{PROVIDER}_KEY_TTL_HOURS.",
+        "testStrategy": "Set TTL 1 hour, verify key shows expiry badge, wait (or mock), verify auto-disable",
+        "subtasks": [],
+        "updatedAt": "2026-04-21T14:29:54.257Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:15:35.263Z",
-      "taskCount": 13,
+      "lastModified": "2026-04-21T14:29:54.257Z",
+      "taskCount": 20,
       "completedCount": 13,
       "tags": [
         "master"
