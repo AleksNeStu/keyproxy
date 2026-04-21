@@ -823,6 +823,8 @@ class ProxyServer {
       await this.handleRemoveEnvFile(res, body);
     } else if (path === '/admin/api/switch-env' && req.method === 'POST') {
       await this.handleSwitchEnv(res, body);
+    } else if (path === '/admin/api/reorder-env-files' && req.method === 'POST') {
+      await this.handleReorderEnvFiles(res, body);
     } else if (path === '/admin/api/health' && req.method === 'GET') {
       await this.handleGetHealth(res);
     } else if (path === '/admin/api/health/check-all' && req.method === 'POST') {
@@ -1790,6 +1792,22 @@ $form.Dispose()
       });
     }
     return providers;
+  }
+
+  async handleReorderEnvFiles(res, body) {
+    try {
+      const { names } = JSON.parse(body);
+      if (!Array.isArray(names)) {
+        this.sendError(res, 400, 'Missing names array');
+        return;
+      }
+      this.config.reorderEnvFiles(names);
+      const data = this.config.getEnvFiles();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true, ...data }));
+    } catch (error) {
+      this.sendError(res, 500, 'Failed to reorder env files: ' + error.message);
+    }
   }
 
   async handleGetHealth(res) {

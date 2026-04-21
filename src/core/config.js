@@ -566,6 +566,24 @@ class Config {
     this.writeLocalEnv(vars);
   }
 
+  reorderEnvFiles(names) {
+    const localEnvPath = path.join(process.cwd(), '.env');
+    const content = fs.readFileSync(localEnvPath, 'utf8');
+    const vars = this.parseEnvFile(content);
+    const files = this.parseEnvFiles(vars.ENV_FILES);
+
+    const reordered = {};
+    for (const name of names) {
+      if (files[name]) reordered[name] = files[name];
+    }
+    for (const [name, p] of Object.entries(files)) {
+      if (!reordered[name]) reordered[name] = p;
+    }
+
+    vars.ENV_FILES = Object.entries(reordered).map(([n, p]) => `${n}:${p}`).join(',');
+    this.writeLocalEnv(vars);
+  }
+
   writeLocalEnv(vars) {
     const localEnvPath = path.join(process.cwd(), '.env');
     const lines = [];
