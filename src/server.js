@@ -675,7 +675,9 @@ class ProxyServer {
         : null;
       const lbStrategyKey = `${provider.apiType.toUpperCase()}_${providerName.toUpperCase().replace(/-/g, '_')}_LB_STRATEGY`;
       const lbStrategy = this.config.envVars[lbStrategyKey] || 'round-robin';
-      const keyRotator = new this.KeyRotator(enabledKeys, provider.apiType, systemEnvName, this.historyManager, lbStrategy);
+      const ttlKey = `${provider.apiType.toUpperCase()}_${providerName.toUpperCase().replace(/-/g, '_')}_KEY_TTL_HOURS`;
+      const ttlMs = parseFloat(this.config.envVars[ttlKey]) ? parseFloat(this.config.envVars[ttlKey]) * 3600000 : 0;
+      const keyRotator = new this.KeyRotator(enabledKeys, provider.apiType, systemEnvName, this.historyManager, lbStrategy, ttlMs);
       keyRotator.onRotation = (provName, statusCode) => {
         this.metrics.incCounter('keyproxy_key_rotations_total', { provider: provName });
       };
@@ -1096,6 +1098,10 @@ class ProxyServer {
       await this.handleGetBudgets(res);
     } else if (path === '/admin/api/budgets' && req.method === 'POST') {
       await this.handleSetBudget(res, body);
+    } else if (path === '/admin/api/key-expiry' && req.method === 'GET') {
+      await this.handleGetKeyExpiry(res, params);
+    } else if (path === '/admin/api/key-extend' && req.method === 'POST') {
+      await this.handleExtendKey(res, body);
     } else if (path === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
       await this.handleSelectEnv(res);
     } else if (path === '/admin/api/fs-list' && req.method === 'GET') {
@@ -2436,6 +2442,46 @@ $form.Dispose()
       res.end(JSON.stringify(this.budgetTracker.getStatus(keyHash)));
     } catch (error) {
       this.sendError(res, 500, 'Budget set failed: ' + error.message);
+    }
+  }
+
+  async handleGetKeyExpiry(res, params) {
+    try {
+      const providerName = params?.provider;
+      const result = {};
+      const clients = this.providerClients;
+      for (const [name, client] of clients.entries()) {
+        if (providerName && name !== providerName) continue;
+        if (client.keyRotator && client.keyRotator.ttlMs > 0) {
+          result[name] = client.keyRotator.getKeyUsageStats(name)
+            .filter(k => k.expiry)
+            .map(k => ({ key: k.key, expiry: k.expiry }));
+        }
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify(result));
+    } catch (error) {
+      this.sendError(res, 500, 'Key expiry query failed: ' + error.message);
+    }
+  }
+
+  async handleExtendKey(res, body) {
+    try {
+      const { provider, fullKey } = JSON.parse(body || '{}');
+      if (!provider || !fullKey) {
+        this.sendError(res, 400, 'provider and fullKey required');
+        return;
+      }
+      const client = this.providerClients.get(provider);
+      if (!client || !client.keyRotator) {
+        this.sendError(res, 404, 'Provider not found');
+        return;
+      }
+      client.keyRotator.extendKey(fullKey);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } catch (error) {
+      this.sendError(res, 500, 'Key extend failed: ' + error.message);
     }
   }
 

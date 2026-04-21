@@ -1,19 +1,22 @@
 class KeyRotator {
-  constructor(apiKeys, apiType = 'unknown', systemEnvName = null, historyManager = null, strategy = 'round-robin') {
+  constructor(apiKeys, apiType = 'unknown', systemEnvName = null, historyManager = null, strategy = 'round-robin', ttlMs = 0) {
     this.apiKeys = [...apiKeys];
     this.apiType = apiType;
     this.systemEnvName = systemEnvName;
     this.historyManager = historyManager;
     this.strategy = strategy; // 'round-robin', 'weighted-random', 'least-used'
+    this.ttlMs = ttlMs; // Key TTL in ms (0 = no expiry)
     this.activeKey = null; // Currently synced system-wide key
     this.lastFailedKey = null; // Track the key that failed in the last request
     this.keyUsageCount = new Map(); // Track per-key usage count
     this.keyWeights = new Map(); // Per-key weight for weighted-random
+    this.keyFirstSeen = new Map(); // Track when key was first seen (for TTL)
     this.onRotation = null; // Callback: (providerName, statusCode) => void
     // Initialize usage counts and default weights for all keys
     for (const key of this.apiKeys) {
       this.keyUsageCount.set(key, 0);
       this.keyWeights.set(key, 1);
+      this.keyFirstSeen.set(key, Date.now());
     }
 
     let logMsg = `[${apiType.toUpperCase()}-ROTATOR] Initialized with ${this.apiKeys.length} API keys (strategy: ${strategy})`;
@@ -44,7 +47,8 @@ class KeyRotator {
    * @returns {RequestKeyContext} A new context for managing keys for a single request
    */
   createRequestContext() {
-    return new RequestKeyContext(this.apiKeys, this.apiType, this.lastFailedKey, this.strategy, this.keyUsageCount, this.keyWeights);
+    const activeKeys = this.getActiveKeys();
+    return new RequestKeyContext(activeKeys, this.apiType, this.lastFailedKey, this.strategy, this.keyUsageCount, this.keyWeights);
   }
 
   /**
@@ -111,6 +115,10 @@ class KeyRotator {
         entry.rotationReason = status.rotationReason;
         entry.rotationCount = status.rotationCount;
       }
+      const expiry = this.getKeyExpiry(key);
+      if (expiry) {
+        entry.expiry = expiry;
+      }
       stats.push(entry);
     }
     return stats;
@@ -118,6 +126,43 @@ class KeyRotator {
 
   getTotalKeysCount() {
     return this.apiKeys.length;
+  }
+
+  /**
+   * Get keys that haven't expired based on TTL.
+   * Returns filtered array if TTL is set, otherwise all keys.
+   */
+  getActiveKeys() {
+    if (!this.ttlMs || this.ttlMs <= 0) return this.apiKeys;
+    const now = Date.now();
+    return this.apiKeys.filter(key => {
+      const firstSeen = this.keyFirstSeen.get(key) || now;
+      return (now - firstSeen) < this.ttlMs;
+    });
+  }
+
+  /**
+   * Get expiry info for a key.
+   */
+  getKeyExpiry(key) {
+    if (!this.ttlMs || this.ttlMs <= 0) return null;
+    const firstSeen = this.keyFirstSeen.get(key);
+    if (!firstSeen) return null;
+    const expiresAt = firstSeen + this.ttlMs;
+    const remaining = Math.max(0, expiresAt - Date.now());
+    return {
+      firstSeen: new Date(firstSeen).toISOString(),
+      expiresAt: new Date(expiresAt).toISOString(),
+      remainingMs: remaining,
+      expired: remaining <= 0
+    };
+  }
+
+  /**
+   * Extend a key's TTL (reset first-seen time).
+   */
+  extendKey(key) {
+    this.keyFirstSeen.set(key, Date.now());
   }
 
   maskApiKey(key) {

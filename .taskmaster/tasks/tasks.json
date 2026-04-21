@@ -253,7 +253,7 @@
         "id": "20",
         "title": "API key expiration and auto-rotation",
         "priority": "medium",
-        "status": "pending",
+        "status": "done",
         "dependencies": [
           "17"
         ],
@@ -261,14 +261,14 @@
         "details": "Files: src/core/keyRotator.js (expiry check in getNextKey), src/server.js (expiry routes + extend endpoint), public/admin.html (expiry badges + extend button). Config: {TYPE}_{PROVIDER}_KEY_TTL_HOURS.",
         "testStrategy": "Set TTL 1 hour, verify key shows expiry badge, wait (or mock), verify auto-disable",
         "subtasks": [],
-        "updatedAt": "2026-04-21T14:29:54.257Z"
+        "updatedAt": "2026-04-21T14:57:32.261Z"
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:53:27.013Z",
+      "lastModified": "2026-04-21T14:57:32.261Z",
       "taskCount": 20,
-      "completedCount": 19,
+      "completedCount": 20,
       "tags": [
         "master"
       ]
