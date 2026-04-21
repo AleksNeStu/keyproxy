@@ -52,11 +52,9 @@ class Config {
 
     // Resolve port: .env takes priority, then process.env, then fail
     const port = envVars.PORT || process.env.PORT;
-    const adminPassword = envVars.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD;
 
     const missingFields = [];
     if (!port) missingFields.push('PORT');
-    if (!adminPassword) missingFields.push('ADMIN_PASSWORD');
 
     if (missingFields.length > 0) {
       console.error('\n❌ ERROR: Required fields missing!');
@@ -66,7 +64,6 @@ class Config {
 
     // Set required fields
     this.port = parseInt(port);
-    this.adminPassword = adminPassword;
     this.envVars = envVars; // Save for UI access
 
     console.log(`[CONFIG] Port: ${this.port}`);
@@ -401,12 +398,10 @@ class Config {
     return this.openaiApiKeys.length > 0;
   }
 
-  getAdminPassword() {
-    return this.adminPassword;
-  }
-
   hasAdminPassword() {
-    return this.adminPassword && this.adminPassword.length > 0;
+    const Auth = require('./auth');
+    const envPassword = this.envVars.ADMIN_PASSWORD;
+    return !!(envPassword || Auth.loadHashFromFile());
   }
 
   maskApiKey(key) {

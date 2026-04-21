@@ -894,7 +894,7 @@ class ProxyServer {
 
         // Set session cookie (expires in 24 hours)
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString();
-        const upgradeAvailable = !Auth.isHash(adminPassword);
+        const upgradeAvailable = !Auth.isHash(adminPassword) && !Auth.loadHashFromFile();
         res.writeHead(200, {
           'Content-Type': 'application/json',
           'Set-Cookie': `adminSession=${this.adminSessionToken}; HttpOnly; Expires=${expires}; Path=/admin`
@@ -973,9 +973,9 @@ class ProxyServer {
       const envPath = path.join(process.cwd(), '.env');
       const envContent = fs.readFileSync(envPath, 'utf8');
       const envVars = this.config.parseEnvFile(envContent);
-      return envVars.ADMIN_PASSWORD;
+      return Auth.getAdminPassword(envVars.ADMIN_PASSWORD);
     } catch (error) {
-      return null;
+      return Auth.getAdminPassword(null);
     }
   }
   
@@ -1664,25 +1664,17 @@ $form.Dispose()
   async handleUpgradePassword(res) {
     try {
       const adminPassword = this.getAdminPassword();
-      if (Auth.isHash(adminPassword)) {
-        this.sendError(res, 400, 'Password is already hashed');
+      if (!adminPassword) {
+        this.sendError(res, 400, 'No admin password configured');
         return;
       }
 
-      const hashed = Auth.hashPassword(adminPassword);
-      const envPath = path.join(process.cwd(), '.env');
-      const envContent = fs.readFileSync(envPath, 'utf8');
-      const lines = envContent.split('\n');
-      const updated = lines.map(line => {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('ADMIN_PASSWORD=')) {
-          return `ADMIN_PASSWORD=${hashed}`;
-        }
-        return line;
-      }).join('\n');
+      const hash = Auth.isHash(adminPassword)
+        ? adminPassword
+        : Auth.hashPassword(adminPassword);
 
-      fs.writeFileSync(envPath, updated, 'utf8');
-      this.config.loadConfig();
+      Auth.saveHashToFile(hash);
+      Auth.removePasswordFromEnv(path.join(process.cwd(), '.env'));
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
@@ -1711,19 +1703,8 @@ $form.Dispose()
       }
 
       const hashed = Auth.hashPassword(newPassword);
-      const envPath = path.join(process.cwd(), '.env');
-      const envContent = fs.readFileSync(envPath, 'utf8');
-      const lines = envContent.split('\n');
-      const updated = lines.map(line => {
-        const trimmed = line.trim();
-        if (trimmed.startsWith('ADMIN_PASSWORD=')) {
-          return `ADMIN_PASSWORD=${hashed}`;
-        }
-        return line;
-      }).join('\n');
-
-      fs.writeFileSync(envPath, updated, 'utf8');
-      this.config.loadConfig();
+      Auth.saveHashToFile(hashed);
+      Auth.removePasswordFromEnv(path.join(process.cwd(), '.env'));
 
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ success: true }));
