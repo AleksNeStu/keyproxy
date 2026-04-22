@@ -6,7 +6,7 @@ param(
 
 $KeyProxyDir = $PSScriptRoot
 $Port = 8990
-$ServiceName = 'KeyProxy'
+$ServiceName = 'keyproxy.exe'
 $AdminUrl = "http://localhost:${Port}/admin"
 
 # --- Helpers ---

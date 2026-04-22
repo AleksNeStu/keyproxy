@@ -195,6 +195,25 @@ class ProxyServer {
         }
       }
 
+      // Serve test login page
+      if (req.url === '/test-login' || req.url === '/test-login.html') {
+        try {
+          const filePath = path.join(process.cwd(), 'public', 'test-login.html');
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'text/html',
+            'Content-Length': Buffer.byteLength(fileContent)
+          });
+          res.end(fileContent);
+          return;
+        } catch (error) {
+          console.log(`[STATIC] Error serving test-login.html: ${error.message}`);
+          res.writeHead(404, { 'Content-Type': 'text/plain' });
+          res.end('File not found');
+          return;
+        }
+      }
+
       // Handle root route - redirect to admin
       if (req.url === '/' || req.url === '') {
         res.writeHead(302, { 'Location': '/admin' });
@@ -1155,11 +1174,16 @@ class ProxyServer {
       const data = JSON.parse(body);
       const adminPassword = this.getAdminPassword();
 
+      console.log('[SECURITY] Login attempt, password provided:', data.password ? 'yes' : 'no');
+      console.log('[SECURITY] Admin password configured:', adminPassword ? 'yes' : 'no');
+
       if (Auth.verifyPassword(data.password, adminPassword)) {
         // Successful login - reset counters
         this.failedLoginAttempts = 0;
         this.loginBlockedUntil = null;
         this.adminSessionToken = this.generateSessionToken();
+
+        console.log('[SECURITY] Successful admin login');
 
         // Set session cookie (expires in 24 hours)
         const expires = new Date(Date.now() + 24 * 60 * 60 * 1000).toUTCString();
@@ -1169,6 +1193,7 @@ class ProxyServer {
           'Set-Cookie': `adminSession=${this.adminSessionToken}; HttpOnly; Expires=${expires}; Path=/admin`
         });
         res.end(JSON.stringify({ success: true, passwordUpgradeAvailable: upgradeAvailable }));
+        console.log('[SECURITY] Session token set, cookie sent');
       } else {
         // Failed login - increment counter
         this.failedLoginAttempts++;
