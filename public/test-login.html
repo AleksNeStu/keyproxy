@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KeyProxy Login Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin: 20px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            font-size: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 4px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+    </style>
+</head>
+<body>
+    <h1>KeyProxy Login Test</h1>
+    
+    <div class="form-group">
+        <label for="password">Password:</label>
+        <input type="password" id="password" value="admin123" placeholder="Enter password">
+    </div>
+    
+    <button onclick="testLogin()">Test Login</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function testLogin() {
+            const password = document.getElementById('password').value;
+            const resultDiv = document.getElementById('result');
+            
+            resultDiv.style.display = 'block';
+            resultDiv.className = 'info';
+            resultDiv.innerHTML = 'Testing login...';
+            
+            try {
+                console.log('Sending login request with password:', password);
+                
+                const response = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ password: password }),
+                    credentials: 'include' // Important for cookies!
+                });
+                
+                console.log('Response status:', response.status);
+                console.log('Response headers:', [...response.headers.entries()]);
+                
+                const data = await response.json();
+                console.log('Response data:', data);
+                
+                if (response.ok && data.success) {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ Login Successful!</strong><br>
+                        Status: ${response.status}<br>
+                        Data: ${JSON.stringify(data, null, 2)}<br>
+                        <br>
+                        <button onclick="testAuth()">Test Auth Status</button>
+                    `;
+                } else {
+                    resultDiv.className = 'error';
+                    resultDiv.innerHTML = `
+                        <strong>❌ Login Failed</strong><br>
+                        Status: ${response.status}<br>
+                        Error: ${data.error || 'Unknown error'}<br>
+                        Data: ${JSON.stringify(data, null, 2)}
+                    `;
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `
+                    <strong>❌ Request Failed</strong><br>
+                    Error: ${error.message}
+                `;
+            }
+        }
+        
+        async function testAuth() {
+            const resultDiv = document.getElementById('result');
+            
+            try {
+                console.log('Checking auth status...');
+                
+                const response = await fetch('/admin/api/auth', {
+                    method: 'GET',
+                    credentials: 'include'
+                });
+                
+                console.log('Auth response status:', response.status);
+                const data = await response.json();
+                console.log('Auth response data:', data);
+                
+                if (data.authenticated) {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ Authentication Verified!</strong><br>
+                        You are logged in and can access admin panel.<br>
+                        <br>
+                        <a href="/admin">Go to Admin Panel</a>
+                    `;
+                } else {
+                    resultDiv.className = 'error';
+                    resultDiv.innerHTML = `
+                        <strong>❌ Not Authenticated</strong><br>
+                        Session cookie may not be working.<br>
+                        Data: ${JSON.stringify(data, null, 2)}
+                    `;
+                }
+            } catch (error) {
+                console.error('Auth check error:', error);
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `
+                    <strong>❌ Auth Check Failed</strong><br>
+                    Error: ${error.message}
+                `;
+            }
+        }
+        
+        // Allow Enter key to submit
+        document.getElementById('password').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                testLogin();
+            }
+        });
+    </script>
+</body>
+</html>

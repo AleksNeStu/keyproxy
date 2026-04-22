@@ -15,6 +15,7 @@ build/
 # IDEs and Tools
 .vscode/
 .idea/
+.kiro/
 .claude/
 .serena/
 .agent/

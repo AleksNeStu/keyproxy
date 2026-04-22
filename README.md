@@ -55,13 +55,33 @@ Configure your keys in the root `.env` file using the `_1`, `_2` indexing patter
 *   **LLM**: OpenAI, Gemini (Google AI), Anthropic.
 *   **Tooling**: Firecrawl, Jina, etc.
 
-For a full list of environment variable mappings, see [MAPPING.md](./docs/MAPPING.md).
+For a full list of environment variable mappings, see [Environment Mapping Guide](./docs/guides/ENVIRONMENT_MAPPING.md).
 
 ---
 
 ## 🏛️ Admin Panel
 Access the professional dashboard for real-time monitoring:
 **`http://localhost:8990/admin`**
+
+### 🔐 Authentication
+- **Default Password**: `admin123`
+- **Password Storage**: Encrypted in `data/admin.hash` (scrypt)
+- **Reset Password**: See [Password Reset Guide](./docs/troubleshooting/PASSWORD_RESET.md)
+
+**Important:** 
+- Admin panel requires password for security
+- API endpoints (`/provider/*`) do NOT require password by default
+- Use `ACCESS_KEY` per provider for API authentication (optional)
+
+---
+
+## 📚 Documentation
+
+- **[Quick Start Guide](./docs/guides/QUICK_START.md)** - Get started in 5 minutes
+- **[Environment Mapping](./docs/guides/ENVIRONMENT_MAPPING.md)** - Configure API keys
+- **[Desktop Shortcuts](./docs/guides/DESKTOP_SHORTCUTS.md)** - Windows shortcuts setup
+- **[Password Reset](./docs/troubleshooting/PASSWORD_RESET.md)** - Reset admin password
+- **[Login Issues](./docs/troubleshooting/LOGIN_ISSUES.md)** - Troubleshoot login problems
 
 ---
 
