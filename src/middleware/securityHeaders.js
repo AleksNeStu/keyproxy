@@ -123,14 +123,26 @@ function createRateLimiter(options = {}) {
     const requestCount = ipRequests.length;
 
     if (requestCount >= maxRequests) {
-      console.log(`[RATE_LIMIT] IP ${ip} exceeded limit: ${requestCount}/${maxRequests}`);
+      const resetTime = Math.ceil((now + windowMs) / 1000);
+      const retryAfter = Math.ceil(windowMs / 1000);
+
+      console.log(`[RATE_LIMIT] IP ${ip} exceeded limit: ${requestCount}/${maxRequests} for endpoint ${req.url}`);
+
       res.writeHead(429, {
         'Content-Type': 'application/json',
-        'Retry-After': Math.ceil(windowMs / 1000).toString()
+        'Retry-After': String(retryAfter),
+        'X-RateLimit-Limit': String(maxRequests),
+        'X-RateLimit-Remaining': '0',
+        'X-RateLimit-Reset': String(resetTime)
       });
       res.end(JSON.stringify({
         error: 'Too many requests',
-        retryAfter: Math.ceil(windowMs / 1000)
+        retryAfter: retryAfter,
+        limit: maxRequests,
+        remaining: 0,
+        resetAt: new Date(now + windowMs).toISOString(),
+        endpoint: req.url,
+        requestId: res._requestId || 'unknown'
       }));
       return;
     }
@@ -167,10 +179,46 @@ const loginLimiter = createRateLimiter({
   maxRequests: 5 // 5 attempts per 15 minutes
 });
 
+/**
+ * Read operations rate limiter (higher limit for monitoring).
+ */
+const adminReadLimiter = createRateLimiter({
+  windowMs: 60000, // 1 minute
+  maxRequests: 150 // 150 requests per minute
+});
+
+/**
+ * Write operations rate limiter (stricter to prevent abuse).
+ */
+const adminWriteLimiter = createRateLimiter({
+  windowMs: 60000, // 1 minute
+  maxRequests: 50 // 50 requests per minute
+});
+
+/**
+ * File operations rate limiter (resource-intensive).
+ */
+const adminFileOpsLimiter = createRateLimiter({
+  windowMs: 60000, // 1 minute
+  maxRequests: 10 // 10 requests per minute
+});
+
+/**
+ * High-risk operations rate limiter (config changes).
+ */
+const adminHighRiskLimiter = createRateLimiter({
+  windowMs: 60000, // 1 minute
+  maxRequests: 5 // 5 requests per minute
+});
+
 module.exports = {
   addSecurityHeaders,
   sanitizeInput,
   createRateLimiter,
   adminApiLimiter,
-  loginLimiter
+  loginLimiter,
+  adminReadLimiter,
+  adminWriteLimiter,
+  adminFileOpsLimiter,
+  adminHighRiskLimiter
 };

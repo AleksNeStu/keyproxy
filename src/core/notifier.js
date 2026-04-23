@@ -1,4 +1,5 @@
 const SlackNotifier = require('./slackNotifier');
+const { handleError, ErrorCategories } = require('./errorHandler');
 
 class Notifier {
   constructor(server) {
@@ -19,22 +20,41 @@ class Notifier {
   }
 
   async send(message, level = 'info') {
-    // Dedup: skip if same level sent recently
     const now = Date.now();
     if (this.lastSent[level] && now - this.lastSent[level] < this.minInterval) return;
     this.lastSent[level] = now;
 
-    // Slack
     if (this.channels.slack && this.shouldNotify('slack', level)) {
-      this.channels.slack.send(message).catch(() => {});
+      this.channels.slack.send(message).catch((err) => {
+        handleError(err, {
+          location: 'notifier',
+          category: ErrorCategories.CRITICAL,
+          metadata: { channel: 'slack', level, message }
+        });
+
+        if (this.server.telegramBot && this.shouldNotify('telegram', level)) {
+          this.server.telegramBot.broadcastMessage(
+            `[Slack Failed] ${message}`
+          ).catch((fallbackErr) => {
+            handleError(fallbackErr, {
+              location: 'notifier',
+              category: ErrorCategories.CRITICAL,
+              metadata: { channel: 'telegram', reason: 'fallback' }
+            });
+          });
+        }
+      });
     }
 
-    // Telegram broadcast
     if (this.server.telegramBot && this.shouldNotify('telegram', level)) {
       try {
         this.server.telegramBot.broadcastMessage(message);
       } catch (err) {
-        console.error('[NOTIFIER] Telegram broadcast failed:', err.message);
+        handleError(err, {
+          location: 'notifier',
+          category: ErrorCategories.HIGH,
+          metadata: { channel: 'telegram' }
+        });
       }
     }
   }

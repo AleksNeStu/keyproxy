@@ -368,6 +368,8 @@ async function handleProxyRequest(server, req, res, body) {
   const startTime = Date.now();
   let fallbackAttempted = false;
 
+  res._requestId = requestId;
+
   const isApiCall = parseRoute(server, req.url) !== null;
   console.log(`[REQ-${requestId}] ${req.method} ${req.url} from ${clientIp}`);
 

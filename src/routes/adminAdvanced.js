@@ -571,7 +571,9 @@ async function handleFsList(server, res, queryPath) {
           extra.size = s.size;
           extra.mtime = s.mtime;
         }
-      } catch (e) {}
+      } catch (e) {
+        console.warn(`[FS-ADMIN] Failed to stat file '${fullPath}':`, e.message);
+      }
 
       return {
         name: item.name,

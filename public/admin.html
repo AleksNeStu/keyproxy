@@ -1690,7 +1690,267 @@
         function showInfoToast(message, duration = 3000) {
             return showToast(message, 'info', duration);
         }
-        
+
+        // ============================================
+        // GLOBAL ERROR HANDLERS
+        // ============================================
+
+        /**
+         * Global unhandled error handler
+         */
+        window.onerror = function(message, source, lineno, colno, error) {
+            console.error('[GLOBAL ERROR]', {
+                message,
+                source,
+                lineno,
+                colno,
+                error
+            });
+
+            let type = 'error';
+            let userMessage = 'An unexpected error occurred';
+            let duration = 6000;
+
+            const msgStr = String(message).toLowerCase();
+
+            if (msgStr.includes('networkerror') || msgStr.includes('fetch') || msgStr.includes('network')) {
+                type = 'warning';
+                userMessage = 'Network connection issue - some features may be unavailable';
+            } else if (msgStr.includes('syntaxerror')) {
+                userMessage = 'Data format error - please refresh the page';
+            } else if (msgStr.includes('typeerror')) {
+                userMessage = 'Application error - please refresh the page';
+            }
+
+            const refId = Date.now().toString(36).toUpperCase();
+            showToast(`${userMessage} (Ref: ${refId})`, type, duration);
+
+            return false;
+        };
+
+        /**
+         * Global unhandled promise rejection handler
+         */
+        window.addEventListener('unhandledrejection', function(event) {
+            console.error('[UNHANDLED PROMISE]', event.reason);
+
+            let userMessage = 'Async operation failed';
+            let type = 'error';
+            let duration = 5000;
+
+            if (event.reason?.message) {
+                const msg = event.reason.message.toLowerCase();
+
+                if (msg.includes('network') || msg.includes('fetch')) {
+                    type = 'warning';
+                    userMessage = 'Network error during background operation';
+                } else if (msg.includes('timeout')) {
+                    type = 'warning';
+                    userMessage = 'Operation timed out - please try again';
+                } else if (msg.includes('unauthorized') || msg.includes('401')) {
+                    userMessage = 'Session expired - please refresh';
+                    duration = 8000;
+                } else if (msg.includes('429') || msg.includes('too many')) {
+                    type = 'warning';
+                    userMessage = 'Too many requests - please wait a moment';
+                } else if (msg.includes('abort')) {
+                    type = 'warning';
+                    userMessage = 'Operation was cancelled';
+                }
+            } else if (event.reason?.status) {
+                const status = event.reason.status;
+                if (status === 401 || status === 403) {
+                    userMessage = 'Authentication required';
+                    duration = 8000;
+                } else if (status === 429) {
+                    type = 'warning';
+                    userMessage = 'Rate limit exceeded - please wait';
+                } else if (status >= 500) {
+                    userMessage = 'Server error - please try again later';
+                }
+            }
+
+            const refId = `PROM-${Date.now().toString(36).toUpperCase()}`;
+            showToast(`${userMessage} (Ref: ${refId})`, type, duration);
+
+            event.preventDefault();
+        });
+
+        /**
+         * Enhanced fetch with timeout and error categorization
+         */
+        async function fetchWithErrorHandling(url, options = {}, timeout = 10000) {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), timeout);
+
+            try {
+                const response = await fetch(url, {
+                    ...options,
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    const errorCategory = categorizeHttpError(response.status);
+                    console.debug(`[FETCH] ${options.method || 'GET'} ${url} -> ${response.status} (${errorCategory})`);
+                }
+
+                return response;
+
+            } catch (error) {
+                clearTimeout(timeoutId);
+
+                let errorType = 'unknown';
+                let userMessage = error.message || 'Request failed';
+
+                if (error.name === 'AbortError') {
+                    errorType = 'timeout';
+                    userMessage = 'Request timed out';
+                    console.warn(`[FETCH TIMEOUT] ${options.method || 'GET'} ${url} after ${timeout}ms`);
+                } else if (userMessage.toLowerCase().includes('network') || userMessage.toLowerCase().includes('fetch')) {
+                    errorType = 'network';
+                    userMessage = 'Network error';
+                    console.warn(`[FETCH NETWORK] ${options.method || 'GET'} ${url}`);
+                } else {
+                    console.error(`[FETCH ERROR] ${options.method || 'GET'} ${url}:`, error);
+                }
+
+                const enrichedError = new Error(userMessage);
+                enrichedError._errorType = errorType;
+                enrichedError._url = url;
+                enrichedError._method = options.method || 'GET';
+                enrichedError._originalError = error;
+
+                throw enrichedError;
+            }
+        }
+
+        /**
+         * Categorize HTTP status codes
+         */
+        function categorizeHttpError(status) {
+            if (status === 401 || status === 403) return 'auth';
+            if (status === 429) return 'rate_limit';
+            if (status >= 400 && status < 500) return 'client_error';
+            if (status >= 500) return 'server_error';
+            return 'unknown';
+        }
+
+        /**
+         * Show user-friendly error message with debugging context
+         */
+        function showErrorWithContext(error, operation = 'Operation', context = {}) {
+            console.error(`[ERROR] ${operation}:`, error, context);
+
+            let userMessage = `${operation} failed`;
+            let type = 'error';
+            const debugInfo = [];
+
+            if (typeof error === 'object' && error !== null) {
+                if (error.status && error.statusText) {
+                    if (error.status === 401 || error.status === 403) {
+                        userMessage = 'Authentication required';
+                        debugInfo.push('Type: auth');
+                    } else if (error.status === 429) {
+                        type = 'warning';
+                        userMessage = 'Too many requests';
+                        debugInfo.push('Type: rate_limit');
+                    } else if (error.status >= 500) {
+                        userMessage = 'Server error';
+                        debugInfo.push('Type: server_error');
+                    }
+
+                    if (error.json) {
+                        error.json().then(data => {
+                            if (data.error) {
+                                const enhancedMsg = `${data.error} (Ref: ${context.requestId || 'N/A'})`;
+                                showToast(enhancedMsg, type, 6000);
+                            }
+                        }).catch(() => {});
+                    }
+                } else if (error._errorType) {
+                    if (error._errorType === 'timeout') {
+                        type = 'warning';
+                        userMessage = 'Request timed out';
+                    } else if (error._errorType === 'network') {
+                        type = 'warning';
+                        userMessage = 'Network error';
+                    }
+                    debugInfo.push(`Type: ${error._errorType}`);
+                } else if (error.message) {
+                    const msg = error.message.toLowerCase();
+
+                    if (msg.includes('network') || msg.includes('fetch')) {
+                        type = 'warning';
+                        userMessage = 'Network connection issue';
+                        debugInfo.push('Type: network');
+                    } else if (msg.includes('timeout')) {
+                        type = 'warning';
+                        userMessage = 'Request timed out';
+                        debugInfo.push('Type: timeout');
+                    } else if (msg.includes('unauthorized') || msg.includes('401')) {
+                        userMessage = 'Authentication required';
+                        debugInfo.push('Type: auth');
+                    } else if (msg.includes('429')) {
+                        type = 'warning';
+                        userMessage = 'Too many requests';
+                        debugInfo.push('Type: rate_limit');
+                    }
+                }
+            } else if (typeof error === 'string') {
+                userMessage = error;
+            }
+
+            if (context.endpoint) debugInfo.push(`Endpoint: ${context.endpoint}`);
+            if (context.requestId) debugInfo.push(`ID: ${context.requestId}`);
+
+            const ref = `ERR-${Date.now().toString(36).toUpperCase()}`;
+            const fullMessage = debugInfo.length > 0
+                ? `${userMessage} (${ref}) [${debugInfo.join(', ')}]`
+                : `${userMessage} (${ref})`;
+
+            showToast(fullMessage, type, 6000);
+
+            return ref;
+        }
+
+        /**
+         * Show error from fetch Response with automatic message extraction
+         */
+        function showToastFromResponse(response, defaultMessage = 'Operation failed') {
+            response.json().then(data => {
+                let message = defaultMessage;
+                let type = 'error';
+                let duration = 5000;
+
+                if (data.error) {
+                    message = data.error;
+
+                    if (response.status === 401 || response.status === 403) {
+                        message = 'Authentication required - please refresh';
+                        duration = 8000;
+                    } else if (response.status === 429) {
+                        type = 'warning';
+                        message = data.error + (data.retryAfter ? ` (Retry in ${data.retryAfter}s)` : '');
+                    } else if (response.status >= 500) {
+                        message = 'Server error - please try again later';
+                    }
+                }
+
+                if (data.requestId) {
+                    message += ` [ID: ${data.requestId}]`;
+                } else {
+                    message += ` [ERR-${Date.now().toString(36).toUpperCase()}]`;
+                }
+
+                showToast(message, type, duration);
+            }).catch(() => {
+                const ref = `ERR-${Date.now().toString(36).toUpperCase()}`;
+                showToast(`${defaultMessage} (${ref})`, 'error', 5000);
+            });
+        }
+
         // Dark mode functionality
         function toggleTheme() {
             const body = document.getElementById('mainBody');

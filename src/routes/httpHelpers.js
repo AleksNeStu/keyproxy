@@ -3,12 +3,54 @@
  * Pure helpers with no dependency on the ProxyServer instance.
  */
 
+const crypto = require('crypto');
+const { categorizeHttpError } = require('../core/errorHandler');
+
 /**
- * Send a JSON error response.
+ * Send a JSON error response with debugging context.
+ * @param {Object} res - Response object
+ * @param {number} statusCode - HTTP status code
+ * @param {string} message - Error message
+ * @param {Object} context - Optional debugging context
  */
-function sendError(res, statusCode, message) {
-  res.writeHead(statusCode, { 'Content-Type': 'application/json' });
-  res.end(JSON.stringify({ error: message }));
+function sendError(res, statusCode, message, context = {}) {
+  const {
+    endpoint,
+    method,
+    provider,
+    includeDetails = process.env.NODE_ENV !== 'production',
+    retryAfter
+  } = context;
+
+  const requestId = res._requestId || crypto.randomBytes(4).toString('hex');
+  const timestamp = new Date().toISOString();
+
+  const errorResponse = {
+    error: message,
+    statusCode: statusCode,
+    requestId: requestId,
+    timestamp: timestamp
+  };
+
+  if (includeDetails) {
+    if (endpoint) errorResponse.endpoint = endpoint;
+    if (method) errorResponse.method = method;
+    if (provider) errorResponse.provider = provider;
+    errorResponse.category = categorizeHttpError(statusCode, message);
+  }
+
+  if (statusCode === 429 && retryAfter) {
+    errorResponse.retryAfter = retryAfter;
+    errorResponse.limit = context.limit;
+    errorResponse.remaining = 0;
+    errorResponse.resetAt = new Date(Date.now() + retryAfter * 1000).toISOString();
+  }
+
+  res.writeHead(statusCode, {
+    'Content-Type': 'application/json',
+    'X-Request-ID': requestId
+  });
+  res.end(JSON.stringify(errorResponse));
 }
 
 /**
@@ -102,5 +144,6 @@ module.exports = {
   parseJsonBody,
   parseCookies,
   getStatusText,
-  isStreamingRequest
+  isStreamingRequest,
+  categorizeHttpError
 };

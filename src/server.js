@@ -16,7 +16,7 @@ const BudgetTracker = require('./core/budgetTracker');
 const TelegramBot = require('./core/telegramBot');
 const { refreshCsrfToken, getCsrfToken } = require('./middleware/csrf');
 const { validateBody, limitBodySize } = require('./middleware/validation');
-const { addSecurityHeaders, sanitizeInput, adminApiLimiter } = require('./middleware/securityHeaders');
+const { addSecurityHeaders, sanitizeInput, adminApiLimiter, adminReadLimiter, adminWriteLimiter, adminFileOpsLimiter, adminHighRiskLimiter } = require('./middleware/securityHeaders');
 
 // Route modules
 const { sendError, sendResponse, readRequestBody, getStatusText } = require('./routes/httpHelpers');
@@ -274,11 +274,32 @@ class ProxyServer {
       return;
     }
 
-    // Apply rate limiting to admin API (skip for static files and login)
+    // Apply rate limiting to admin API with endpoint categorization
     if (adminPath.startsWith('/admin/api/') && adminPath !== '/admin/api/login-status') {
+      // Determine which limiter to use based on endpoint and method
+      const isReadOperation = req.method === 'GET';
+      const isFileOperation = adminPath.includes('/fs-') ||
+                              adminPath.includes('/export-config') ||
+                              adminPath.includes('/import-config');
+      const isHighRiskOperation = adminPath.includes('/reload') ||
+                                  adminPath.includes('/import-config');
+
+      let selectedLimiter;
+      if (isHighRiskOperation && !isReadOperation) {
+        selectedLimiter = adminHighRiskLimiter;
+      } else if (isFileOperation && !isReadOperation) {
+        selectedLimiter = adminFileOpsLimiter;
+      } else if (!isReadOperation) {
+        selectedLimiter = adminWriteLimiter;
+      } else {
+        selectedLimiter = adminReadLimiter;
+      }
+
+      // Apply selected rate limiter
       const rateLimitResult = await new Promise((resolve) => {
-        adminApiLimiter(req, res, () => resolve({ allowed: true }));
+        selectedLimiter(req, res, () => resolve({ allowed: true }));
       });
+
       if (res.writableEnded) return; // Rate limit rejected the request
     }
 

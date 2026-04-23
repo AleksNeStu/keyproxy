@@ -44,7 +44,9 @@ async function handleChat(bot, chatId, text) {
 
     // Handle multimodal response (images)
     if (result.multimodal) {
-      if (thinkingMsg) api.deleteMessage(bot, chatId, thinkingMsg.message_id).catch(() => {});
+      if (thinkingMsg) api.deleteMessage(bot, chatId, thinkingMsg.message_id).catch((err) => {
+        console.debug(`[TELEGRAM] Failed to delete message ${thinkingMsg.message_id}:`, err.message);
+      });
 
       const textParts = [];
       for (const part of result.parts) {
@@ -57,8 +59,13 @@ async function handleChat(bot, chatId, text) {
       const textReply = textParts.join('\n');
       if (textReply) {
         const withStatus = `${textReply}\n\n${statusTag}`;
-        await api.sendMessage(bot, chatId, withStatus, { parse_mode: 'Markdown' }).catch(async () => {
-          await api.sendMessage(bot, chatId, withStatus);
+        await api.sendMessage(bot, chatId, withStatus, { parse_mode: 'Markdown' }).catch(async (err) => {
+          console.debug(`[TELEGRAM] Markdown parse failed, retrying as plain text:`, err.message);
+          try {
+            await api.sendMessage(bot, chatId, withStatus);
+          } catch (retryErr) {
+            console.error(`[TELEGRAM] Message send failed completely:`, retryErr.message);
+          }
         });
       }
 
@@ -89,11 +96,18 @@ async function handleChat(bot, chatId, text) {
       }
     } else {
       // Delete thinking message and send chunks
-      if (thinkingMsg) api.deleteMessage(bot, chatId, thinkingMsg.message_id).catch(() => {});
+      if (thinkingMsg) api.deleteMessage(bot, chatId, thinkingMsg.message_id).catch((err) => {
+        console.debug(`[TELEGRAM] Failed to delete message ${thinkingMsg.message_id}:`, err.message);
+      });
       const chunks = api.splitMessage(replyWithStatus, 4096);
       for (const chunk of chunks) {
-        await api.sendMessage(bot, chatId, chunk, { parse_mode: 'Markdown' }).catch(async () => {
-          await api.sendMessage(bot, chatId, chunk);
+        await api.sendMessage(bot, chatId, chunk, { parse_mode: 'Markdown' }).catch(async (err) => {
+          console.debug(`[TELEGRAM] Markdown parse failed, retrying as plain text:`, err.message);
+          try {
+            await api.sendMessage(bot, chatId, chunk);
+          } catch (retryErr) {
+            console.error(`[TELEGRAM] Message send failed completely:`, retryErr.message);
+          }
         });
       }
     }
@@ -101,7 +115,9 @@ async function handleChat(bot, chatId, text) {
     // Remove the user message from history on failure
     history.pop();
     if (thinkingMsg) {
-      await api.editMessage(bot, chatId, thinkingMsg.message_id, `Error: ${err.message}`).catch(() => {});
+      await api.editMessage(bot, chatId, thinkingMsg.message_id, `Error: ${err.message}`).catch((err) => {
+        console.debug(`[TELEGRAM] Failed to edit error message:`, err.message);
+      });
     } else {
       await api.sendMessage(bot, chatId, `Error: ${err.message}`);
     }
