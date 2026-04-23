@@ -75,6 +75,7 @@ class ResponseCache {
     }
 
     this.cache.set(key, {
+      provider,
       statusCode: response.statusCode,
       headers: { ...response.headers },
       data: response.data,
@@ -87,11 +88,11 @@ class ResponseCache {
    * Invalidate all entries for a provider.
    */
   invalidateProvider(provider) {
-    for (const [key] of this.cache.entries()) {
-      // We can't reverse-hash, so clear all on provider invalidation
-      // This is fine — cache entries are short-lived
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.provider === provider) {
+        this.cache.delete(key);
+      }
     }
-    this.cache.clear();
   }
 
   /**
