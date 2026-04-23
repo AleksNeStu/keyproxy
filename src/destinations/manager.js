@@ -5,6 +5,11 @@
 class DestinationManager {
   constructor() {
     this.destinations = [];
+    this.exclusionManager = null;
+  }
+
+  setExclusionManager(manager) {
+    this.exclusionManager = manager;
   }
 
   /**
@@ -22,6 +27,11 @@ class DestinationManager {
    */
   async sync(name, key) {
     if (!name || !key) return;
+
+    if (this.exclusionManager && this.exclusionManager.isExcluded(name)) {
+      console.log(`[DEST-MGR] Skipping sync for '${name}' — matched exclusion pattern`);
+      return;
+    }
 
     const syncPromises = this.destinations.map(dest => {
       try {

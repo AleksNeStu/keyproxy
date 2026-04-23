@@ -26,6 +26,11 @@ function main() {
 
     console.log(`[INIT] Destination Manager initialized with ${destMgr.destinations.length} targets`);
 
+    // Initialize Key Exclusion Manager
+    const KeyExclusionManager = require('./src/core/exclusions');
+    const exclusionManager = new KeyExclusionManager();
+    destMgr.setExclusionManager(exclusionManager);
+
     // Initialize legacy clients for backward compatibility
     let geminiClient = null;
     let openaiClient = null;
@@ -47,6 +52,7 @@ function main() {
     }
 
     const server = new ProxyServer(config, geminiClient, openaiClient);
+    server.exclusionManager = exclusionManager;
     server.start();
 
     process.on('SIGINT', () => {
