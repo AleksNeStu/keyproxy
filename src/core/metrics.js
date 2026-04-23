@@ -21,11 +21,12 @@ class MetricsCollector {
   observeHistogram(name, labels, value) {
     const key = this._labelKey(name, labels);
     if (!this.histograms[key]) {
-      this.histograms[key] = { name, labels, values: [], sum: 0, count: 0 };
+      this.histograms[key] = { name, labels, values: [], sum: 0, count: 0, lastObserved: 0 };
     }
     this.histograms[key].values.push(value);
     this.histograms[key].sum += value;
     this.histograms[key].count++;
+    this.histograms[key].lastObserved = Date.now();
     // Keep only last 1000 observations to bound memory
     if (this.histograms[key].values.length > 1000) {
       this.histograms[key].values.shift();
@@ -87,6 +88,32 @@ class MetricsCollector {
     this.counters = {};
     this.gauges = {};
     this.histograms = {};
+  }
+
+  /**
+   * Remove histogram entries that have not been observed recently (stale keys
+   * from rotated/removed providers) and enforce a hard cap on total keys.
+   * Call periodically (e.g. every 5 minutes) to bound memory over long uptimes.
+   * @param {number} staleThresholdMs - Evict keys idle longer than this (default 1 hour)
+   */
+  cleanup(staleThresholdMs = 3600000) {
+    const now = Date.now();
+    const keys = Object.keys(this.histograms);
+    // Remove histograms with no recent observations
+    for (const key of keys) {
+      if (now - this.histograms[key].lastObserved > staleThresholdMs) {
+        delete this.histograms[key];
+      }
+    }
+    // Hard cap: if still too many unique keys, evict the stalest ones
+    const remaining = Object.keys(this.histograms);
+    if (remaining.length > 500) {
+      remaining.sort((a, b) => this.histograms[a].lastObserved - this.histograms[b].lastObserved);
+      const toRemove = remaining.slice(0, remaining.length - 500);
+      for (const key of toRemove) {
+        delete this.histograms[key];
+      }
+    }
   }
 }
 

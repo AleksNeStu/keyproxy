@@ -77,6 +77,7 @@ class ProxyServer {
     // Per-key RPM tracker (sliding window)
     this.rpmTracker = new SlidingWindowCounter();
     this._rpmPruneTimer = setInterval(() => this.rpmTracker.prune(), 60000);
+    this._metricsCleanupTimer = setInterval(() => this.metrics.cleanup(), 300000); // every 5 min
 
     // Response cache
     const cacheEnabled = config.envVars?.KEYPROXY_CACHE_ENABLED !== 'false';

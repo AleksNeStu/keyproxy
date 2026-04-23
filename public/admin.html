@@ -206,6 +206,15 @@
         .key-badge.badge-exhausted { background: rgba(107,114,128,0.15); color: #9ca3af; }
         .key-badge.badge-fresh { background: rgba(34,197,94,0.15); color: #22c55e; }
 
+        .expiry-badge { font-family: monospace; font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
+        .expiry-badge.expiry-green { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .expiry-badge.expiry-yellow { background: rgba(234,179,8,0.15); color: #eab308; }
+        .expiry-badge.expiry-red { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .expiry-badge.expiry-gray { background: rgba(107,114,128,0.15); color: #9ca3af; }
+        .expiry-badge.expiry-none { background: rgba(107,114,128,0.08); color: #4b5563; }
+        .btn-extend { background: rgba(59,130,246,0.15); color: #3b82f6; border: 1px solid rgba(59,130,246,0.3); }
+        .btn-extend:hover { background: rgba(59,130,246,0.25); }
+
         .rpm-badge { font-family: monospace; min-width: 50px; text-align: center; }
         .rpm-green { background: rgba(34,197,94,0.15); color: #22c55e; }
         .rpm-yellow { background: rgba(234,179,8,0.15); color: #eab308; }
@@ -982,6 +991,25 @@
                             </thead>
                             <tbody id="analyticsProviderTable">
                                 <tr><td colspan="6" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Model Breakdown Table -->
+                <div class="bg-card border border-border rounded-lg p-4">
+                    <h3 class="text-sm font-medium text-foreground mb-3">Model Breakdown</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead class="border-b border-border">
+                                <tr>
+                                    <th class="text-left py-2 pr-4">Model</th>
+                                    <th class="text-right py-2 pr-4">Requests</th>
+                                    <th class="text-right py-2">Est. Cost</th>
+                                </tr>
+                            </thead>
+                            <tbody id="analyticsModelTable">
+                                <tr><td colspan="3" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2727,9 +2755,10 @@
                                         <div class="flex-1 font-mono text-xs text-foreground bg-muted px-2 py-1 rounded${isKeyDisabled ? ' line-through' : ''}">
                                             ${maskedKey}
                                         </div>
-                                        <!-- Usage count + rotation count + RPM -->
+                                        <!-- Usage count + rotation count + RPM + Expiry -->
                                         <span class="text-xs text-muted-foreground whitespace-nowrap" title="Times used${rotationCount > 0 ? ' / Rotations: ' + rotationCount : ''}">${usageDisplay} uses${rotationCount > 0 ? ' / ' + rotationCount + ' rot' : ''}</span>
                                         <span class="rpm-badge text-xs px-1.5 py-0.5 rounded" data-key="${maskedKey}" data-provider="${provider.apiType}" title="Requests per minute">--rpm</span>
+                                        <span class="expiry-badge expiry-none" data-key="${maskedKey}" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Key TTL">--</span>
                                         ${keyStatus === 'exhausted'
                                             ? `<button onclick="testAndRecoverKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">Test & Reset</button>`
                                             : `<button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
@@ -5884,6 +5913,19 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 <td class="text-right py-2 pr-4">${k.requests.toLocaleString()}</td>
                 <td class="text-right py-2 pr-4 ${k.errors > 0 ? 'text-red-500' : ''}">${k.errors}</td>
                 <td class="text-right py-2">$${k.estimatedCost.toFixed(4)}</td>
+            </tr>`).join('');
+        }
+
+        // Model breakdown table
+        const modelBody = document.getElementById('analyticsModelTable');
+        const modelEntries = Object.entries(data.modelBreakdown || {}).sort((a, b) => b[1].requests - a[1].requests);
+        if (modelEntries.length === 0) {
+            modelBody.innerHTML = '<tr><td colspan="3" class="py-4 text-center text-muted-foreground">No data yet</td></tr>';
+        } else {
+            modelBody.innerHTML = modelEntries.map(([model, s]) => `<tr class="border-b border-border/50">
+                <td class="py-2 pr-4 font-mono text-xs">${esc(model)}</td>
+                <td class="text-right py-2 pr-4">${s.requests.toLocaleString()}</td>
+                <td class="text-right py-2">$${s.estimatedCost.toFixed(4)}</td>
             </tr>`).join('');
         }
 
