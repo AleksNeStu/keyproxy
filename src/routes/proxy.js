@@ -459,7 +459,29 @@ async function handleProxyRequest(server, req, res, body) {
     console.log(`[REQ-${requestId}] Cache MISS for ${providerName}`);
   }
 
-  response = await client.makeRequest(req.method, apiPath, body, headers, customStatusCodes, streaming);
+  try {
+    response = await client.makeRequest(req.method, apiPath, body, headers, customStatusCodes, streaming);
+  } catch (error) {
+    const isTimeout = error.message && error.message.toLowerCase().includes('timeout');
+    const statusCode = isTimeout ? 504 : 502;
+    const statusText = isTimeout ? 'Gateway Timeout' : 'Bad Gateway';
+
+    console.log(`[REQ-${requestId}] ${statusText}: ${error.message}`);
+
+    // Record failure in circuit breaker
+    server.circuitBreaker.recordFailure(providerName);
+
+    if (isApiCall) {
+      const responseTime = Date.now() - startTime;
+      server.logApiRequest(requestId, req.method, apiPath, providerName, statusCode, responseTime, error.message, clientIp);
+      server.metrics.incCounter('keyproxy_requests_total', { provider: providerName, status: String(statusCode) });
+      server.metrics.incCounter('keyproxy_errors_total', { provider: providerName, type: 'server' });
+      server.metrics.observeHistogram('keyproxy_request_duration_seconds', { provider: providerName }, responseTime / 1000);
+    }
+
+    sendError(res, statusCode, `${statusText}: ${error.message}`);
+    return;
+  }
 
   // Extract key info from response
   const keyInfo = response._keyInfo || null;
