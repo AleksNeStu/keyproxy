@@ -19,6 +19,7 @@
   "license": "MIT",
   "description": "Universal API Key Orchestrator & Proxy with native MCP support. Automates rotation, health checks, and environment injection for Windows/Linux Workstations and VPS.",
   "dependencies": {
+    "joi": "^18.1.2",
     "node-windows": "^1.0.0-beta.8"
   }
 }

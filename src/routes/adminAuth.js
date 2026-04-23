@@ -6,6 +6,8 @@
 const crypto = require('crypto');
 const Auth = require('../core/auth');
 const { sendError, parseCookies } = require('./httpHelpers');
+const { refreshCsrfToken } = require('../middleware/csrf');
+const { validatePasswordStrength } = require('../middleware/validation');
 
 /**
  * Check if the current request is authenticated via session cookie.
@@ -53,6 +55,9 @@ async function handleAdminLogin(server, req, res, body) {
       server.loginBlockedUntil = null;
       server.adminSessionToken = generateSessionToken();
 
+      // Generate and store CSRF token
+      const csrfToken = refreshCsrfToken(server);
+
       console.log('[SECURITY] Successful admin login');
 
       // Set session cookie (expires in 24 hours)
@@ -62,8 +67,12 @@ async function handleAdminLogin(server, req, res, body) {
         'Content-Type': 'application/json',
         'Set-Cookie': `adminSession=${server.adminSessionToken}; HttpOnly; Secure; SameSite=Strict; Expires=${expires}; Path=/admin`
       });
-      res.end(JSON.stringify({ success: true, passwordUpgradeAvailable: upgradeAvailable }));
-      console.log('[SECURITY] Session token set, cookie sent');
+      res.end(JSON.stringify({
+        success: true,
+        passwordUpgradeAvailable: upgradeAvailable,
+        csrfToken: csrfToken
+      }));
+      console.log('[SECURITY] Session token set, CSRF token generated, cookie sent');
     } else {
       // Failed login - increment counter
       server.failedLoginAttempts++;
@@ -99,6 +108,7 @@ async function handleAdminLogin(server, req, res, body) {
  */
 function handleAdminLogout(server, req, res) {
   server.adminSessionToken = null;
+  server.csrfToken = null; // Clear CSRF token on logout
   res.writeHead(200, {
     'Content-Type': 'application/json',
     'Set-Cookie': 'adminSession=; HttpOnly; Secure; SameSite=Strict; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/admin'
@@ -128,8 +138,10 @@ async function handleChangePassword(server, req, res, body) {
       return;
     }
 
-    if (newPassword.length < 6) {
-      sendError(res, 400, 'New password must be at least 6 characters');
+    // Validate password strength
+    const strengthCheck = validatePasswordStrength(newPassword);
+    if (!strengthCheck.valid) {
+      sendError(res, 400, `Password too weak: ${strengthCheck.errors.join(', ')}`);
       return;
     }
 

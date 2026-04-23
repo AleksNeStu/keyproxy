@@ -1737,6 +1737,12 @@
                 const data = await response.json();
 
                 if (response.ok) {
+                    // Store CSRF token from login response
+                    if (data.csrfToken) {
+                        csrfToken = data.csrfToken;
+                        localStorage.setItem('keyproxy_csrf_token', data.csrfToken);
+                    }
+
                     document.getElementById('loginForm').classList.add('hidden');
                     document.getElementById('adminPanel').classList.remove('hidden');
                     if (data.passwordUpgradeAvailable) {
@@ -1815,7 +1821,10 @@
             } catch (error) {
                 console.log('Logout request failed, but continuing with local logout');
             }
-            
+
+            // Clear CSRF token on logout
+            clearCsrfToken();
+
             document.getElementById('loginForm').classList.remove('hidden');
             document.getElementById('adminPanel').classList.add('hidden');
             document.getElementById('password').value = '';
@@ -5423,6 +5432,9 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 const data = await response.json();
 
                 if (data.authenticated) {
+                    // Fetch CSRF token when authenticated
+                    await fetchCsrfToken();
+
                     document.getElementById('loginForm').classList.add('hidden');
                     document.getElementById('adminPanel').classList.remove('hidden');
                     loadEnvVars();
@@ -5805,6 +5817,96 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
 </div>
 
 <script>
+    // CSRF Token Management
+    let csrfToken = null;
+
+    /**
+     * Fetch CSRF token from server
+     */
+    async function fetchCsrfToken() {
+        try {
+            const response = await fetch('/admin/api/csrf-token');
+            if (response.ok) {
+                const data = await response.json();
+                csrfToken = data.csrfToken;
+                localStorage.setItem('keyproxy_csrf_token', csrfToken);
+                return csrfToken;
+            }
+        } catch (error) {
+            console.error('Failed to fetch CSRF token:', error);
+        }
+        return null;
+    }
+
+    /**
+     * Get current CSRF token from memory or localStorage
+     */
+    function getCsrfToken() {
+        if (!csrfToken) {
+            csrfToken = localStorage.getItem('keyproxy_csrf_token');
+        }
+        return csrfToken;
+    }
+
+    /**
+     * Clear CSRF token (on logout)
+     */
+    function clearCsrfToken() {
+        csrfToken = null;
+        localStorage.removeItem('keyproxy_csrf_token');
+    }
+
+    /**
+     * Get authentication headers including CSRF token
+     * Use this function to get headers for authenticated API requests
+     */
+    function authHeaders() {
+        const token = getCsrfToken();
+        const headers = {};
+        if (token) {
+            headers['X-CSRF-Token'] = token;
+        }
+        return headers;
+    }
+
+    /**
+     * Intercept fetch calls to add CSRF token
+     */
+    const originalFetch = window.fetch;
+    window.fetch = function(url, options = {}) {
+        // Add CSRF token to state-changing requests
+        if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())) {
+            const token = getCsrfToken();
+            if (token) {
+                options.headers = options.headers || {};
+                options.headers['X-CSRF-Token'] = token;
+            }
+        }
+
+        // Handle CSRF errors (403)
+        return originalFetch(url, options).then(response => {
+            if (response.status === 403) {
+                return response.clone().json().then(data => {
+                    if (data.error === 'Invalid CSRF token') {
+                        console.error('CSRF validation failed. Refreshing page...');
+                        // Try to fetch new token
+                        fetchCsrfToken().then(() => {
+                            // If successful, retry the request
+                            if (getCsrfToken()) {
+                                return window.fetch(url, options);
+                            } else {
+                                // If still no token, reload page
+                                location.reload();
+                            }
+                        });
+                    }
+                    throw new Error(data.error || 'Request failed');
+                });
+            }
+            return response;
+        });
+    };
+
     function openSettingsModal() {
         document.getElementById('settingsModal').classList.remove('hidden');
         loadTelegramSettings();

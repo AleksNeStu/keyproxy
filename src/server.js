@@ -14,6 +14,9 @@ const ResponseCache = require('./core/cache');
 const VirtualKeyManager = require('./core/virtualKeys');
 const BudgetTracker = require('./core/budgetTracker');
 const TelegramBot = require('./core/telegramBot');
+const { refreshCsrfToken, getCsrfToken } = require('./middleware/csrf');
+const { validateBody, limitBodySize } = require('./middleware/validation');
+const { addSecurityHeaders, sanitizeInput, adminApiLimiter } = require('./middleware/securityHeaders');
 
 // Route modules
 const { sendError, sendResponse, readRequestBody, getStatusText } = require('./routes/httpHelpers');
@@ -34,6 +37,7 @@ class ProxyServer {
     this.providerClients = new Map(); // Map of provider_name -> client instance
     this.server = null;
     this.adminSessionToken = null;
+    this.csrfToken = null; // CSRF token for authenticated session
     this.logBuffer = []; // Store logs in RAM only (last 100 entries)
     this.responseStorage = new Map(); // Store response data for viewing
 
@@ -147,11 +151,17 @@ class ProxyServer {
   }
 
   async handleRequest(req, res) {
+    // Apply security headers
+    addSecurityHeaders(req, res, () => {});
+
+    // Sanitize input (remove null bytes, excessive whitespace)
+    sanitizeInput(req, res, () => {});
+
     // Set CORS headers — configurable via CORS_ORIGIN env var (defaults to * for backward compat)
     const corsOrigin = this.config.envVars.CORS_ORIGIN || '*';
     res.setHeader('Access-Control-Allow-Origin', corsOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token');
     res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
 
     // Handle preflight OPTIONS requests
@@ -264,6 +274,22 @@ class ProxyServer {
       return;
     }
 
+    // Apply rate limiting to admin API (skip for static files and login)
+    if (adminPath.startsWith('/admin/api/') && adminPath !== '/admin/api/login-status') {
+      const rateLimitResult = await new Promise((resolve) => {
+        adminApiLimiter(req, res, () => resolve({ allowed: true }));
+      });
+      if (res.writableEnded) return; // Rate limit rejected the request
+    }
+
+    // Apply body size limiting for POST/PUT/PATCH requests
+    if (['POST', 'PUT', 'PATCH'].includes(req.method) && adminPath.startsWith('/admin/api/')) {
+      const sizeLimitResult = await new Promise((resolve) => {
+        limitBodySize(1024 * 1024)(req, res, () => resolve({ allowed: true }));
+      });
+      if (res.writableEnded) return; // Size limit rejected the request
+    }
+
     // Serve main admin page
     if (adminPath === '/admin' || adminPath === '/admin/') {
       this.serveAdminPanel(res);
@@ -273,6 +299,26 @@ class ProxyServer {
     // Check authentication status
     if (adminPath === '/admin/api/auth' && req.method === 'GET') {
       return handleAuthCheck(this, req, res);
+    }
+
+    // CSRF token endpoint (authenticated)
+    if (adminPath === '/admin/api/csrf-token' && req.method === 'GET') {
+      if (!isAdminAuthenticated(this, req)) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Unauthorized' }));
+        return;
+      }
+      const currentToken = getCsrfToken(this);
+      if (!currentToken) {
+        // Generate new token if none exists
+        const newToken = refreshCsrfToken(this);
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ csrfToken: newToken }));
+      } else {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ csrfToken: currentToken }));
+      }
+      return;
     }
 
     // Check login rate limit status
@@ -304,6 +350,42 @@ class ProxyServer {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));
       return;
+    }
+
+    // CSRF validation for state-changing operations (POST/PUT/DELETE/PATCH)
+    const stateChangingMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
+    if (stateChangingMethods.includes(req.method)) {
+      const headerToken = req.headers['x-csrf-token'] || req.headers['X-CSRF-Token'];
+      const sessionToken = this.csrfToken;
+
+      if (!sessionToken || !headerToken) {
+        console.log(`[SECURITY] CSRF token missing for ${req.method} ${adminPath}`);
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid CSRF token' }));
+        return;
+      }
+
+      // Validate token using timing-safe comparison
+      try {
+        const sessionBuffer = Buffer.from(sessionToken, 'hex');
+        const headerBuffer = Buffer.from(headerToken, 'hex');
+
+        if (sessionToken.length !== 64 || headerToken.length !== 64 ||
+            !crypto.timingSafeEqual(sessionBuffer, headerBuffer)) {
+          console.log(`[SECURITY] CSRF validation failed for ${req.method} ${adminPath}`);
+          res.writeHead(403, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Invalid CSRF token' }));
+          return;
+        }
+      } catch (error) {
+        console.log(`[SECURITY] CSRF validation error for ${req.method} ${adminPath}:`, error.message);
+        res.writeHead(403, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Invalid CSRF token' }));
+        return;
+      }
+
+      // Token is valid - rotate it after successful validation
+      this.csrfToken = refreshCsrfToken(this);
     }
 
     // ─── Admin API routes ───────────────────────────────────────

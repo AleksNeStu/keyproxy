@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
+const { generateCsrfToken } = require('../middleware/csrf');
 
 const SCRYPT_PREFIX = '$scrypt$';
 const SALT_LENGTH = 16;
@@ -91,6 +92,39 @@ class Auth {
     }
 
     return null;
+  }
+
+  /**
+   * Generate a CSRF token for the current session.
+   * Used during login and token refresh.
+   * @returns {string} 64-character hexadecimal CSRF token
+   */
+  static generateCsrfToken() {
+    return generateCsrfToken();
+  }
+
+  /**
+   * Validate a CSRF token using timing-safe comparison.
+   * @param {string} sessionToken - Token stored in session
+   * @param {string} headerToken - Token from request header
+   * @returns {boolean} True if tokens match
+   */
+  static validateCsrfToken(sessionToken, headerToken) {
+    if (!sessionToken || !headerToken) {
+      return false;
+    }
+
+    if (sessionToken.length !== 64 || headerToken.length !== 64) {
+      return false;
+    }
+
+    try {
+      const sessionBuffer = Buffer.from(sessionToken, 'hex');
+      const headerBuffer = Buffer.from(headerToken, 'hex');
+      return crypto.timingSafeEqual(sessionBuffer, headerBuffer);
+    } catch (error) {
+      return false;
+    }
   }
 }
 
