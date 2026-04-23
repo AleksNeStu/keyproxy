@@ -166,6 +166,48 @@ class KeyRotator {
   extendKey(key) {
     this.keyFirstSeen.set(key, Date.now());
   }
+
+  /**
+   * Set weight for a specific key (used by weighted-random strategy).
+   * @param {string} key The API key
+   * @param {number} weight Weight value (1-10)
+   */
+  setWeight(key, weight) {
+    if (!this.keyWeights.has(key)) return;
+    const w = Math.max(1, Math.min(10, Math.round(weight)));
+    this.keyWeights.set(key, w);
+    console.log(`[${this.apiType.toUpperCase()}-ROTATOR] Weight for ${maskApiKey(key)} set to ${w}`);
+  }
+
+  /**
+   * Get all key weights.
+   * @returns {Array<{key: string, maskedKey: string, weight: number}>}
+   */
+  getWeights() {
+    const result = [];
+    for (const key of this.apiKeys) {
+      result.push({
+        key,
+        maskedKey: maskApiKey(key),
+        weight: this.keyWeights.get(key) || 1
+      });
+    }
+    return result;
+  }
+
+  /**
+   * Set the load balancing strategy.
+   * @param {string} strategy One of 'round-robin', 'weighted-random', 'least-used'
+   */
+  setStrategy(strategy) {
+    const valid = ['round-robin', 'weighted-random', 'least-used'];
+    if (!valid.includes(strategy)) {
+      throw new Error(`Invalid strategy: ${strategy}. Must be one of: ${valid.join(', ')}`);
+    }
+    const old = this.strategy;
+    this.strategy = strategy;
+    console.log(`[${this.apiType.toUpperCase()}-ROTATOR] Strategy changed: ${old} -> ${strategy}`);
+  }
 }
 
 /**
