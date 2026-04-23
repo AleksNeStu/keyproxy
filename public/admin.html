@@ -2258,6 +2258,220 @@
             }
         }
 
+        // Configuration Tab Functions
+        let configEnvFiles = [];
+
+        async function loadConfiguration() {
+            try {
+                const res = await fetch('/admin/api/env-files');
+                const data = await res.json();
+                configEnvFiles = data.files || [];
+                renderConfigEnvFiles(data.active);
+
+                // Update active file display
+                const activeFile = data.active || 'default';
+                document.getElementById('configActiveFile').textContent = activeFile;
+                const activeBadge = document.getElementById('configActiveFileBadge');
+                if (configEnvFiles.some(f => f.name === activeFile && !f.disabled)) {
+                    activeBadge.classList.remove('hidden');
+                } else {
+                    activeBadge.classList.add('hidden');
+                }
+            } catch (err) {
+                console.error('Failed to load configuration:', err);
+                showErrorToast('Failed to load configuration');
+            }
+        }
+
+        function renderConfigEnvFiles(activeName) {
+            const list = document.getElementById('configEnvFileList');
+
+            if (!configEnvFiles || configEnvFiles.length === 0) {
+                list.innerHTML = '<div class="text-center text-muted-foreground text-sm py-4">No environment files configured</div>';
+                return;
+            }
+
+            list.innerHTML = configEnvFiles.map((file, index) => {
+                const priorityBadge = getPriorityBadge(file.priority);
+                const isActive = file.name === activeName;
+                const activeClass = isActive ? 'border-l-4 border-l-green-500' : '';
+                const disabledClass = file.disabled ? 'opacity-50' : '';
+
+                return `
+                    <div class="config-env-item flex items-center gap-2 p-2 rounded bg-card border border-border hover:border-border transition-colors ${activeClass} ${disabledClass}"
+                         data-env-name="${file.name}" data-priority="${file.priority}">
+                        <!-- Drag Handle -->
+                        <div class="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground" title="Drag to reorder">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8h16M4 16h16" />
+                            </svg>
+                        </div>
+
+                        <!-- Priority Badge -->
+                        ${priorityBadge}
+
+                        <!-- File Info -->
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center gap-2">
+                                <span class="text-sm font-medium text-foreground truncate">${file.name}</span>
+                                ${isActive ? '<span class="px-1.5 py-0.5 text-xs bg-green-500/20 text-green-400 rounded-full">Active</span>' : ''}
+                                ${file.disabled ? '<span class="px-1.5 py-0.5 text-xs bg-muted text-muted-foreground rounded-full">Disabled</span>' : ''}
+                            </div>
+                            <div class="text-xs text-muted-foreground truncate" title="${file.path}">${file.path}</div>
+                        </div>
+
+                        <!-- Up/Down Buttons -->
+                        <div class="flex items-center gap-1">
+                            <button onclick="moveEnvFilePriority(${index}, -1)" class="p-1 hover:bg-muted rounded transition-colors ${index === 0 ? 'opacity-30 cursor-not-allowed' : ''}" ${index === 0 ? 'disabled' : ''} title="Move up">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+                                </svg>
+                            </button>
+                            <button onclick="moveEnvFilePriority(${index}, 1)" class="p-1 hover:bg-muted rounded transition-colors ${index === configEnvFiles.length - 1 ? 'opacity-30 cursor-not-allowed' : ''}" ${index === configEnvFiles.length - 1 ? 'disabled' : ''} title="Move down">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <!-- Enable/Disable Toggle -->
+                        <button onclick="toggleConfigEnvFileDisabled('${file.name}')" class="p-1.5 hover:bg-muted rounded transition-colors ${file.disabled ? 'text-muted-foreground' : 'text-green-500'}" title="${file.disabled ? 'Enable file' : 'Disable file'}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                ${file.disabled
+                                    ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />'
+                                    : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />'}
+                            </svg>
+                        </button>
+
+                        <!-- Remove Button -->
+                        <button onclick="removeConfigEnvFile('${file.name}')" class="p-1.5 hover:bg-red-500/10 text-red-500 rounded transition-colors" title="Remove file">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getPriorityBadge(priority) {
+            const colors = {
+                1: 'bg-gradient-to-r from-yellow-500 to-amber-600 text-yellow-900 shadow-lg shadow-yellow-500/30',
+                2: 'bg-gradient-to-r from-gray-300 to-gray-400 text-gray-800 shadow-lg shadow-gray-400/30',
+                3: 'bg-gradient-to-r from-orange-600 to-amber-700 text-orange-50 shadow-lg shadow-orange-600/30'
+            };
+            const defaultColor = 'bg-muted text-muted-foreground';
+
+            const colorClass = colors[priority] || defaultColor;
+
+            return `
+                <div class="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${colorClass}" title="Priority ${priority}">
+                    ${priority}
+                </div>
+            `;
+        }
+
+        async function moveEnvFilePriority(index, direction) {
+            const newIndex = index + direction;
+            if (newIndex < 0 || newIndex >= configEnvFiles.length) return;
+
+            // Swap items
+            [configEnvFiles[index], configEnvFiles[newIndex]] = [configEnvFiles[newIndex], configEnvFiles[index]];
+
+            // Update priority numbers
+            configEnvFiles.forEach((file, i) => file.priority = i + 1);
+
+            // Get the new order
+            const newOrder = configEnvFiles.map(f => f.name);
+
+            try {
+                const res = await fetch('/admin/api/reorder-env-files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ names: newOrder })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showSuccessToast('Priority updated');
+                    loadConfiguration();
+                } else {
+                    showErrorToast('Failed to update priority');
+                }
+            } catch (err) {
+                showErrorToast('Failed to update priority: ' + err.message);
+            }
+        }
+
+        async function toggleConfigEnvFileDisabled(name) {
+            try {
+                const res = await fetch('/admin/api/toggle-env-file-disabled', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    const file = configEnvFiles.find(f => f.name === name);
+                    const newState = !file.disabled;
+                    showSuccessToast(`${name} ${newState ? 'disabled' : 'enabled'}`);
+                    loadConfiguration();
+                } else {
+                    showErrorToast('Failed to toggle state');
+                }
+            } catch (err) {
+                showErrorToast('Failed to toggle state: ' + err.message);
+            }
+        }
+
+        async function addConfigEnvFile() {
+            const name = document.getElementById('configNewEnvName').value.trim();
+            const filePath = document.getElementById('configNewEnvPath').value.trim();
+
+            if (!name || !filePath) {
+                showErrorToast('Please enter both name and path');
+                return;
+            }
+
+            try {
+                const res = await fetch('/admin/api/env-files', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, path: filePath })
+                });
+                if (res.ok) {
+                    document.getElementById('configNewEnvName').value = '';
+                    document.getElementById('configNewEnvPath').value = '';
+                    showSuccessToast(`Added "${name}"`);
+                    loadConfiguration();
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    showErrorToast('Failed to add: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                showErrorToast('Failed to add env file: ' + err.message);
+            }
+        }
+
+        async function removeConfigEnvFile(name) {
+            if (!confirm(`Remove "${name}" from configuration?`)) return;
+
+            try {
+                const res = await fetch('/admin/api/env-files', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                if (res.ok) {
+                    showSuccessToast(`Removed "${name}"`);
+                    loadConfiguration();
+                } else {
+                    showErrorToast('Failed to remove');
+                }
+            } catch (err) {
+                showErrorToast('Failed to remove: ' + err.message);
+            }
+        }
+
         let originalValues = {};
         let keyUsageData = {};
         let keyHistoryData = {};
@@ -5062,6 +5276,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             // Load budgets if budgets tab is selected
             if (tabName === 'budgets') {
                 loadBudgets();
+            }
+            // Load configuration if configuration tab is selected
+            if (tabName === 'configuration') {
+                loadConfiguration();
             }
         }
         
