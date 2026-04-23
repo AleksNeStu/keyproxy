@@ -60,3 +60,7 @@ ROTATO_LOGGING_FIX_SUMMARY.md
 LOGGING_IMPROVEMENTS.md
 LOGIN_FIX_SUMMARY.md
 TASK_*_*.md
+# Development documentation (optional - can be excluded from public repo)
+# docs/development/
+# docs/implementation/
+
