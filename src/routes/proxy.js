@@ -9,6 +9,61 @@ const crypto = require('crypto');
 const { sendError, sendResponse, isStreamingRequest } = require('./httpHelpers');
 
 /**
+ * Determine if a response status should trigger fallback routing.
+ * Triggers on: 429 (rate limit), 5xx (server errors).
+ * Does NOT trigger on 4xx client errors (except 429) — those are caller issues.
+ */
+function shouldTriggerFallback(statusCode) {
+  return statusCode === 429 || (statusCode >= 500 && statusCode <= 599);
+}
+
+/**
+ * Attempt fallback routing through the full fallback chain.
+ * Iterates through getFallback() until it returns null or a successful response is received.
+ * The fallbackRouter already caps chain depth at maxDepth (2).
+ *
+ * @returns {{ success: boolean, response?: object, provider?: string, fallbackCount?: number }}
+ */
+async function tryFallbackChain(server, currentProvider, req, apiPath, body, headers, customStatusCodes, streaming, requestId) {
+  if (!server.fallbackRouter) return { success: false };
+
+  let provider = currentProvider;
+  let fallbackCount = 0;
+
+  while (fallbackCount < server.fallbackRouter.maxDepth) {
+    const fallback = server.fallbackRouter.getFallback(provider);
+    if (!fallback) break;
+
+    const fbProvider = server.config.getProvider(fallback.provider);
+    if (!fbProvider || fbProvider.disabled) break;
+
+    console.log(`[REQ-${requestId}] Attempting fallback ${fallbackCount + 1}: ${provider} → ${fallback.provider}`);
+    try {
+      const fbClient = await getProviderClient(server, fallback.provider, fbProvider, false);
+      if (!fbClient) break;
+
+      const fbBody = server.fallbackRouter.prepareBody(body, fallback);
+      const fbResponse = await fbClient.makeRequest(req.method, apiPath, fbBody, headers, customStatusCodes, streaming);
+
+      if (fbResponse.statusCode < 400) {
+        console.log(`[REQ-${requestId}] Fallback ${fallbackCount + 1} succeeded via ${fallback.provider} (${fbResponse.statusCode})`);
+        return { success: true, response: fbResponse, provider: fallback.provider, fallbackCount: fallbackCount + 1 };
+      }
+
+      console.log(`[REQ-${requestId}] Fallback ${fallback.provider} returned ${fbResponse.statusCode}, trying next in chain`);
+      provider = fallback.provider;
+      fallbackCount++;
+    } catch (fbErr) {
+      console.log(`[REQ-${requestId}] Fallback ${fallback.provider} failed: ${fbErr.message}`);
+      provider = fallback.provider;
+      fallbackCount++;
+    }
+  }
+
+  return { success: false, fallbackCount };
+}
+
+/**
  * Parse a request URL into provider route info.
  * Returns null for non-API routes.
  */
@@ -118,9 +173,9 @@ async function getProviderClient(server, providerName, provider, legacy = false)
     let client;
 
     if (provider.apiType === 'openai') {
-      client = new server.OpenAIClient(keyRotator, provider.baseUrl, providerName, retryConfig, timeoutMs);
+      client = new server.OpenAIClient(keyRotator, provider.baseUrl, providerName, retryConfig, timeoutMs, server.budgetTracker);
     } else if (provider.apiType === 'gemini') {
-      client = new server.GeminiClient(keyRotator, provider.baseUrl, providerName, retryConfig, timeoutMs);
+      client = new server.GeminiClient(keyRotator, provider.baseUrl, providerName, retryConfig, timeoutMs, server.budgetTracker);
     } else {
       return null;
     }
@@ -471,6 +526,32 @@ async function handleProxyRequest(server, req, res, body) {
     // Record failure in circuit breaker
     server.circuitBreaker.recordFailure(providerName);
 
+    // Attempt fallback chain for timeouts and network errors
+    if (!fallbackAttempted) {
+      fallbackAttempted = true;
+      const fbResult = await tryFallbackChain(server, providerName, req, apiPath, body, headers, customStatusCodes, streaming, requestId);
+      if (fbResult.success && fbResult.response) {
+        const fbResponse = fbResult.response;
+        const fbKeyInfo = fbResponse._keyInfo || null;
+        const fbProviderConfig = server.config.getProvider(fbResult.provider);
+        const fbResponseTime = Date.now() - startTime;
+
+        server.metrics.incCounter('keyproxy_requests_total', { provider: fbResult.provider, status: String(fbResponse.statusCode) });
+        server.metrics.incCounter('keyproxy_fallback_requests_total', { from: providerName, to: fbResult.provider });
+        server.analytics.recordRequest({
+          provider: fbResult.provider, statusCode: fbResponse.statusCode, latencyMs: fbResponseTime,
+          requestBody: body, responseBody: fbResponse.data, apiKey: fbKeyInfo?.actualKey, apiType: fbProviderConfig?.apiType
+        });
+        if (isApiCall) {
+          server.logApiRequest(requestId, req.method, apiPath, fbResult.provider, fbResponse.statusCode, fbResponseTime, null, clientIp, fbKeyInfo);
+          server.metrics.observeHistogram('keyproxy_request_duration_seconds', { provider: fbResult.provider }, fbResponseTime / 1000);
+        }
+        server.logApiResponse(requestId, fbResponse, body);
+        sendResponse(res, fbResponse);
+        return;
+      }
+    }
+
     if (isApiCall) {
       const responseTime = Date.now() - startTime;
       server.logApiRequest(requestId, req.method, apiPath, providerName, statusCode, responseTime, error.message, clientIp);
@@ -590,7 +671,7 @@ async function handleProxyRequest(server, req, res, body) {
       recordBudgetSpend(server, keyInfo?.actualKey, body, response.data, apiType);
     }
 
-    // Notify on all keys exhausted
+    // Notify on all keys exhausted (only for 429 with full key exhaustion)
     if (keyInfo && keyInfo.failedKeys && response.statusCode === 429) {
       const providerClient = server.providerClients.get(providerName);
       if (providerClient && providerClient.keyRotator && providerClient.keyRotator.apiKeys.length > 0 &&
@@ -598,43 +679,33 @@ async function handleProxyRequest(server, req, res, body) {
         if (server.notifier) {
           server.notifier.send(`All keys exhausted for provider '${providerName}' (${keyInfo.failedKeys.length}/${providerClient.keyRotator.apiKeys.length})`, 'failures');
         }
+      }
+    }
 
-        // Try fallback provider if configured
-        if (server.fallbackRouter && !fallbackAttempted) {
-          fallbackAttempted = true;
-          const fallback = server.fallbackRouter.getFallback(providerName);
-          if (fallback) {
-            const fbProvider = server.config.getProvider(fallback.provider);
-            if (fbProvider && !fbProvider.disabled) {
-              console.log(`[REQ-${requestId}] Attempting fallback: ${providerName} → ${fallback.provider}`);
-              try {
-                const fbClient = await getProviderClient(server, fallback.provider, fbProvider, false);
-                if (fbClient) {
-                  const fbBody = server.fallbackRouter.prepareBody(body, fallback);
-                  const fbResponse = await fbClient.makeRequest(req.method, apiPath, fbBody, headers, customStatusCodes, streaming);
-                  const fbKeyInfo = fbResponse._keyInfo || null;
+    // Attempt fallback chain on 429 (rate limit) or 5xx (server errors)
+    if (!fallbackAttempted && shouldTriggerFallback(response.statusCode)) {
+      fallbackAttempted = true;
+      const triggerReason = response.statusCode === 429 ? 'rate limit' : `server error ${response.statusCode}`;
+      console.log(`[REQ-${requestId}] Triggering fallback due to ${triggerReason} from ${providerName}`);
 
-                  if (fbResponse.statusCode < 400) {
-                    console.log(`[REQ-${requestId}] Fallback succeeded via ${fallback.provider} (${fbResponse.statusCode})`);
-                    server.metrics.incCounter('keyproxy_requests_total', { provider: fallback.provider, status: String(fbResponse.statusCode) });
-                    server.metrics.incCounter('keyproxy_fallback_requests_total', { from: providerName, to: fallback.provider });
-                    const fbResponseTime = Date.now() - startTime;
-                    server.analytics.recordRequest({
-                      provider: fallback.provider, statusCode: fbResponse.statusCode, latencyMs: fbResponseTime,
-                      requestBody: fbBody, responseBody: fbResponse.data, apiKey: fbKeyInfo?.actualKey, apiType: fbProvider.apiType
-                    });
-                    server.logApiResponse(requestId, fbResponse, fbBody);
-                    sendResponse(res, fbResponse);
-                    return;
-                  }
-                  console.log(`[REQ-${requestId}] Fallback ${fallback.provider} returned ${fbResponse.statusCode}, serving original response`);
-                }
-              } catch (fbErr) {
-                console.log(`[REQ-${requestId}] Fallback ${fallback.provider} failed: ${fbErr.message}`);
-              }
-            }
-          }
-        }
+      const fbResult = await tryFallbackChain(server, providerName, req, apiPath, body, headers, customStatusCodes, streaming, requestId);
+      if (fbResult.success && fbResult.response) {
+        const fbResponse = fbResult.response;
+        const fbKeyInfo = fbResponse._keyInfo || null;
+        const fbProviderConfig = server.config.getProvider(fbResult.provider);
+        const fbResponseTime = Date.now() - startTime;
+
+        server.metrics.incCounter('keyproxy_requests_total', { provider: fbResult.provider, status: String(fbResponse.statusCode) });
+        server.metrics.incCounter('keyproxy_fallback_requests_total', { from: providerName, to: fbResult.provider });
+        server.analytics.recordRequest({
+          provider: fbResult.provider, statusCode: fbResponse.statusCode, latencyMs: fbResponseTime,
+          requestBody: body, responseBody: fbResponse.data, apiKey: fbKeyInfo?.actualKey, apiType: fbProviderConfig?.apiType
+        });
+        if (keyInfo?.actualKey) server.rpmTracker.record(keyInfo.actualKey);
+        recordBudgetSpend(server, fbKeyInfo?.actualKey, body, fbResponse.data, apiType);
+        server.logApiResponse(requestId, fbResponse, body);
+        sendResponse(res, fbResponse);
+        return;
       }
     }
 
