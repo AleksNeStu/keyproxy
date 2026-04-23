@@ -10,14 +10,14 @@
 
 ## 🎯 What is KeyProxy?
 
-**KeyProxy** (formerly Nest-Rotato) is a production-ready API key management system that sits between your development tools and AI providers. It automatically detects failures, rotates to healthy keys, and synchronizes the active key across your entire development environment — all in real-time.
+**KeyProxy** is a production-ready API key management system that sits between your development tools and AI providers. It automatically detects failures, rotates to healthy keys, and synchronizes the active key across your entire development environment — all in real-time.
 
-### 🔥 Key Features
+### 🔥 Core Features
 
 - **🔄 Intelligent Key Rotation** — Automatic failover on rate limits (429), quota exhaustion (402), or errors
-- **💊 Health Monitoring** — Real-time provider health checks with circuit breaker protection
+- **💊 Health Monitoring** — Real-time provider health checks with auto-recovery
 - **🎯 Multi-Destination Sync** — Updates System Environment, local files, and web proxy simultaneously
-- **📊 Analytics Dashboard** — Track usage, costs, latency, and request patterns per key/provider
+- **📊 Usage Analytics** — Track requests, costs, and latency per key/provider
 - **🔐 Secure by Default** — Scrypt-encrypted passwords, CSRF protection, input validation
 - **🌐 Web Proxy** — Zero-config HTTP proxy at `localhost:8990` for any client
 - **⚡ Auto-Recovery** — Failed keys automatically recover after cooldown period
@@ -110,8 +110,8 @@ docker compose logs -f
 │  │              │  │              │  │ Breaker      │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Analytics    │  │ Budget       │  │ Fallback     │      │
-│  │              │  │ Tracker      │  │ Router       │      │
+│  │ Analytics    │  │ Budget       │  │ Exclusion    │      │
+│  │              │  │ Tracker      │  │ Manager      │      │
 │  └──────────────┘  └──────────────┘  └──────────────┘      │
 └────────────────────┬────────────────────────────────────────┘
                      │
@@ -132,41 +132,80 @@ docker compose logs -f
 
 ## 🎨 Admin Panel Features
 
-### 📊 Dashboard Overview
-- **Real-time key status** — Active, exhausted, recovering, disabled
-- **Provider health** — Status badges, last check time, response time
-- **Request metrics** — Total requests, success rate, error breakdown
-- **Cost tracking** — Estimated costs per provider/key with budget alerts
+### 📊 Available Tabs
 
-### 🔑 API Keys Management
-- **Multi-provider support** — 13+ providers (OpenAI, Gemini, Tavily, Firecrawl, etc.)
-- **Bulk operations** — Enable/disable multiple keys at once
-- **Key rotation history** — Track when and why keys were rotated
-- **RPM tracking** — Real-time requests-per-minute with rate limit warnings
-- **Model selection** — Fetch and filter available models per provider
+#### 1. **API Keys** — Provider & Key Management
+- ✅ View all configured providers (OpenAI, Gemini, Tavily, etc.)
+- ✅ Enable/disable individual keys
+- ✅ Reorder keys for rotation priority
+- ✅ View key status: Active, Fresh, Exhausted
+- ✅ Real-time RPM (requests per minute) tracking
+- ✅ Key expiration tracking with extend functionality
+- ✅ Test individual keys
+- ✅ Fetch and configure available models per provider
+- ✅ Toggle provider sync to environment
 
-### ⚙️ Configuration
-- **Multi-environment support** — Switch between production, staging, personal configs
-- **Priority ordering** — Drag-and-drop environment file priority
-- **Hot reload** — Changes apply instantly without restart
-- **Import/Export** — Backup and restore full configuration
+#### 2. **API Logs** — Request Monitoring
+- ✅ Real-time request logs (last 100 entries)
+- ✅ View request details: method, endpoint, status, latency
+- ✅ Filter by provider, status code
+- ✅ Response inspection for debugging
 
-### 📈 Analytics
-- **Usage charts** — Requests over time, latency distribution
-- **Cost estimation** — Per-provider breakdown with pricing tables
-- **Top keys** — Most used keys with filtering
-- **Performance metrics** — p50, p95, p99 latency tracking
+#### 3. **Management** — Provider Health Dashboard
+- ✅ Provider health status (Active, Degraded, Failed, Disabled)
+- ✅ Key counts: Total, Enabled, Disabled, Exhausted
+- ✅ Request statistics per provider
+- ✅ Average response time tracking
+- ✅ Last check timestamp
+- ✅ Manual health check trigger
+- ✅ Provider reset functionality
 
-### 🔔 Notifications
-- **Telegram integration** — Broadcast alerts to Telegram channels
-- **Slack webhooks** — Send notifications to Slack channels
-- **Event triggers** — Key exhaustion, recovery, circuit breaker events
+#### 4. **Analytics** — Usage & Cost Tracking
+- ✅ Request count tracking
+- ✅ Token usage estimation (input/output)
+- ✅ Cost estimation per provider/key
+- ✅ Date range filtering (7d, 30d, all)
+- ✅ Top keys by usage
+- ✅ Model breakdown
+- ⏳ Charts visualization (planned)
 
-### 🛡️ Security
-- **Password management** — Change password, force upgrade from default
-- **CSRF protection** — Token-based protection for state-changing operations
-- **Input validation** — Comprehensive validation on all API endpoints
-- **Session management** — Secure cookie-based authentication
+#### 5. **Virtual Keys** — Scoped Access Control
+- ✅ Generate virtual API keys (vk-xxxx format)
+- ✅ Provider whitelist per virtual key
+- ✅ Model whitelist per virtual key
+- ✅ Rate limiting per virtual key
+- ✅ Expiration dates
+- ✅ Enable/disable virtual keys
+- ✅ Revoke virtual keys
+
+#### 6. **Budgets** — Spend Management
+- ✅ Set daily/monthly budget per key
+- ✅ Auto-disable keys when budget exceeded
+- ✅ Budget tracking and alerts
+- ✅ Reset budget counters
+- ✅ View available keys for budget assignment
+
+#### 7. **Configuration** — Environment Management
+- ✅ Multi-environment support (.env files)
+- ✅ Add/remove environment files
+- ✅ Switch between environments
+- ✅ Reorder environment priority (drag-and-drop)
+- ✅ Enable/disable environment files
+- ✅ File system browser for .env selection
+- ✅ Hot reload configuration
+- ✅ Import/export configuration backup
+
+### ⚙️ Settings Modal
+- ✅ Change admin password
+- ✅ Telegram bot configuration
+- ✅ Slack webhook notifications
+- ✅ Notification event triggers
+- ✅ Test notifications
+- ✅ Cache configuration (enable/disable, TTL, max entries)
+- ✅ Circuit breaker settings
+- ✅ Fallback provider configuration
+- ✅ Load balancing strategy (round-robin, weighted-random, least-used)
+- ✅ Key weight configuration
 
 ---
 
@@ -178,11 +217,11 @@ docker compose logs -f
 4. **Monitor response** → Check for rate limits (429), quota errors (402), failures
 5. **Auto-rotate** → On error, mark key as exhausted and try next key
 6. **Sync everywhere** → Update System Env, `.active_keys.env`, and web proxy
-7. **Auto-recovery** → After cooldown (5 min), retest exhausted keys
+7. **Auto-recovery** → After cooldown (5 min default), retest exhausted keys with exponential backoff
 
 ### Load Balancing Strategies
 
-- **Round-robin** — Distribute requests evenly across all keys
+- **Round-robin** — Distribute requests evenly across all keys (default)
 - **Weighted-random** — Assign weights to prioritize certain keys
 - **Least-used** — Route to key with lowest request count
 
@@ -191,73 +230,120 @@ docker compose logs -f
 ## 🧩 Supported Providers
 
 ### LLM Providers
-- **OpenAI** — GPT-4, GPT-3.5, embeddings
-- **Gemini** — Gemini Pro, Gemini Flash
-- **Anthropic** — Claude models
-- **Groq** — Fast inference
+- ✅ **OpenAI** — GPT-4, GPT-3.5, embeddings
+- ✅ **Gemini** — Gemini Pro, Gemini Flash
+- ✅ **Anthropic** — Claude models (via OpenAI-compatible API)
+- ✅ **Groq** — Fast inference
 
 ### Search Providers
-- **Tavily** — AI-optimized search
-- **Exa** — Semantic search
-- **Brave Search** — Privacy-focused search
+- ✅ **Tavily** — AI-optimized search
+- ✅ **Exa** — Semantic search
+- ✅ **Brave Search** — Privacy-focused search
 
 ### Tool Providers
-- **Firecrawl** — Web scraping and crawling
-- **Jina** — Document parsing and embeddings
-- **Context7** — Documentation search
-- **RTFM** — Package documentation
+- ✅ **Firecrawl** — Web scraping and crawling
+- ✅ **Jina** — Document parsing and embeddings
+- ✅ **Context7** — Documentation search
+- ✅ **RTFM** — Package documentation
 
 ---
 
 ## 🛠️ Advanced Features
 
-### Circuit Breaker
-Prevents cascading failures by temporarily blocking requests to failing providers:
-- **Threshold**: 5 consecutive failures (configurable)
-- **Timeout**: 30 seconds before retry (configurable)
-- **States**: Closed → Open → Half-Open → Closed
+### ✅ Implemented
 
-### Fallback Routing
-Automatically retry failed requests on alternative providers:
-```env
-# If Groq fails, fallback to OpenAI
-OPENAI_GROQ_FALLBACK=openai
-OPENAI_GROQ_FALLBACK_MODEL=gpt-4o-mini
-```
+#### Health Monitoring & Auto-Recovery
+- Real-time provider health checks (every 5 minutes)
+- Automatic recovery of exhausted keys after cooldown
+- Exponential backoff for failed recovery attempts
+- Max recovery attempts limit (default: 5)
+- Configurable cooldown period (default: 5 minutes)
 
-### Budget Tracking
-Set daily/monthly spend caps per key with auto-disable:
-```env
-KEYPROXY_DEFAULT_DAILY_BUDGET=10.00
-KEYPROXY_DEFAULT_MONTHLY_BUDGET=300.00
-```
+#### Circuit Breaker
+- Per-provider circuit breaker pattern
+- Threshold: 5 consecutive failures (configurable)
+- Timeout: 30 seconds before retry (configurable)
+- States: Closed → Open → Half-Open → Closed
+- Manual reset via admin panel
 
-### Response Caching
-In-memory LRU cache for repeated requests:
-```env
-KEYPROXY_CACHE_ENABLED=true
-KEYPROXY_CACHE_TTL_SEC=300
-KEYPROXY_CACHE_MAX_ENTRIES=1000
-```
+#### Response Caching
+- In-memory LRU cache for repeated requests
+- Configurable TTL (default: 300 seconds)
+- Configurable max entries (default: 1000)
+- X-Cache HIT/MISS headers
+- Enable/disable per provider
 
-### Virtual API Keys
-Generate scoped virtual keys with limited access:
+#### Virtual API Keys
+- Generate scoped virtual keys (vk-xxxx format)
 - Provider whitelist
 - Model whitelist
-- Rate limits
+- Rate limits per key
 - Expiration dates
+- Enable/disable/revoke functionality
 
-### Prometheus Metrics
-Export metrics for monitoring:
-```
-http://localhost:8990/metrics
-```
+#### Budget Tracking
+- Daily/monthly spend caps per key
+- Auto-disable when cap reached
+- Notification on budget exceeded
+- Reset counters
+- Cost estimation based on token usage
 
-Metrics include:
-- `keyproxy_requests_total` — Total requests by provider/status
-- `keyproxy_request_duration_seconds` — Request latency histogram
-- `keyproxy_key_rotations_total` — Key rotation counter
-- `keyproxy_errors_total` — Error counter by type
+#### Key Exclusion Manager
+- Exclude specific keys from environment sync
+- Pattern-based exclusion (regex support)
+- Test exclusion patterns
+- Enable/disable exclusions
+
+#### Fallback Routing
+- Cross-provider failover configuration
+- Fallback chains (provider → fallback provider)
+- Model mapping for fallbacks
+- Max fallback depth: 2
+
+#### Configuration Management
+- Multi-environment support
+- Import/export configuration
+- Hot reload without restart
+- File system browser
+- Drag-and-drop priority ordering
+
+#### Security
+- Scrypt password hashing
+- CSRF token protection
+- Input validation (Joi schemas)
+- Rate limiting on admin API
+- Session-based authentication
+- Security headers (CSP, X-Frame-Options, etc.)
+
+#### Analytics
+- Request count tracking
+- Token usage estimation
+- Cost estimation per provider/key
+- Latency tracking
+- Top keys by usage
+- Model breakdown
+- Date range filtering
+
+#### Notifications
+- Telegram bot integration
+- Slack webhook support
+- Configurable event triggers
+- Test notification functionality
+
+#### Prometheus Metrics
+- `/metrics` endpoint for monitoring
+- Request counters by provider/status
+- Latency histograms
+- Key rotation counters
+- Error counters by type
+
+### ⏳ Planned (See Roadmap)
+
+- Analytics charts visualization (Task #27)
+- Complete circuit breaker UI integration (Task #28)
+- Settings tab reorganization (Task #33)
+- Collapsible provider sections (Task #32)
+- Comprehensive testing suite (Task #30)
 
 ---
 
@@ -321,7 +407,7 @@ services:
 - **Throughput**: 1000+ requests/second (single instance)
 - **Memory usage**: ~50-100MB (depends on cache size)
 - **Key rotation**: <100ms failover time
-- **Health checks**: Every 30 seconds (configurable)
+- **Health checks**: Every 5 minutes (configurable)
 
 ---
 
@@ -333,9 +419,6 @@ npm test
 
 # Run specific test suite
 node --test test/core/auth.test.js
-
-# Run with coverage
-npm run test:coverage
 ```
 
 ---
@@ -354,13 +437,13 @@ npm run test:coverage
 
 ## 🛣️ Roadmap
 
-### ✅ Completed
+### ✅ Completed (23 tasks)
 - [x] Secure password storage with scrypt
 - [x] Multi-environment configuration
 - [x] Provider health monitoring
 - [x] Telegram & Slack notifications
 - [x] Auto-recovery of failed keys
-- [x] Analytics dashboard with cost tracking
+- [x] Analytics tracking with cost estimation
 - [x] Circuit breaker pattern
 - [x] Fallback provider routing
 - [x] Prometheus metrics endpoint
@@ -369,16 +452,30 @@ npm run test:coverage
 - [x] Budget tracking per key
 - [x] Response caching
 - [x] CSRF protection & input validation
+- [x] Key exclusion manager
+- [x] Model selection per provider
+- [x] Environment file priority management
+- [x] Enhanced provider management UI
+- [x] Load balancing strategies
+- [x] Request timeout configuration
+- [x] Key expiration tracking
+- [x] RPM tracking per key
+- [x] Configuration import/export
 
-### 🚧 In Progress
-- [ ] Complete analytics UI with charts
-- [ ] Enhanced circuit breaker integration
-- [ ] Comprehensive testing suite (target: 80% coverage)
+### 🚧 In Progress (10 tasks)
+- [ ] Settings section enhancement (Task #22)
+- [ ] API rate limiting improvements (Task #25)
+- [ ] Enhanced auto-recovery UI (Task #26)
+- [ ] Complete analytics dashboard with charts (Task #27)
+- [ ] Complete circuit breaker integration (Task #28)
+- [ ] Complete fallback routing UI (Task #29)
+- [ ] Comprehensive testing suite (Task #30)
+- [ ] Enhanced provider management (Task #31)
+- [ ] Collapsible provider sections (Task #32)
+- [ ] Move Settings to tab level (Task #33)
 
 ### 📋 Planned
-- [ ] Settings tab reorganization
-- [ ] Collapsible provider sections
-- [ ] API rate limiting enhancements
+- [ ] Screenshots for README (Task #34 - after UI completion)
 - [ ] WebSocket support for real-time updates
 - [ ] Multi-user support with RBAC
 - [ ] Audit logging
@@ -401,23 +498,13 @@ Contributions are welcome! Please:
 
 MIT License. Copyright (c) 2026 NestLab.
 
-Based on the original high-availability rotation logic from the Rotato project.
-
 ---
 
 ## 🆘 Support
 
-- **Issues**: [GitHub Issues](https://github.com/yourusername/keyproxy/issues)
+- **Issues**: [GitHub Issues](https://github.com/AleksNeStu/keyproxy/issues)
 - **Documentation**: [./docs](./docs)
 - **Logs**: `./manage.ps1 logs` (Windows) or `./manage.sh logs` (Linux)
-
----
-
-## 🙏 Acknowledgments
-
-- Built with Node.js and zero external dependencies (except joi for validation)
-- Inspired by high-availability patterns from production systems
-- Community feedback and contributions
 
 ---
 
