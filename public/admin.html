@@ -1074,6 +1074,72 @@
                 </div>
             </div>
 
+            <!-- Budgets Tab -->
+            <div id="budgets" class="tab-content hidden">
+                <div class="section-header">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-semibold text-foreground">Budget & Quota Management</h2>
+                            <p class="text-muted-foreground text-xs mt-1">Set daily and monthly spend limits per API key</p>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <button onclick="openSetBudgetModal()" class="btn btn-primary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                                Set Budget
+                            </button>
+                            <button onclick="loadBudgets()" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div class="border border-border rounded p-3 bg-muted/30 text-center">
+                        <div class="text-2xl font-bold text-foreground" id="budgetTotal">-</div>
+                        <div class="text-xs text-muted-foreground">Keys with Budgets</div>
+                    </div>
+                    <div class="border border-green-500/30 rounded p-3 bg-green-500/5 text-center">
+                        <div class="text-2xl font-bold text-green-400" id="budgetAllowed">-</div>
+                        <div class="text-xs text-green-400/80">Within Budget</div>
+                    </div>
+                    <div class="border border-red-500/30 rounded p-3 bg-red-500/5 text-center">
+                        <div class="text-2xl font-bold text-red-400" id="budgetExceeded">-</div>
+                        <div class="text-xs text-red-400/80">Exceeded</div>
+                    </div>
+                    <div class="border border-blue-500/30 rounded p-3 bg-blue-500/5 text-center">
+                        <div class="text-2xl font-bold text-blue-400" id="budgetTotalSpend">-</div>
+                        <div class="text-xs text-blue-400/80">Total Spend (Today)</div>
+                    </div>
+                </div>
+
+                <!-- Budgets Table -->
+                <div class="section">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                                    <th class="pb-2 pr-3">Key</th>
+                                    <th class="pb-2 pr-3">Provider</th>
+                                    <th class="pb-2 pr-3">Status</th>
+                                    <th class="pb-2 pr-3">Daily Spend</th>
+                                    <th class="pb-2 pr-3">Daily Limit</th>
+                                    <th class="pb-2 pr-3">Monthly Spend</th>
+                                    <th class="pb-2 pr-3">Monthly Limit</th>
+                                    <th class="pb-2">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="budgetTableBody">
+                                <tr><td colspan="8" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                <p class="text-xs text-muted-foreground mt-2">Auto-refreshes every 30 seconds when tab is visible. <span id="budgetLastRefresh"></span></p>
+            </div>
+
         </main>
 
         <!-- Footer -->
@@ -4632,6 +4698,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             if (tabName === 'virtualkeys') {
                 refreshVirtualKeys();
             }
+            // Load budgets if budgets tab is selected
+            if (tabName === 'budgets') {
+                loadBudgets();
+            }
         }
         
         // Health monitoring
@@ -5364,6 +5434,114 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         }
     }
 
+
+    // ─── Load Balancing ────────────────────────────
+    let lbStrategyData = {};
+
+    async function loadLbSettings() {
+        try {
+            const res = await fetch('/admin/api/lb-strategy');
+            if (!res.ok) return;
+            lbStrategyData = await res.json();
+            renderLbSettings();
+        } catch (err) {
+            console.error('Failed to load LB settings:', err);
+        }
+    }
+
+    function renderLbSettings() {
+        const list = document.getElementById('lbStrategyList');
+        const weightEditors = document.getElementById('lbWeightEditors');
+        if (!list || !weightEditors) return;
+
+        const providers = Object.keys(lbStrategyData);
+        if (providers.length === 0) {
+            list.innerHTML = '<p class="text-xs text-muted-foreground">No active providers found.</p>';
+            weightEditors.innerHTML = '';
+            return;
+        }
+
+        const strategies = ['round-robin', 'weighted-random', 'least-used'];
+        list.innerHTML = providers.map(function(name) {
+            const cfg = lbStrategyData[name];
+            const opts = strategies.map(function(s) {
+                return '<option value="' + s + '"' + (s === cfg.strategy ? ' selected' : '') + '>' + s + '</option>';
+            }).join('');
+            return '<div class="flex items-center gap-3 bg-muted/30 rounded-md px-3 py-2">' +
+                '<span class="font-medium text-sm flex-1">' + esc(name) + '</span>' +
+                '<select onchange="saveLbStrategy(\'' + esc(name) + '\', this.value)" class="input-field px-2 py-1 rounded-md text-xs">' +
+                opts + '</select></div>';
+        }).join('');
+
+        var weightedProviders = providers.filter(function(n) { return lbStrategyData[n].strategy === 'weighted-random'; });
+        if (weightedProviders.length === 0) {
+            weightEditors.innerHTML = '<p class="text-xs text-muted-foreground">Select "weighted-random" strategy above to configure key weights.</p>';
+            return;
+        }
+
+        weightEditors.innerHTML = weightedProviders.map(function(name) {
+            var cfg = lbStrategyData[name];
+            var weightRows = cfg.weights.map(function(w, i) {
+                return '<div class="flex items-center gap-2">' +
+                    '<span class="text-xs text-muted-foreground font-mono flex-1 truncate">' + esc(w.maskedKey) + '</span>' +
+                    '<input type="range" min="1" max="10" value="' + w.weight + '" class="w-20 accent-primary"' +
+                    ' oninput="this.nextElementSibling.textContent=this.value"' +
+                    ' onchange="saveLbWeight(\'' + esc(name) + '\', ' + i + ', this.value)">' +
+                    '<span class="text-xs font-medium w-4 text-center">' + w.weight + '</span></div>';
+            }).join('');
+            return '<div class="bg-muted/30 rounded-md px-3 py-2">' +
+                '<p class="text-xs font-medium text-foreground mb-1">' + esc(name) + ' — Key Weights</p>' +
+                '<div class="space-y-1.5">' + weightRows + '</div></div>';
+        }).join('');
+    }
+
+    async function saveLbStrategy(provider, strategy) {
+        try {
+            const res = await fetch('/admin/api/lb-strategy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider: provider, strategy: strategy })
+            });
+            if (res.ok) {
+                lbStrategyData[provider].strategy = strategy;
+                renderLbSettings();
+                showSuccessToast('Strategy for ' + provider + ' set to ' + strategy);
+            } else {
+                const err = await res.json();
+                showErrorToast(err.error || 'Failed to save strategy');
+            }
+        } catch (err) {
+            showErrorToast('Failed: ' + err.message);
+        }
+    }
+
+    async function saveLbWeight(provider, weightIndex, weight) {
+        try {
+            const cfg = lbStrategyData[provider];
+            if (!cfg || !cfg.weights[weightIndex]) return;
+            const res = await fetch('/admin/api/lb-strategy');
+            const freshData = await res.json();
+            const fullKey = freshData[provider] && freshData[provider].weights && freshData[provider].weights[weightIndex] && freshData[provider].weights[weightIndex].key;
+            if (!fullKey) {
+                showErrorToast('Could not resolve key for weight update');
+                return;
+            }
+            const resp = await fetch('/admin/api/lb-weight', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider: provider, key: fullKey, weight: parseInt(weight) })
+            });
+            if (resp.ok) {
+                lbStrategyData[provider].weights[weightIndex].weight = parseInt(weight);
+                showSuccessToast('Weight updated to ' + weight);
+            } else {
+                showErrorToast('Failed to update weight');
+            }
+        } catch (err) {
+            showErrorToast('Failed: ' + err.message);
+        }
+    }
+
     // ─── Circuit Breaker ────────────────────────────
     async function loadCircuitBreakerStates() {
         try {
@@ -6073,6 +6251,204 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             showErrorToast('Failed to toggle virtual key: ' + error.message);
         }
     }
+
+    // ─── Budget Management ──────────────────────────
+    let budgetRefreshTimer = null;
+
+    async function loadBudgets() {
+        try {
+            const res = await fetch('/admin/api/budgets', { headers: authHeaders() });
+            if (!res.ok) return;
+            const statuses = await res.json();
+            renderBudgetSummary(statuses);
+            renderBudgetTable(statuses);
+            document.getElementById('budgetLastRefresh').textContent = 'Last refresh: ' + new Date().toLocaleTimeString();
+            // Auto-refresh every 30s
+            clearTimeout(budgetRefreshTimer);
+            budgetRefreshTimer = setTimeout(loadBudgets, 30000);
+        } catch (err) {
+            console.error('Failed to load budgets:', err);
+        }
+    }
+
+    function renderBudgetSummary(statuses) {
+        const entries = Object.values(statuses);
+        const total = entries.length;
+        const allowed = entries.filter(e => e.allowed).length;
+        const exceeded = total - allowed;
+        const totalSpend = entries.reduce((sum, e) => sum + (e.dailySpent || 0), 0);
+        document.getElementById('budgetTotal').textContent = total;
+        document.getElementById('budgetAllowed').textContent = allowed;
+        document.getElementById('budgetExceeded').textContent = exceeded;
+        document.getElementById('budgetTotalSpend').textContent = '$' + totalSpend.toFixed(2);
+    }
+
+    function renderBudgetTable(statuses) {
+        const tbody = document.getElementById('budgetTableBody');
+        const entries = Object.entries(statuses);
+        if (entries.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" class="py-4 text-center text-muted-foreground">No budgets configured. Click "Set Budget" to add one.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = entries.map(([hash, b]) => {
+            const displayKey = b.maskedKey || hash.substring(0, 8) + '...';
+            const provider = b.provider || 'unknown';
+            const statusBadge = b.allowed
+                ? '<span class="key-badge badge-fresh">OK</span>'
+                : '<span class="key-badge badge-exhausted">Exceeded</span>';
+            const dailyPct = b.dailyLimit > 0 ? Math.min((b.dailySpent / b.dailyLimit) * 100, 100) : -1;
+            const monthlyPct = b.monthlyLimit > 0 ? Math.min((b.monthlySpent / b.monthlyLimit) * 100, 100) : -1;
+            const dailyBar = dailyPct >= 0 ? renderProgressBar(dailyPct, b.dailySpent, b.dailyLimit) : '<span class="text-muted-foreground">no limit</span>';
+            const monthlyBar = monthlyPct >= 0 ? renderProgressBar(monthlyPct, b.monthlySpent, b.monthlyLimit) : '<span class="text-muted-foreground">no limit</span>';
+            return `<tr class="border-b border-border/50">
+                <td class="py-2 pr-3 font-mono text-xs">${esc(displayKey)}</td>
+                <td class="py-2 pr-3">${esc(provider)}</td>
+                <td class="py-2 pr-3">${statusBadge}</td>
+                <td class="py-2 pr-3">${dailyBar}</td>
+                <td class="py-2 pr-3 text-xs">$${(b.dailyLimit || 0).toFixed(2)}</td>
+                <td class="py-2 pr-3">${monthlyBar}</td>
+                <td class="py-2 pr-3 text-xs">$${(b.monthlyLimit || 0).toFixed(2)}</td>
+                <td class="py-2">
+                    <div class="flex items-center gap-1">
+                        <button onclick="editBudget('${esc(hash)}')" class="text-xs text-blue-400 hover:text-blue-300" title="Edit">Edit</button>
+                        <span class="text-border">|</span>
+                        <button onclick="removeBudget('${esc(hash)}')" class="text-xs text-red-400 hover:text-red-300" title="Remove">Remove</button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function renderProgressBar(pct, spent, limit) {
+        const color = pct >= 90 ? '#ef4444' : pct >= 70 ? '#f59e0b' : '#22c55e';
+        const spentStr = '$' + spent.toFixed(2);
+        const limitStr = '$' + limit.toFixed(2);
+        return `<div class="w-full max-w-[120px]">
+            <div class="flex items-center justify-between text-[10px] mb-0.5">
+                <span>${spentStr}</span>
+                <span class="text-muted-foreground">${Math.round(pct)}%</span>
+            </div>
+            <div class="w-full bg-muted rounded-full h-1.5">
+                <div class="h-1.5 rounded-full transition-all" style="width: ${pct}%; background-color: ${color};"></div>
+            </div>
+        </div>`;
+    }
+
+    async function openSetBudgetModal(prefillHash) {
+        const modal = document.getElementById('setBudgetModal');
+        modal.classList.remove('hidden');
+        document.getElementById('budgetSaveStatus').classList.add('hidden');
+        document.getElementById('budgetExistingInfo').classList.add('hidden');
+        document.getElementById('budgetDailyLimit').value = '';
+        document.getElementById('budgetMonthlyLimit').value = '';
+
+        // Load available keys
+        try {
+            const res = await fetch('/admin/api/budgets/available-keys', { headers: authHeaders() });
+            if (!res.ok) return;
+            const keys = await res.json();
+            const select = document.getElementById('budgetKeySelect');
+            select.innerHTML = '<option value="">-- Select a key --</option>' +
+                keys.map(k => `<option value="${esc(k.keyHash)}" data-provider="${esc(k.provider)}" data-masked="${esc(k.maskedKey)}">${esc(k.provider)}: ${esc(k.maskedKey)}${k.hasBudget ? ' (has budget)' : ''}</option>`).join('');
+
+            // If editing, pre-select the key
+            if (prefillHash) {
+                select.value = prefillHash;
+                if (select.value === prefillHash) {
+                    loadExistingBudgetInfo(prefillHash);
+                }
+            }
+        } catch (err) {
+            console.error('Failed to load available keys:', err);
+            document.getElementById('budgetKeySelect').innerHTML = '<option value="">Error loading keys</option>';
+        }
+    }
+
+    async function loadExistingBudgetInfo(keyHash) {
+        try {
+            const res = await fetch('/admin/api/budgets', { headers: authHeaders() });
+            if (!res.ok) return;
+            const statuses = await res.json();
+            const status = statuses[keyHash];
+            if (status) {
+                document.getElementById('budgetExistingInfo').classList.remove('hidden');
+                document.getElementById('budgetDailyLimit').value = status.dailyLimit || '';
+                document.getElementById('budgetMonthlyLimit').value = status.monthlyLimit || '';
+                const dailyStr = status.dailyLimit > 0
+                    ? `$${status.dailySpent.toFixed(2)} / $${status.dailyLimit.toFixed(2)}`
+                    : 'no limit ($' + status.dailySpent.toFixed(2) + ' spent)';
+                const monthlyStr = status.monthlyLimit > 0
+                    ? `$${status.monthlySpent.toFixed(2)} / $${status.monthlyLimit.toFixed(2)}`
+                    : 'no limit ($' + status.monthlySpent.toFixed(2) + ' spent)';
+                document.getElementById('budgetExistingDaily').textContent = dailyStr;
+                document.getElementById('budgetExistingMonthly').textContent = monthlyStr;
+            }
+        } catch (err) {
+            console.error('Failed to load budget info:', err);
+        }
+    }
+
+    function closeSetBudgetModal() {
+        document.getElementById('setBudgetModal').classList.add('hidden');
+    }
+
+    async function saveBudget() {
+        const keyHash = document.getElementById('budgetKeySelect').value;
+        if (!keyHash) {
+            showBudgetStatus('Please select an API key', 'error');
+            return;
+        }
+        const dailyLimit = parseFloat(document.getElementById('budgetDailyLimit').value) || 0;
+        const monthlyLimit = parseFloat(document.getElementById('budgetMonthlyLimit').value) || 0;
+        if (dailyLimit === 0 && monthlyLimit === 0) {
+            showBudgetStatus('Set at least one limit (daily or monthly)', 'error');
+            return;
+        }
+
+        try {
+            const res = await fetch('/admin/api/budgets', {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ keyHash, dailyLimit, monthlyLimit })
+            });
+            if (!res.ok) {
+                const err = await res.json();
+                showBudgetStatus('Failed: ' + (err.error || 'Unknown error'), 'error');
+                return;
+            }
+            showBudgetStatus('Budget saved successfully', 'success');
+            closeSetBudgetModal();
+            loadBudgets();
+        } catch (err) {
+            showBudgetStatus('Error: ' + err.message, 'error');
+        }
+    }
+
+    function showBudgetStatus(msg, type) {
+        const el = document.getElementById('budgetSaveStatus');
+        el.classList.remove('hidden');
+        el.className = 'text-xs mt-2 ' + (type === 'error' ? 'text-red-400' : 'text-green-400');
+        el.textContent = msg;
+    }
+
+    function editBudget(keyHash) {
+        openSetBudgetModal(keyHash);
+    }
+
+    async function removeBudget(keyHash) {
+        if (!confirm('Remove budget for this key? The key will no longer have spend limits.')) return;
+        try {
+            const res = await fetch('/admin/api/budgets/' + encodeURIComponent(keyHash), { method: 'DELETE', headers: authHeaders() });
+            if (res.ok) {
+                showSuccessToast('Budget removed');
+                loadBudgets();
+            } else {
+                showErrorToast('Failed to remove budget');
+            }
+        } catch (err) {
+            showErrorToast('Error: ' + err.message);
+        }
+    }
 </script>
 <!-- File Browser Modal -->
 <div id="fsBrowserModal" class="fixed inset-0 z-[60] hidden">
@@ -6110,6 +6486,66 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 <div class="flex gap-2">
                     <button onclick="listFs(currentFsPath)" class="btn btn-secondary px-3 py-1.5 text-xs">Refresh</button>
                     <button onclick="closeFsBrowser()" class="btn btn-primary px-4 py-1.5 text-xs">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Set Budget Modal -->
+    <div id="setBudgetModal" class="fixed inset-0 z-50 hidden">
+        <div class="absolute inset-0 bg-black/40" onclick="closeSetBudgetModal()"></div>
+        <div class="absolute inset-y-0 right-0 w-full max-w-md bg-card border-l border-border shadow-xl overflow-y-auto">
+            <div class="p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm font-semibold text-foreground">Set Budget for API Key</h3>
+                    <button onclick="closeSetBudgetModal()" class="hover:bg-muted p-1.5 rounded-full text-muted-foreground hover:text-foreground transition-colors">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="space-y-4">
+                    <!-- Key Selection -->
+                    <div>
+                        <label class="block text-xs font-medium text-foreground mb-1">API Key</label>
+                        <select id="budgetKeySelect" class="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-primary outline-none">
+                            <option value="">Loading keys...</option>
+                        </select>
+                        <p class="text-[10px] text-muted-foreground mt-1">Select an API key to set budget limits</p>
+                    </div>
+
+                    <!-- Daily Limit -->
+                    <div>
+                        <label class="block text-xs font-medium text-foreground mb-1">Daily Limit ($)</label>
+                        <input type="number" id="budgetDailyLimit" step="0.01" min="0" placeholder="e.g. 10.00" class="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-primary outline-none">
+                        <p class="text-[10px] text-muted-foreground mt-1">Set to 0 or leave empty for no daily limit</p>
+                    </div>
+
+                    <!-- Monthly Limit -->
+                    <div>
+                        <label class="block text-xs font-medium text-foreground mb-1">Monthly Limit ($)</label>
+                        <input type="number" id="budgetMonthlyLimit" step="0.01" min="0" placeholder="e.g. 100.00" class="w-full bg-background border border-border rounded px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-primary outline-none">
+                        <p class="text-[10px] text-muted-foreground mt-1">Set to 0 or leave empty for no monthly limit</p>
+                    </div>
+
+                    <!-- Existing budget info -->
+                    <div id="budgetExistingInfo" class="hidden border border-border rounded p-3 bg-muted/30">
+                        <h4 class="text-xs font-medium text-foreground mb-2">Current Budget Status</h4>
+                        <div class="space-y-1 text-xs text-muted-foreground">
+                            <div>Daily: <span id="budgetExistingDaily" class="text-foreground">-</span></div>
+                            <div>Monthly: <span id="budgetExistingMonthly" class="text-foreground">-</span></div>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex gap-2 pt-2">
+                        <button onclick="saveBudget()" class="btn btn-primary px-4 py-2 text-sm flex-1">Save Budget</button>
+                        <button onclick="closeSetBudgetModal()" class="btn btn-secondary px-4 py-2 text-sm">Cancel</button>
+                    </div>
+
+                    <!-- Status message -->
+                    <div id="budgetSaveStatus" class="hidden text-xs mt-2"></div>
                 </div>
             </div>
         </div>

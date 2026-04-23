@@ -4,6 +4,7 @@
  * budgets, key expiry, config export/import, filesystem ops.
  */
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const { sendError } = require('./httpHelpers');
@@ -230,15 +231,85 @@ async function handleToggleVirtualKey(server, req, res, urlPath) {
 // ─── Budgets ───────────────────────────────────────────────
 
 /**
- * GET /admin/api/budgets — get all budget statuses.
+ * Build a map of keyHash -> { provider, maskedKey } from all provider clients.
+ */
+function buildKeyHashMap(server) {
+  const map = {};
+  for (const [providerName, client] of server.providerClients.entries()) {
+    if (client.keyRotator) {
+      const stats = client.keyRotator.getKeyUsageStats(providerName);
+      for (const entry of stats) {
+        if (entry.fullKey) {
+          const hash = crypto.createHash('sha256').update(entry.fullKey).digest('hex').substring(0, 16);
+          map[hash] = { provider: providerName, maskedKey: entry.key };
+        }
+      }
+    }
+  }
+  // Legacy clients
+  if (server.geminiClient && server.geminiClient.keyRotator) {
+    const stats = server.geminiClient.keyRotator.getKeyUsageStats('gemini');
+    for (const entry of stats) {
+      if (entry.fullKey) {
+        const hash = crypto.createHash('sha256').update(entry.fullKey).digest('hex').substring(0, 16);
+        map[hash] = { provider: 'gemini', maskedKey: entry.key };
+      }
+    }
+  }
+  if (server.openaiClient && server.openaiClient.keyRotator) {
+    const stats = server.openaiClient.keyRotator.getKeyUsageStats('openai');
+    for (const entry of stats) {
+      if (entry.fullKey) {
+        const hash = crypto.createHash('sha256').update(entry.fullKey).digest('hex').substring(0, 16);
+        map[hash] = { provider: 'openai', maskedKey: entry.key };
+      }
+    }
+  }
+  return map;
+}
+
+/**
+ * GET /admin/api/budgets — get all budget statuses enriched with provider/masked key info.
  */
 async function handleGetBudgets(server, res) {
   try {
     const statuses = server.budgetTracker.getAllStatuses();
+    const hashMap = buildKeyHashMap(server);
+    for (const [hash, status] of Object.entries(statuses)) {
+      const info = hashMap[hash];
+      if (info) {
+        status.provider = info.provider;
+        status.maskedKey = info.maskedKey;
+      }
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(statuses));
   } catch (error) {
     sendError(res, 500, 'Budget query failed');
+  }
+}
+
+/**
+ * GET /admin/api/budgets/available-keys — get all known keys (with hashes) for the budget form dropdown.
+ */
+async function handleGetAvailableKeys(server, res) {
+  try {
+    const hashMap = buildKeyHashMap(server);
+    const existingBudgets = server.budgetTracker.getAllStatuses();
+    const keys = [];
+    for (const [hash, info] of Object.entries(hashMap)) {
+      keys.push({
+        keyHash: hash,
+        provider: info.provider,
+        maskedKey: info.maskedKey,
+        hasBudget: !!existingBudgets[hash]
+      });
+    }
+    keys.sort((a, b) => a.provider.localeCompare(b.provider) || a.maskedKey.localeCompare(b.maskedKey));
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(keys));
+  } catch (error) {
+    sendError(res, 500, 'Failed to get available keys');
   }
 }
 
@@ -254,10 +325,37 @@ async function handleSetBudget(server, req, res, body) {
       return;
     }
     server.budgetTracker.setBudget(keyHash, { dailyLimit: dailyLimit || 0, monthlyLimit: monthlyLimit || 0 });
+    const status = server.budgetTracker.getStatus(keyHash);
+    // Enrich with provider info
+    const hashMap = buildKeyHashMap(server);
+    const info = hashMap[keyHash];
+    if (info) {
+      status.provider = info.provider;
+      status.maskedKey = info.maskedKey;
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify(server.budgetTracker.getStatus(keyHash)));
+    res.end(JSON.stringify(status));
   } catch (error) {
     sendError(res, 500, 'Budget set failed');
+  }
+}
+
+/**
+ * DELETE /admin/api/budgets/:keyHash — remove a budget.
+ */
+async function handleRemoveBudget(server, req, res, urlPath) {
+  try {
+    const parts = urlPath.split('/');
+    const keyHash = parts[parts.length - 1];
+    if (!keyHash) {
+      sendError(res, 400, 'keyHash required');
+      return;
+    }
+    server.budgetTracker.removeBudget(keyHash);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+  } catch (error) {
+    sendError(res, 500, 'Budget remove failed');
   }
 }
 
@@ -340,10 +438,97 @@ async function handleImportConfig(server, req, res, body) {
       return;
     }
     const result = server.configExporter.importConfig(importData, mode || 'merge');
+
+    // Reload config and reinitialize provider clients so changes take effect immediately
+    let reloadWarning = null;
+    try {
+      server.config.loadConfig();
+      server.reinitializeClients();
+    } catch (reloadError) {
+      console.error('[ADMIN] Config reload after import failed:', reloadError.message);
+      reloadWarning = 'Config imported to file but live reload failed: ' + reloadError.message + '. A server restart is needed for changes to take effect.';
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ...result, reloadWarning }));
+  } catch (error) {
+    sendError(res, 500, 'Import failed');
+  }
+}
+
+// ─── Load Balancing ───────────────────────────────────────
+
+/**
+ * GET /admin/api/lb-strategy — returns current strategy and weights per provider.
+ */
+async function handleGetLbStrategy(server, res) {
+  try {
+    const result = {};
+    for (const [name, client] of server.providerClients.entries()) {
+      if (client.keyRotator) {
+        result[name] = {
+          strategy: client.keyRotator.strategy,
+          apiType: client.apiType || name,
+          weights: client.keyRotator.getWeights().map(w => ({
+            key: w.key,
+            maskedKey: w.maskedKey,
+            weight: w.weight
+          }))
+        };
+      }
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(result));
   } catch (error) {
-    sendError(res, 500, 'Import failed');
+    sendError(res, 500, 'Failed to get LB strategy: ' + error.message);
+  }
+}
+
+/**
+ * POST /admin/api/lb-strategy — sets strategy for a provider.
+ * Body: { provider, strategy }
+ */
+async function handleSetLbStrategy(server, req, res, body) {
+  try {
+    const { provider, strategy } = JSON.parse(body || '{}');
+    if (!provider || !strategy) {
+      sendError(res, 400, 'provider and strategy required');
+      return;
+    }
+    const client = server.providerClients.get(provider);
+    if (!client || !client.keyRotator) {
+      sendError(res, 404, 'Provider not found');
+      return;
+    }
+    client.keyRotator.setStrategy(strategy);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, provider, strategy }));
+  } catch (error) {
+    sendError(res, 400, error.message);
+  }
+}
+
+/**
+ * POST /admin/api/lb-weight — sets weight for a specific key.
+ * Body: { provider, key, weight }
+ */
+async function handleSetLbWeight(server, req, res, body) {
+  try {
+    const { provider, key, weight } = JSON.parse(body || '{}');
+    if (!provider || !key || weight == null) {
+      sendError(res, 400, 'provider, key, and weight required');
+      return;
+    }
+    const client = server.providerClients.get(provider);
+    if (!client || !client.keyRotator) {
+      sendError(res, 404, 'Provider not found');
+      return;
+    }
+    client.keyRotator.setWeight(key, weight);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, provider, maskedKey: key.substring(0, 8) + '...', weight }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to set weight: ' + error.message);
   }
 }
 
@@ -458,11 +643,16 @@ module.exports = {
   handleRevokeVirtualKey,
   handleToggleVirtualKey,
   handleGetBudgets,
+  handleGetAvailableKeys,
   handleSetBudget,
+  handleRemoveBudget,
   handleGetKeyExpiry,
   handleExtendKey,
   handleExportConfig,
   handleImportConfig,
   handleFsList,
-  handleFsDrives
+  handleFsDrives,
+  handleGetLbStrategy,
+  handleSetLbStrategy,
+  handleSetLbWeight
 };

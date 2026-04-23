@@ -22,7 +22,7 @@ const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSet
 const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm } = require('./routes/adminKeys');
 const { handleToggleProvider, handleToggleSyncEnv, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleTestApiKey } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
-const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleSetBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives } = require('./routes/adminAdvanced');
+const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
 const { parseRoute, handleProxyRequest } = require('./routes/proxy');
 
 class ProxyServer {
@@ -462,6 +462,12 @@ class ProxyServer {
     if (adminPath === '/admin/api/budgets' && req.method === 'GET') {
       return handleGetBudgets(this, res);
     }
+    if (adminPath === '/admin/api/budgets/available-keys' && req.method === 'GET') {
+      return handleGetAvailableKeys(this, res);
+    }
+    if (adminPath.startsWith('/admin/api/budgets/') && req.method === 'DELETE') {
+      return handleRemoveBudget(this, req, res, adminPath);
+    }
     if (adminPath === '/admin/api/budgets' && req.method === 'POST') {
       return handleSetBudget(this, req, res, body);
     }
@@ -479,6 +485,15 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/fs-drives' && req.method === 'GET') {
       return handleFsDrives(this, res);
+    }
+    if (adminPath === '/admin/api/lb-strategy' && req.method === 'GET') {
+      return handleGetLbStrategy(this, res);
+    }
+    if (adminPath === '/admin/api/lb-strategy' && req.method === 'POST') {
+      return handleSetLbStrategy(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/lb-weight' && req.method === 'POST') {
+      return handleSetLbWeight(this, req, res, body);
     }
 
     sendError(res, 404, 'Not found');
