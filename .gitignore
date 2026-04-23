@@ -48,3 +48,15 @@ yarn-error.log*
 tmp/
 .taskmaster/
 .research/
+
+# Internal documentation (not for public repo)
+DEEP_RESEARCH_SUMMARY.md
+COMMIT_SUMMARY.md
+DISCORD_MESSAGE.md
+IMPLEMENTATION_SUMMARY.md
+BEFORE_AFTER_COMPARISON.md
+LOG_FORMAT_GUIDE.md
+ROTATO_LOGGING_FIX_SUMMARY.md
+LOGGING_IMPROVEMENTS.md
+LOGIN_FIX_SUMMARY.md
+TASK_*_*.md
