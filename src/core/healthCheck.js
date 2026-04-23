@@ -3,6 +3,7 @@
  * Aggregates provider status from config, usage stats, history, and logs.
  */
 const { maskApiKey } = require('./utils');
+const { testGeminiKey, testOpenaiKey } = require('../routes/adminProviders');
 
 class HealthMonitor {
   constructor(server) {
@@ -200,7 +201,7 @@ class HealthMonitor {
   async probeKey(providerName, providerConfig, apiKey) {
     try {
       if (providerConfig.apiType === 'gemini') {
-        return await this.server.testGeminiKey(apiKey, providerConfig.baseUrl);
+        return await testGeminiKey(this.server, apiKey, providerConfig.baseUrl);
       } else if (providerConfig.apiType === 'openai') {
         // Skip probe for providers without /models endpoint
         const skipDomains = ['firecrawl.dev', 'context7.com', 'ref.tools', 'tavily.com', 'jina.ai'];
@@ -208,7 +209,7 @@ class HealthMonitor {
         if (skipDomains.some(d => baseUrl.includes(d))) {
           return { success: true };
         }
-        return await this.server.testOpenaiKey(apiKey, providerConfig.baseUrl);
+        return await testOpenaiKey(this.server, apiKey, providerConfig.baseUrl);
       }
       return { success: false, error: 'Unknown apiType' };
     } catch (err) {
