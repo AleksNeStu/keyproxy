@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { maskApiKey } = require('./utils');
 const { estimateCost, estimateTokens, extractModel } = require('./pricing');
 
 class AnalyticsTracker {
@@ -117,9 +118,7 @@ class AnalyticsTracker {
 
     // Per-key tracking (masked)
     if (apiKey) {
-      const masked = apiKey.length >= 8
-        ? apiKey.substring(0, 4) + '...' + apiKey.substring(apiKey.length - 4)
-        : '***';
+      const masked = maskApiKey(apiKey);
       if (!prov.keys[masked]) {
         prov.keys[masked] = { requests: 0, errors: 0, estimatedCost: 0 };
       }

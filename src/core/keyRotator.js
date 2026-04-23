@@ -1,3 +1,5 @@
+const { maskApiKey } = require('./utils');
+
 class KeyRotator {
   constructor(apiKeys, apiType = 'unknown', systemEnvName = null, historyManager = null, strategy = 'round-robin', ttlMs = 0) {
     this.apiKeys = [...apiKeys];
@@ -58,7 +60,7 @@ class KeyRotator {
   updateLastFailedKey(failedKey) {
     this.lastFailedKey = failedKey;
     if (failedKey) {
-      const maskedKey = this.maskApiKey(failedKey);
+      const maskedKey = maskApiKey(failedKey);
       console.log(`[${this.apiType.toUpperCase()}-ROTATOR] Last failed key updated: ${maskedKey}`);
     }
   }
@@ -104,7 +106,7 @@ class KeyRotator {
     const stats = [];
     for (const key of this.apiKeys) {
       const entry = {
-        key: this.maskApiKey(key),
+        key: maskApiKey(key),
         fullKey: key,
         usageCount: this.keyUsageCount.get(key) || 0
       };
@@ -164,11 +166,6 @@ class KeyRotator {
   extendKey(key) {
     this.keyFirstSeen.set(key, Date.now());
   }
-
-  maskApiKey(key) {
-    if (!key || key.length < 8) return '***';
-    return key.substring(0, 4) + '...' + key.substring(key.length - 4);
-  }
 }
 
 /**
@@ -191,7 +188,7 @@ class RequestKeyContext {
     this.apiKeys = this.orderKeys(apiKeys, lastFailedKey);
 
     if (lastFailedKey) {
-      const maskedKey = this.maskApiKey(lastFailedKey);
+      const maskedKey = maskApiKey(lastFailedKey);
       console.log(`[${this.apiType.toUpperCase()}] Strategy: ${strategy} - last failed key ${maskedKey} deprioritized`);
     }
   }
@@ -290,7 +287,7 @@ class RequestKeyContext {
       
       if (!this.triedKeys.has(key)) {
         this.triedKeys.add(key);
-        const maskedKey = this.maskApiKey(key);
+        const maskedKey = maskApiKey(key);
         console.log(`[${this.apiType.toUpperCase()}::${maskedKey}] Trying key (${this.triedKeys.size}/${this.apiKeys.length} tried for this request)`);
         return key;
       }
@@ -309,7 +306,7 @@ class RequestKeyContext {
   markKeyAsRateLimited(key) {
     this.rateLimitedKeys.add(key);
     this.lastFailedKeyForThisRequest = key; // Track the most recent failed key
-    const maskedKey = this.maskApiKey(key);
+    const maskedKey = maskApiKey(key);
     console.log(`[${this.apiType.toUpperCase()}::${maskedKey}] Rate limited for this request (${this.rateLimitedKeys.size}/${this.triedKeys.size} rate limited)`);
     
     // Move to next key for the next attempt
@@ -351,11 +348,6 @@ class RequestKeyContext {
       rateLimitedKeys: this.rateLimitedKeys.size,
       hasUntriedKeys: this.triedKeys.size < this.apiKeys.length
     };
-  }
-
-  maskApiKey(key) {
-    if (!key || key.length < 8) return '***';
-    return key.substring(0, 4) + '...' + key.substring(key.length - 4);
   }
 }
 

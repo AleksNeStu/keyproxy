@@ -1,5 +1,6 @@
 const { exec } = require('child_process');
 const { promisify } = require('util');
+const { maskApiKey } = require('../core/utils');
 const execAsync = promisify(exec);
 
 /**
@@ -37,7 +38,7 @@ class WindowsEnv {
         throw new Error(stderr);
       }
 
-      const maskedValue = value.substring(0, 4) + '...' + value.substring(value.length - 4);
+      const maskedValue = maskApiKey(value);
       console.log(`[SYNC-WIN] Successfully updated system variable: ${name} = ${maskedValue}`);
       return true;
     } catch (error) {

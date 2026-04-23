@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { maskApiKey } = require('./utils');
 
 class Config {
   constructor() {
@@ -80,7 +81,7 @@ class Config {
 
     // Log each provider
     for (const [providerName, config] of this.providers.entries()) {
-      const maskedKeys = config.keys.map(key => this.maskApiKey(key));
+      const maskedKeys = config.keys.map(key => maskApiKey(key));
       console.log(`[CONFIG] Provider '${providerName}' (${config.apiType}): ${config.keys.length} keys [${maskedKeys.join(', ')}] → ${config.baseUrl}`);
     }
   }
@@ -402,11 +403,6 @@ class Config {
     const Auth = require('./auth');
     const envPassword = this.envVars.ADMIN_PASSWORD;
     return !!(envPassword || Auth.loadHashFromFile());
-  }
-
-  maskApiKey(key) {
-    if (!key || key.length < 8) return '***';
-    return key.substring(0, 4) + '...' + key.substring(key.length - 4);
   }
 
   // New provider methods

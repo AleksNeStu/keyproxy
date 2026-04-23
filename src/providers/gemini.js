@@ -1,157 +1,28 @@
-const https = require('https');
 const { URL } = require('url');
+const BaseProvider = require('./BaseProvider');
 
-class GeminiClient {
+class GeminiClient extends BaseProvider {
   constructor(keyRotator, baseUrl = 'https://generativelanguage.googleapis.com', providerName = 'gemini', retryConfig = null, timeoutMs = 60000) {
-    this.keyRotator = keyRotator;
-    this.baseUrl = baseUrl;
-    this.providerName = providerName;
-    this.retryConfig = retryConfig || { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };
-    this.timeoutMs = timeoutMs;
+    super(keyRotator, baseUrl, providerName, retryConfig, timeoutMs);
   }
 
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+  getProvidedApiKey(headers) {
+    const key = headers['x-goog-api-key'];
+    if (!key) return null;
+    const cleanHeaders = { ...headers };
+    delete cleanHeaders['x-goog-api-key'];
+    return { key, cleanHeaders };
   }
 
-  async makeRequest(method, path, body, headers = {}, customStatusCodes = null, streaming = false) {
-    // Check if an API key was provided in headers
-    const providedApiKey = headers['x-goog-api-key'];
-
-    // If an API key was provided, use it directly without rotation
-    if (providedApiKey) {
-      const maskedKey = this.maskApiKey(providedApiKey);
-      console.log(`[GEMINI::${maskedKey}] Using provided API key${streaming ? ' (streaming)' : ''}`);
-
-      const cleanHeaders = { ...headers };
-      delete cleanHeaders['x-goog-api-key'];
-
-      try {
-        if (streaming) {
-          const response = await this.sendStreamingRequest(method, path, body, cleanHeaders, providedApiKey, true);
-          console.log(`[GEMINI::${maskedKey}] Response (${response.statusCode}) - streaming`);
-          response._keyInfo = { keyUsed: maskedKey, failedKeys: [] };
-          return response;
-        } else {
-          const response = await this.sendRequest(method, path, body, cleanHeaders, providedApiKey, true);
-          console.log(`[GEMINI::${maskedKey}] Response (${response.statusCode})`);
-          response._keyInfo = { keyUsed: maskedKey, failedKeys: [] };
-          return response;
-        }
-      } catch (error) {
-        console.log(`[GEMINI::${maskedKey}] Request failed: ${error.message}`);
-        throw error;
-      }
-    }
-
-    // No API key provided, use rotation system
-    const requestContext = this.keyRotator.createRequestContext();
-    let lastError = null;
-    let lastResponse = null;
-    const failedKeys = [];
-
-    const rotationStatusCodes = customStatusCodes || new Set([429]);
-    const { maxRetries, retryDelayMs, retryBackoff } = this.retryConfig;
-
-    let apiKey;
-    let attempt = 0;
-    while ((apiKey = requestContext.getNextKey()) !== null && attempt < maxRetries) {
-      attempt++;
-      const maskedKey = this.maskApiKey(apiKey);
-
-      console.log(`[GEMINI::${maskedKey}] Attempting ${method} ${path}${streaming ? ' (streaming)' : ''}`);
-
-      try {
-        if (streaming) {
-          const response = await this.sendStreamingRequest(method, path, body, headers, apiKey, false);
-
-          if (rotationStatusCodes.has(response.statusCode)) {
-            console.log(`[GEMINI::${maskedKey}] Status ${response.statusCode} triggers rotation - trying next key`);
-            response.stream.resume();
-            requestContext.markKeyAsRateLimited(apiKey);
-            this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
-            failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
-            lastResponse = { statusCode: response.statusCode, headers: response.headers, data: '' };
-            const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
-            console.log(`[GEMINI] Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
-            await this.sleep(delay);
-            continue;
-          }
-
-          console.log(`[GEMINI::${maskedKey}] Success (${response.statusCode}) - streaming`);
-          this.keyRotator.incrementKeyUsage(apiKey);
-          this.keyRotator.recordSuccessEvent(this.providerName, apiKey);
-          response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
-          return response;
-        } else {
-          const response = await this.sendRequest(method, path, body, headers, apiKey, false);
-
-          if (rotationStatusCodes.has(response.statusCode)) {
-            console.log(`[GEMINI::${maskedKey}] Status ${response.statusCode} triggers rotation - trying next key`);
-            requestContext.markKeyAsRateLimited(apiKey);
-            this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
-            failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
-            lastResponse = response;
-            const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
-            console.log(`[GEMINI] Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
-            await this.sleep(delay);
-            continue;
-          }
-
-          console.log(`[GEMINI::${maskedKey}] Success (${response.statusCode})`);
-          this.keyRotator.incrementKeyUsage(apiKey);
-          this.keyRotator.recordSuccessEvent(this.providerName, apiKey);
-          response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
-          return response;
-        }
-      } catch (error) {
-        console.log(`[GEMINI::${maskedKey}] Request failed: ${error.message}`);
-        failedKeys.push({ key: maskedKey, status: null, reason: error.message });
-        lastError = error;
-        const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
-        await this.sleep(delay);
-        continue;
-      }
-    }
-
-    const stats = requestContext.getStats();
-    console.log(`[GEMINI] All ${stats.totalKeys} keys tried for this request. ${stats.rateLimitedKeys} were rate limited.`);
-
-    const lastFailedKey = requestContext.getLastFailedKey();
-    this.keyRotator.updateLastFailedKey(lastFailedKey);
-
-    if (requestContext.allTriedKeysRateLimited()) {
-      console.log('[GEMINI] All keys rate limited for this request - returning 429');
-      const response = lastResponse || {
-        statusCode: 429,
-        headers: { 'content-type': 'application/json' },
-        data: JSON.stringify({
-          error: {
-            code: 429,
-            message: 'All API keys have been rate limited for this request',
-            status: 'RESOURCE_EXHAUSTED'
-          }
-        })
-      };
-      response._keyInfo = { keyUsed: null, failedKeys };
-      return response;
-    }
-
-    if (lastError) {
-      throw lastError;
-    }
-
-    throw new Error('All API keys exhausted without clear error');
-  }
-
-  _buildRequestOptions(method, path, body, headers, apiKey, useHeader) {
+  _buildRequestOptions(method, requestPath, body, headers, apiKey) {
     let fullUrl;
-    if (!path || path === '/') {
+    if (!requestPath || requestPath === '/') {
       fullUrl = this.baseUrl;
-    } else if (path.startsWith('/')) {
+    } else if (requestPath.startsWith('/')) {
       let effectiveBaseUrl = this.baseUrl;
 
-      const pathVersionMatch = path.match(/^\/v[^\/]+\//);
+      // Resolve version conflicts between path and base URL
+      const pathVersionMatch = requestPath.match(/^\/v[^\/]+\//);
       const baseVersionMatch = this.baseUrl.match(/\/v[^\/]+$/);
 
       if (pathVersionMatch && baseVersionMatch) {
@@ -160,13 +31,13 @@ class GeminiClient {
 
         if (pathVersion !== baseVersion) {
           effectiveBaseUrl = this.baseUrl.replace(baseVersion, pathVersion);
-          path = path.substring(pathVersion.length);
+          requestPath = requestPath.substring(pathVersion.length);
         }
       }
 
-      fullUrl = effectiveBaseUrl.endsWith('/') ? effectiveBaseUrl + path.substring(1) : effectiveBaseUrl + path;
+      fullUrl = effectiveBaseUrl.endsWith('/') ? effectiveBaseUrl + requestPath.substring(1) : effectiveBaseUrl + requestPath;
     } else {
-      fullUrl = this.baseUrl.endsWith('/') ? this.baseUrl + path : this.baseUrl + '/' + path;
+      fullUrl = this.baseUrl.endsWith('/') ? this.baseUrl + requestPath : this.baseUrl + '/' + requestPath;
     }
 
     const url = new URL(fullUrl);
@@ -176,7 +47,8 @@ class GeminiClient {
       ...headers
     };
 
-    if (useHeader) {
+    // Use header auth for provided keys, query param for rotated keys
+    if (this._isProvidedKey(apiKey)) {
       finalHeaders['x-goog-api-key'] = apiKey;
     } else {
       url.searchParams.append('key', apiKey);
@@ -198,79 +70,27 @@ class GeminiClient {
     return options;
   }
 
-  sendRequest(method, path, body, headers, apiKey, useHeader = false) {
-    return new Promise((resolve, reject) => {
-      const options = this._buildRequestOptions(method, path, body, headers, apiKey, useHeader);
-
-      const req = https.request(options, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          resolve({
-            statusCode: res.statusCode,
-            headers: res.headers,
-            data: data
-          });
-        });
-      });
-
-      req.setTimeout(this.timeoutMs, () => {
-        req.destroy(new Error(`Request timeout (${this.timeoutMs}ms)`));
-      });
-
-      req.on('error', (error) => {
-        const maskedKey = this.maskApiKey(apiKey);
-        console.log(`[GEMINI::${maskedKey}] HTTP request error: ${error.message}`);
-        reject(error);
-      });
-
-      if (body && method !== 'GET') {
-        const bodyData = typeof body === 'string' ? body : JSON.stringify(body);
-        req.write(bodyData);
+  _rateLimitedError() {
+    return {
+      error: {
+        code: 429,
+        message: 'All API keys have been rate limited for this request',
+        status: 'RESOURCE_EXHAUSTED'
       }
-
-      req.end();
-    });
+    };
   }
 
-  sendStreamingRequest(method, path, body, headers, apiKey, useHeader = false) {
-    return new Promise((resolve, reject) => {
-      const options = this._buildRequestOptions(method, path, body, headers, apiKey, useHeader);
+  /** Track whether the current request is using a provided key (header auth) vs rotated key (query param). */
+  _providedKeyMode = false;
 
-      const req = https.request(options, (res) => {
-        resolve({
-          statusCode: res.statusCode,
-          headers: res.headers,
-          stream: res
-        });
-      });
-
-      req.setTimeout(this.timeoutMs, () => {
-        req.destroy(new Error(`Streaming request timeout (${this.timeoutMs}ms)`));
-      });
-
-      req.on('error', (error) => {
-        const maskedKey = this.maskApiKey(apiKey);
-        console.log(`[GEMINI::${maskedKey}] HTTP streaming request error: ${error.message}`);
-        reject(error);
-      });
-
-      if (body && method !== 'GET') {
-        const bodyData = typeof body === 'string' ? body : JSON.stringify(body);
-        req.write(bodyData);
-      }
-
-      req.end();
-    });
+  _makeProvidedKeyRequest(method, requestPath, body, headers, apiKey, streaming) {
+    this._providedKeyMode = true;
+    return super._makeProvidedKeyRequest(method, requestPath, body, headers, apiKey, streaming)
+      .finally(() => { this._providedKeyMode = false; });
   }
 
-  maskApiKey(key) {
-    if (!key || key.length < 8) return '***';
-    return key.substring(0, 4) + '...' + key.substring(key.length - 4);
+  _isProvidedKey() {
+    return this._providedKeyMode;
   }
 }
 

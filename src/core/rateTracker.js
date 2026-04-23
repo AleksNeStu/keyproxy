@@ -2,6 +2,7 @@
  * SlidingWindowCounter - Per-key RPM tracking with 60-second window.
  * Informational only, no enforcement.
  */
+const { maskApiKey } = require('./utils');
 
 class SlidingWindowCounter {
   constructor(windowMs = 60000) {
@@ -40,9 +41,7 @@ class SlidingWindowCounter {
   getAllRpm() {
     const result = {};
     for (const [key] of this.counters.entries()) {
-      const masked = key.length >= 8
-        ? key.substring(0, 4) + '...' + key.substring(key.length - 4)
-        : '***';
+      const masked = maskApiKey(key);
       result[masked] = this.getRpm(key);
     }
     return result;
@@ -89,4 +88,4 @@ function getRpmHeat(rpm, providerType) {
   return 'green';
 }
 
-module.exports = { SlidingWindowCounter, PROVIDER_RATE_LIMITS, getRpmHeat };
+module.exports = { SlidingWindowCounter };

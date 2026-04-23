@@ -2,6 +2,8 @@
  * Health Monitor for KeyProxy
  * Aggregates provider status from config, usage stats, history, and logs.
  */
+const { maskApiKey } = require('./utils');
+
 class HealthMonitor {
   constructor(server) {
     this.server = server;
@@ -154,7 +156,7 @@ class HealthMonitor {
 
       for (const entry of allExhausted) {
         if (!entry.fullKey) continue;
-        const masked = entry.fullKey.substring(0, 4) + '...' + entry.fullKey.substring(entry.fullKey.length - 4);
+        const masked = maskApiKey(entry.fullKey);
         const attempts = entry.recoveryAttempts || 0;
 
         // Skip keys that exceeded max recovery attempts

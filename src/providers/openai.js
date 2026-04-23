@@ -1,135 +1,22 @@
-const https = require('https');
 const { URL } = require('url');
+const BaseProvider = require('./BaseProvider');
 
-class OpenAIClient {
+class OpenAIClient extends BaseProvider {
   constructor(keyRotator, baseUrl = 'https://api.openai.com', providerName = 'openai', retryConfig = null, timeoutMs = 60000) {
-    this.keyRotator = keyRotator;
-    this.baseUrl = baseUrl;
-    this.providerName = providerName;
-    this.retryConfig = retryConfig || { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };
-    this.timeoutMs = timeoutMs;
+    super(keyRotator, baseUrl, providerName, retryConfig, timeoutMs);
   }
 
-  sleep(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-  }
-
-  async makeRequest(method, path, body, headers = {}, customStatusCodes = null, streaming = false) {
-    // Create a new request context for this specific request
-    const requestContext = this.keyRotator.createRequestContext();
-    let lastError = null;
-    let lastResponse = null;
-    const failedKeys = []; // Track which keys failed and why
-
-    // Determine which status codes should trigger rotation
-    const rotationStatusCodes = customStatusCodes || new Set([429]);
-    const { maxRetries, retryDelayMs, retryBackoff } = this.retryConfig;
-
-    // Try each available key for this request, respecting maxRetries and delay
-    let apiKey;
-    let attempt = 0;
-    while ((apiKey = requestContext.getNextKey()) !== null && attempt < maxRetries) {
-      attempt++;
-      const maskedKey = this.maskApiKey(apiKey);
-
-      console.log(`[OPENAI::${maskedKey}] Attempting ${method} ${path}${streaming ? ' (streaming)' : ''}`);
-
-      try {
-        if (streaming) {
-          const response = await this.sendStreamingRequest(method, path, body, headers, apiKey);
-
-          if (rotationStatusCodes.has(response.statusCode)) {
-            console.log(`[OPENAI::${maskedKey}] Status ${response.statusCode} triggers rotation - trying next key`);
-            response.stream.resume();
-            requestContext.markKeyAsRateLimited(apiKey);
-            this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
-            failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
-            lastResponse = { statusCode: response.statusCode, headers: response.headers, data: '' };
-            const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
-            console.log(`[OPENAI] Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
-            await this.sleep(delay);
-            continue;
-          }
-
-          console.log(`[OPENAI::${maskedKey}] Success (${response.statusCode}) - streaming`);
-          this.keyRotator.incrementKeyUsage(apiKey);
-          this.keyRotator.recordSuccessEvent(this.providerName, apiKey);
-          response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
-          return response;
-        } else {
-          const response = await this.sendRequest(method, path, body, headers, apiKey);
-
-          if (rotationStatusCodes.has(response.statusCode)) {
-            console.log(`[OPENAI::${maskedKey}] Status ${response.statusCode} triggers rotation - trying next key`);
-            requestContext.markKeyAsRateLimited(apiKey);
-            this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
-            failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
-            lastResponse = response;
-            const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
-            console.log(`[OPENAI] Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
-            await this.sleep(delay);
-            continue;
-          }
-
-          console.log(`[OPENAI::${maskedKey}] Success (${response.statusCode})`);
-          this.keyRotator.incrementKeyUsage(apiKey);
-          this.keyRotator.recordSuccessEvent(this.providerName, apiKey);
-          response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
-          return response;
-        }
-      } catch (error) {
-        console.log(`[OPENAI::${maskedKey}] Request failed: ${error.message}`);
-        failedKeys.push({ key: maskedKey, status: null, reason: error.message });
-        lastError = error;
-        const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
-        await this.sleep(delay);
-        continue;
-      }
-    }
-
-    // All keys have been tried for this request
-    const stats = requestContext.getStats();
-    console.log(`[OPENAI] All ${stats.totalKeys} keys tried for this request. ${stats.rateLimitedKeys} were rate limited.`);
-
-    const lastFailedKey = requestContext.getLastFailedKey();
-    this.keyRotator.updateLastFailedKey(lastFailedKey);
-
-    if (requestContext.allTriedKeysRateLimited()) {
-      console.log('[OPENAI] All keys rate limited for this request - returning 429');
-      const response = lastResponse || {
-        statusCode: 429,
-        headers: { 'content-type': 'application/json' },
-        data: JSON.stringify({
-          error: {
-            message: 'All OpenAI API keys have been rate limited for this request',
-            type: 'rate_limit_exceeded',
-            code: 'rate_limit_exceeded'
-          }
-        })
-      };
-      response._keyInfo = { keyUsed: null, failedKeys };
-      return response;
-    }
-
-    if (lastError) {
-      throw lastError;
-    }
-
-    throw new Error('All API keys exhausted without clear error');
-  }
-
-  _buildRequestOptions(method, path, body, headers, apiKey) {
+  _buildRequestOptions(method, requestPath, body, headers, apiKey) {
     let fullUrl;
-    if (!path || path === '/') {
+    if (!requestPath || requestPath === '/') {
       fullUrl = this.baseUrl;
-    } else if (path.startsWith('/')) {
-      fullUrl = this.baseUrl.endsWith('/') ? this.baseUrl + path.substring(1) : this.baseUrl + path;
+    } else if (requestPath.startsWith('/')) {
+      fullUrl = this.baseUrl.endsWith('/') ? this.baseUrl + requestPath.substring(1) : this.baseUrl + requestPath;
     } else {
-      fullUrl = this.baseUrl.endsWith('/') ? this.baseUrl + path : this.baseUrl + '/' + path;
+      fullUrl = this.baseUrl.endsWith('/') ? this.baseUrl + requestPath : this.baseUrl + '/' + requestPath;
     }
 
     // Support for query-parameter authentication (e.g. for Tavily MCP or other custom proxies)
-    // If the URL contains the placeholder "KeyProxy", replace it with the rotated API key and SKIP Bearer header
     if (fullUrl.includes('KeyProxy')) {
       fullUrl = fullUrl.replace(/KeyProxy/g, apiKey);
     }
@@ -160,82 +47,6 @@ class OpenAIClient {
     }
 
     return options;
-  }
-
-  sendRequest(method, path, body, headers, apiKey) {
-    return new Promise((resolve, reject) => {
-      const options = this._buildRequestOptions(method, path, body, headers, apiKey);
-
-      const req = https.request(options, (res) => {
-        let data = '';
-
-        res.on('data', (chunk) => {
-          data += chunk;
-        });
-
-        res.on('end', () => {
-          resolve({
-            statusCode: res.statusCode,
-            headers: res.headers,
-            data: data
-          });
-        });
-      });
-
-      req.setTimeout(this.timeoutMs, () => {
-        req.destroy(new Error(`Request timeout (${this.timeoutMs}ms)`));
-      });
-
-      req.on('error', (error) => {
-        const maskedKey = this.maskApiKey(apiKey);
-        console.log(`[OPENAI::${maskedKey}] HTTP request error: ${error.message}`);
-        reject(error);
-      });
-
-      if (body && method !== 'GET') {
-        const bodyData = typeof body === 'string' ? body : JSON.stringify(body);
-        req.write(bodyData);
-      }
-
-      req.end();
-    });
-  }
-
-  sendStreamingRequest(method, path, body, headers, apiKey) {
-    return new Promise((resolve, reject) => {
-      const options = this._buildRequestOptions(method, path, body, headers, apiKey);
-
-      const req = https.request(options, (res) => {
-        // Resolve immediately with the raw stream - don't buffer
-        resolve({
-          statusCode: res.statusCode,
-          headers: res.headers,
-          stream: res
-        });
-      });
-
-      req.setTimeout(this.timeoutMs, () => {
-        req.destroy(new Error(`Streaming request timeout (${this.timeoutMs}ms)`));
-      });
-
-      req.on('error', (error) => {
-        const maskedKey = this.maskApiKey(apiKey);
-        console.log(`[OPENAI::${maskedKey}] HTTP streaming request error: ${error.message}`);
-        reject(error);
-      });
-
-      if (body && method !== 'GET') {
-        const bodyData = typeof body === 'string' ? body : JSON.stringify(body);
-        req.write(bodyData);
-      }
-
-      req.end();
-    });
-  }
-
-  maskApiKey(key) {
-    if (!key || key.length < 8) return '***';
-    return key.substring(0, 4) + '...' + key.substring(key.length - 4);
   }
 }
 
