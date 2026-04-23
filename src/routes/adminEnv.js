@@ -304,6 +304,25 @@ async function handleReorderEnvFiles(server, req, res, body) {
 }
 
 /**
+ * POST /admin/api/toggle-env-file-disabled — toggle env file enabled/disabled.
+ */
+async function handleToggleEnvFileDisabled(server, req, res, body) {
+  try {
+    const { name } = JSON.parse(body);
+    if (!name) {
+      sendError(res, 400, 'Missing name');
+      return;
+    }
+    server.config.toggleEnvFileDisabled(name);
+    const data = server.config.getEnvFiles();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, ...data }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to toggle env file: ' + error.message);
+  }
+}
+
+/**
  * GET|POST /admin/api/select-env — open file picker for .env selection.
  */
 async function handleSelectEnv(server, req, res) {
@@ -345,5 +364,6 @@ module.exports = {
   handleRemoveEnvFile,
   handleSwitchEnv,
   handleReorderEnvFiles,
+  handleToggleEnvFileDisabled,
   handleSelectEnv
 };

@@ -32,14 +32,14 @@ class Config {
     const rootEnvPath = this.resolveGlobalEnvPath(envVars);
 
     // 2. Load global env and merge (local takes priority for settings, but keys accumulate)
-    if (fs.existsSync(rootEnvPath)) {
+    if (rootEnvPath && fs.existsSync(rootEnvPath)) {
       console.log(`[CONFIG] Loading global configuration from ${rootEnvPath}`);
       const rootEnvContent = fs.readFileSync(rootEnvPath, 'utf8');
       const rootEnvVars = this.parseEnvFile(rootEnvContent);
-      
+
       // Auto-discover keys from root and merge into envVars
       this.autoDiscoverGlobalKeys(rootEnvVars, envVars);
-      
+
       // Merge other root vars if not defined locally
       for (const [key, value] of Object.entries(rootEnvVars)) {
         if (!envVars[key]) envVars[key] = value;
@@ -489,8 +489,22 @@ class Config {
   resolveGlobalEnvPath(localEnvVars) {
     // Check for multi-env: ENV_FILES + ACTIVE_ENV
     if (localEnvVars.ENV_FILES) {
-      const activeEnv = localEnvVars.ACTIVE_ENV || Object.keys(this.parseEnvFiles(localEnvVars.ENV_FILES))[0];
+      const disabledList = this.parseEnvFilesDisabled(localEnvVars.ENV_FILES_DISABLED);
       const envFiles = this.parseEnvFiles(localEnvVars.ENV_FILES);
+      let activeEnv = localEnvVars.ACTIVE_ENV || Object.keys(envFiles)[0];
+
+      // If active is disabled, find first enabled file
+      if (disabledList.includes(activeEnv)) {
+        const enabledFiles = Object.keys(envFiles).filter(n => !disabledList.includes(n));
+        if (enabledFiles.length > 0) {
+          activeEnv = enabledFiles[0];
+          console.log(`[CONFIG] Active env '${localEnvVars.ACTIVE_ENV}' is disabled, switching to '${activeEnv}'`);
+        } else {
+          console.warn(`[CONFIG] All env files are disabled, using local .env only`);
+          return null;
+        }
+      }
+
       if (envFiles[activeEnv]) {
         return path.resolve(process.cwd(), envFiles[activeEnv]);
       }
@@ -518,14 +532,31 @@ class Config {
 
   getEnvFiles() {
     const localEnvPath = path.join(process.cwd(), '.env');
-    if (!fs.existsSync(localEnvPath)) return { files: {}, active: 'default' };
+    if (!fs.existsSync(localEnvPath)) return { files: {}, active: 'default', disabled: [] };
     const content = fs.readFileSync(localEnvPath, 'utf8');
     const vars = this.parseEnvFile(content);
+    const files = this.parseEnvFiles(vars.ENV_FILES);
+    const disabledList = this.parseEnvFilesDisabled(vars.ENV_FILES_DISABLED);
+
+    // Convert to array with priority and disabled state
+    const fileArray = Object.entries(files).map(([name, path], index) => ({
+      name,
+      path,
+      priority: index + 1,
+      disabled: disabledList.includes(name)
+    }));
+
     return {
-      files: this.parseEnvFiles(vars.ENV_FILES),
+      files: fileArray,
       active: vars.ACTIVE_ENV || 'default',
-      legacyPath: vars.EXTERNAL_ENV_PATH || null
+      legacyPath: vars.EXTERNAL_ENV_PATH || null,
+      disabled: disabledList
     };
+  }
+
+  parseEnvFilesDisabled(disabledStr) {
+    if (!disabledStr) return [];
+    return disabledStr.split(',').map(s => s.trim()).filter(Boolean);
   }
 
   setActiveEnv(name) {
@@ -589,6 +620,23 @@ class Config {
     }
 
     vars.ENV_FILES = Object.entries(reordered).map(([n, p]) => `${n}:${p}`).join(',');
+    this.writeLocalEnv(vars);
+  }
+
+  toggleEnvFileDisabled(name) {
+    const localEnvPath = path.join(process.cwd(), '.env');
+    const content = fs.readFileSync(localEnvPath, 'utf8');
+    const vars = this.parseEnvFile(content);
+    const disabledList = this.parseEnvFilesDisabled(vars.ENV_FILES_DISABLED);
+
+    const index = disabledList.indexOf(name);
+    if (index > -1) {
+      disabledList.splice(index, 1); // Enable
+    } else {
+      disabledList.push(name); // Disable
+    }
+
+    vars.ENV_FILES_DISABLED = disabledList.join(',');
     this.writeLocalEnv(vars);
   }
 

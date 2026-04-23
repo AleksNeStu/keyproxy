@@ -18,7 +18,7 @@ const TelegramBot = require('./core/telegramBot');
 // Route modules
 const { sendError, sendResponse, readRequestBody, getStatusText } = require('./routes/httpHelpers');
 const { isAdminAuthenticated, handleAdminLogin, handleAdminLogout, handleAuthCheck, handleChangePassword, handleUpgradePassword } = require('./routes/adminAuth');
-const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleSelectEnv } = require('./routes/adminEnv');
+const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./routes/adminEnv');
 const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm } = require('./routes/adminKeys');
 const { handleToggleProvider, handleToggleSyncEnv, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleTestApiKey } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
@@ -391,6 +391,9 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/reorder-env-files' && req.method === 'POST') {
       return handleReorderEnvFiles(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/toggle-env-file-disabled' && req.method === 'POST') {
+      return handleToggleEnvFileDisabled(this, req, res, body);
     }
     if (adminPath === '/admin/api/recovery-status' && req.method === 'GET') {
       return handleGetRecoveryStatus(this, res);

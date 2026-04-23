@@ -290,12 +290,13 @@
         "id": "23",
         "title": "Environment Files Priority Management",
         "description": "Move environment file management from Global Configuration to a dedicated Configuration section. Implement proper priority ordering (1st, 2nd, 3rd, etc.) with drag-and-drop reordering. Currently the UI only shows active .env without ability to manage priority or reorder files.",
-        "status": "pending",
+        "status": "in-progress",
         "priority": "high",
         "dependencies": [],
         "details": "Create new 'Configuration' tab/section separate from Settings. Move environment file list from Global Configuration to Configuration section. Add priority numbers (1, 2, 3...) to each .env file in the list. Implement drag-and-drop reordering for .env files to change priority. Add up/down arrow buttons as alternative to drag-and-drop. Show visual indicator of which .env file is currently active. Add ability to enable/disable .env files without deleting them. Update backend to respect priority order when loading environment variables.",
         "testStrategy": "Open Configuration tab, verify .env files listed with priority numbers, drag file to reorder, verify priority changes, disable a file, verify it's skipped during load",
-        "subtasks": []
+        "subtasks": [],
+        "updatedAt": "2026-04-23T19:53:05.331Z"
       },
       {
         "id": "24",
@@ -427,7 +428,7 @@
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-23T18:27:33.015Z",
+      "lastModified": "2026-04-23T19:53:05.332Z",
       "taskCount": 31,
       "completedCount": 21,
       "tags": [
