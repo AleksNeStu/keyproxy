@@ -850,7 +850,7 @@ class ProxyServer {
   writeEnvFile(envVars) {
     const envPath = path.join(process.cwd(), '.env');
 
-    let envContent = '# API Key KeyProxyr Configuration\n';
+    let envContent = '# API Key KeyProxy Configuration\n';
     envContent += `# Last updated: ${new Date().toISOString()}\n\n`;
 
     const basicConfig = {};

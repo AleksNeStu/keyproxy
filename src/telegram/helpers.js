@@ -12,7 +12,7 @@ async function handleHelp(bot, chatId) {
     : '*No model selected yet*';
 
   const helpText = [
-    '*API Key KeyProxyr Bot*',
+    '*API Key KeyProxy Bot*',
     '',
     current,
     '',
