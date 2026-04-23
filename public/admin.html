@@ -582,6 +582,26 @@
                             </svg>
                             <span class="text-sm">Analytics</span>
                         </button>
+                        <button
+                            onclick="showTab('virtualkeys')"
+                            class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
+                            data-tab="virtualkeys"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1117 21a6 6 0 01-7.743-5.743z" />
+                            </svg>
+                            <span class="text-sm">Virtual Keys</span>
+                        </button>
+                        <button
+                            onclick="showTab('budgets')"
+                            class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
+                            data-tab="budgets"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span class="text-sm">Budgets</span>
+                        </button>
                     </nav>
                     
                     <!-- Header Notifications Area (placeholder for positioning) -->
@@ -988,6 +1008,72 @@
                 </div>
             </div>
 
+            <!-- Virtual Keys Tab -->
+            <div id="virtualkeys" class="tab-content hidden">
+                <div class="section-header">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-semibold text-foreground">Virtual API Keys</h2>
+                            <p class="text-muted-foreground text-xs mt-1">Scoped access tokens for external consumers</p>
+                        </div>
+                        <div class="flex items-center space-x-2">
+                            <button onclick="refreshVirtualKeys()" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                                Refresh
+                            </button>
+                            <button onclick="openCreateVirtualKeyDialog()" class="btn btn-primary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                Create Virtual Key
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summary Cards -->
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                    <div class="border border-border rounded p-3 bg-muted/30 text-center">
+                        <div class="text-2xl font-bold text-foreground" id="vkTotal">-</div>
+                        <div class="text-xs text-muted-foreground">Total Keys</div>
+                    </div>
+                    <div class="border border-green-500/30 rounded p-3 bg-green-500/5 text-center">
+                        <div class="text-2xl font-bold text-green-400" id="vkEnabled">-</div>
+                        <div class="text-xs text-green-400/80">Enabled</div>
+                    </div>
+                    <div class="border border-amber-500/30 rounded p-3 bg-amber-500/5 text-center">
+                        <div class="text-2xl font-bold text-amber-400" id="vkDisabled">-</div>
+                        <div class="text-xs text-amber-400/80">Disabled</div>
+                    </div>
+                    <div class="border border-blue-500/30 rounded p-3 bg-blue-500/5 text-center">
+                        <div class="text-2xl font-bold text-blue-400" id="vkTotalUsage">-</div>
+                        <div class="text-xs text-blue-400/80">Total Requests</div>
+                    </div>
+                </div>
+
+                <!-- Virtual Keys Table -->
+                <div class="section">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="border-b border-border text-left text-xs text-muted-foreground">
+                                    <th class="pb-2 pr-3">Name</th>
+                                    <th class="pb-2 pr-3">Token</th>
+                                    <th class="pb-2 pr-3">Providers</th>
+                                    <th class="pb-2 pr-3">Models</th>
+                                    <th class="pb-2 pr-3">RPM Limit</th>
+                                    <th class="pb-2 pr-3">Expires</th>
+                                    <th class="pb-2 pr-3">Usage</th>
+                                    <th class="pb-2 pr-3">Status</th>
+                                    <th class="pb-2">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="virtualKeysTableBody">
+                                <tr><td colspan="9" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
         </main>
 
         <!-- Footer -->
@@ -1059,6 +1145,60 @@
                 >
                     Delete
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Virtual Key Dialog -->
+    <div id="createVirtualKeyDialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
+        <div class="bg-card border border-border rounded-lg p-6 max-w-md w-full shadow-xl">
+            <div class="flex items-center justify-between mb-4">
+                <div>
+                    <h3 class="text-lg font-semibold text-foreground">Create Virtual Key</h3>
+                    <p class="text-sm text-muted-foreground">Generate a scoped access token</p>
+                </div>
+                <button onclick="closeCreateVirtualKeyDialog()" class="text-muted-foreground hover:text-foreground transition-colors p-1">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-muted-foreground mb-1">Name</label>
+                    <input type="text" id="vkName" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="e.g. My App">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-muted-foreground mb-1">Allowed Providers <span class="text-muted-foreground font-normal">(comma-separated, leave empty for all)</span></label>
+                    <input type="text" id="vkProviders" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="e.g. openai,anthropic">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-muted-foreground mb-1">Allowed Models <span class="text-muted-foreground font-normal">(comma-separated, leave empty for all)</span></label>
+                    <input type="text" id="vkModels" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="e.g. gpt-4o,claude-3-opus">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-muted-foreground mb-1">RPM Limit <span class="text-muted-foreground font-normal">(0 = unlimited)</span></label>
+                    <input type="number" id="vkRpmLimit" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="0" min="0" value="0">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-muted-foreground mb-1">Expires At <span class="text-muted-foreground font-normal">(optional)</span></label>
+                    <input type="datetime-local" id="vkExpiresAt" class="input-field w-full px-3 py-2 rounded-md text-sm">
+                </div>
+            </div>
+            <!-- Token display (shown after creation) -->
+            <div id="vkTokenDisplay" class="hidden mt-4">
+                <div class="bg-green-50 border border-green-200 rounded-md p-3">
+                    <p class="text-xs font-medium text-green-800 mb-1">Virtual Key Created</p>
+                    <p class="text-xs text-green-700 mb-2">Copy this token now. It will not be shown again.</p>
+                    <div class="flex items-center space-x-2">
+                        <code id="vkTokenValue" class="flex-1 bg-green-100 text-green-900 px-3 py-1.5 rounded text-xs font-mono break-all select-all"></code>
+                        <button onclick="copyVkToken()" class="btn btn-success px-3 py-1.5 text-xs font-medium">Copy</button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeCreateVirtualKeyDialog()" class="btn btn-secondary px-4 py-2 text-sm font-medium">Cancel</button>
+                <button id="vkCreateBtn" onclick="createVirtualKey()" class="btn btn-primary px-4 py-2 text-sm font-medium">Create Key</button>
             </div>
         </div>
     </div>
@@ -4488,6 +4628,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             if (tabName === 'analytics') {
                 loadAnalytics();
             }
+            // Load virtual keys if virtualkeys tab is selected
+            if (tabName === 'virtualkeys') {
+                refreshVirtualKeys();
+            }
         }
         
         // Health monitoring
@@ -4827,6 +4971,21 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
 
                 <hr class="border-border">
 
+                <!-- Load Balancing Section -->
+                <div>
+                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                        </svg>
+                        Load Balancing
+                    </h4>
+                    <p class="text-xs text-muted-foreground mb-3">Configure per-provider key rotation strategy and key weights.</p>
+                    <div id="lbStrategyList" class="space-y-3 mb-3"></div>
+                    <div id="lbWeightEditors" class="space-y-2"></div>
+                </div>
+
+                <hr class="border-border">
+
                 <!-- Security Section -->
                 <div>
                     <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -5003,6 +5162,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         checkPasswordUpgrade();
         loadNotifications();
         loadFallbacks();
+        loadLbSettings();
     }
 
     function closeSettingsModal() {
@@ -5307,6 +5467,9 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape' && !document.getElementById('settingsModal').classList.contains('hidden')) {
             closeSettingsModal();
+        }
+        if (e.key === 'Escape' && !document.getElementById('createVirtualKeyDialog').classList.contains('hidden')) {
+            closeCreateVirtualKeyDialog();
         }
     });
 
@@ -5687,6 +5850,229 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             loadRpmBadges();
         }
     }, 15000);
+
+    // ─── Virtual Keys ──────────────────────────────────────────
+
+    async function refreshVirtualKeys() {
+        try {
+            const res = await fetch('/admin/api/virtual-keys');
+            if (!res.ok) return;
+            const keys = await res.json();
+            renderVirtualKeysTable(keys);
+        } catch (error) {
+            console.log('Failed to load virtual keys:', error);
+        }
+    }
+
+    function renderVirtualKeysTable(keys) {
+        const tbody = document.getElementById('virtualKeysTableBody');
+        const total = keys.length;
+        const enabled = keys.filter(k => k.enabled).length;
+        const disabled = total - enabled;
+        const totalUsage = keys.reduce((sum, k) => sum + (k.usageCount || 0), 0);
+
+        document.getElementById('vkTotal').textContent = total;
+        document.getElementById('vkEnabled').textContent = enabled;
+        document.getElementById('vkDisabled').textContent = disabled;
+        document.getElementById('vkTotalUsage').textContent = totalUsage.toLocaleString();
+
+        if (total === 0) {
+            tbody.innerHTML = '<tr><td colspan="9" class="py-6 text-center text-muted-foreground">No virtual keys yet. Click "Create Virtual Key" to add one.</td></tr>';
+            return;
+        }
+
+        tbody.innerHTML = keys.map(k => {
+            const statusBadge = k.enabled
+                ? '<span class="key-badge badge-fresh">ENABLED</span>'
+                : '<span class="key-badge badge-exhausted">DISABLED</span>';
+
+            const providers = k.allowedProviders && k.allowedProviders.length > 0
+                ? k.allowedProviders.map(p => `<span class="key-badge" style="background:rgba(59,130,246,0.15);color:#3b82f6">${escHtml(p)}</span>`).join(' ')
+                : '<span class="text-xs text-muted-foreground">All</span>';
+
+            const models = k.allowedModels && k.allowedModels.length > 0
+                ? `<span class="text-xs text-muted-foreground" title="${escHtml(k.allowedModels.join(', '))}">${escHtml(k.allowedModels.join(', '))}</span>`
+                : '<span class="text-xs text-muted-foreground">All</span>';
+
+            const rpmLimit = k.rpmLimit > 0
+                ? `<span class="text-xs font-mono">${k.rpmLimit}</span>`
+                : '<span class="text-xs text-muted-foreground">Unlimited</span>';
+
+            const expires = k.expiresAt
+                ? (() => {
+                    const exp = new Date(k.expiresAt);
+                    const now = new Date();
+                    const isExpired = exp < now;
+                    const dateStr = exp.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    return isExpired
+                        ? `<span class="text-xs text-destructive">${dateStr} (expired)</span>`
+                        : `<span class="text-xs text-foreground">${dateStr}</span>`;
+                })()
+                : '<span class="text-xs text-muted-foreground">Never</span>';
+
+            const lastUsed = k.lastUsedAt
+                ? new Date(k.lastUsedAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : 'Never';
+
+            return `<tr class="border-b border-border hover:bg-muted/20 transition-colors">
+                <td class="py-2.5 pr-3">
+                    <div class="font-medium text-foreground text-xs">${escHtml(k.name)}</div>
+                    <div class="text-[10px] text-muted-foreground">Created ${new Date(k.createdAt).toLocaleDateString()}</div>
+                </td>
+                <td class="py-2.5 pr-3"><code class="text-xs font-mono text-muted-foreground">${escHtml(k.tokenPrefix)}...</code></td>
+                <td class="py-2.5 pr-3"><div class="flex flex-wrap gap-1">${providers}</div></td>
+                <td class="py-2.5 pr-3">${models}</td>
+                <td class="py-2.5 pr-3">${rpmLimit}</td>
+                <td class="py-2.5 pr-3">${expires}</td>
+                <td class="py-2.5 pr-3">
+                    <div class="text-xs text-foreground">${(k.usageCount || 0).toLocaleString()} reqs</div>
+                    <div class="text-[10px] text-muted-foreground">Last: ${lastUsed}</div>
+                </td>
+                <td class="py-2.5 pr-3">${statusBadge}</td>
+                <td class="py-2.5">
+                    <div class="flex items-center space-x-1">
+                        <button onclick="toggleVirtualKey('${k.id}')" class="btn btn-secondary px-2 py-1 text-[10px] font-medium" title="${k.enabled ? 'Disable' : 'Enable'}">
+                            ${k.enabled ? 'Disable' : 'Enable'}
+                        </button>
+                        <button onclick="showRevokeVirtualKeyConfirmation('${k.id}', '${escHtml(k.name)}')" class="btn btn-destructive px-2 py-1 text-[10px] font-medium" title="Revoke">
+                            Revoke
+                        </button>
+                    </div>
+                </td>
+            </tr>`;
+        }).join('');
+    }
+
+    function escHtml(str) {
+        if (!str) return '';
+        const div = document.createElement('div');
+        div.textContent = str;
+        return div.innerHTML;
+    }
+
+    function openCreateVirtualKeyDialog() {
+        document.getElementById('vkName').value = '';
+        document.getElementById('vkProviders').value = '';
+        document.getElementById('vkModels').value = '';
+        document.getElementById('vkRpmLimit').value = '0';
+        document.getElementById('vkExpiresAt').value = '';
+        document.getElementById('vkTokenDisplay').classList.add('hidden');
+        document.getElementById('vkCreateBtn').textContent = 'Create Key';
+        document.getElementById('vkCreateBtn').disabled = false;
+        document.getElementById('createVirtualKeyDialog').classList.remove('hidden');
+    }
+
+    function closeCreateVirtualKeyDialog() {
+        document.getElementById('createVirtualKeyDialog').classList.add('hidden');
+    }
+
+    async function createVirtualKey() {
+        const name = document.getElementById('vkName').value.trim();
+        const providersRaw = document.getElementById('vkProviders').value.trim();
+        const modelsRaw = document.getElementById('vkModels').value.trim();
+        const rpmLimit = parseInt(document.getElementById('vkRpmLimit').value, 10) || 0;
+        const expiresAtRaw = document.getElementById('vkExpiresAt').value;
+
+        const allowedProviders = providersRaw ? providersRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const allowedModels = modelsRaw ? modelsRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
+        const expiresAt = expiresAtRaw ? new Date(expiresAtRaw).toISOString() : null;
+
+        if (!name) {
+            showErrorToast('Name is required');
+            return;
+        }
+
+        const btn = document.getElementById('vkCreateBtn');
+        btn.textContent = 'Creating...';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch('/admin/api/virtual-keys', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, allowedProviders, allowedModels, rpmLimit, expiresAt })
+            });
+            if (!res.ok) {
+                showErrorToast('Failed to create virtual key');
+                return;
+            }
+            const result = await res.json();
+
+            // Show the token
+            document.getElementById('vkTokenValue').textContent = result.token;
+            document.getElementById('vkTokenDisplay').classList.remove('hidden');
+            btn.textContent = 'Created';
+            btn.disabled = true;
+
+            showSuccessToast('Virtual key created successfully');
+            refreshVirtualKeys();
+        } catch (error) {
+            showErrorToast('Failed to create virtual key: ' + error.message);
+            btn.textContent = 'Create Key';
+            btn.disabled = false;
+        }
+    }
+
+    function copyVkToken() {
+        const token = document.getElementById('vkTokenValue').textContent;
+        navigator.clipboard.writeText(token).then(() => {
+            showSuccessToast('Token copied to clipboard');
+        }).catch(() => {
+            // Fallback
+            const ta = document.createElement('textarea');
+            ta.value = token;
+            document.body.appendChild(ta);
+            ta.select();
+            document.execCommand('copy');
+            document.body.removeChild(ta);
+            showSuccessToast('Token copied to clipboard');
+        });
+    }
+
+    function showRevokeVirtualKeyConfirmation(id, name) {
+        const dialog = document.getElementById('confirmDialog');
+        const message = document.getElementById('confirmMessage');
+
+        message.textContent = `Revoke virtual key '${name}'? This action cannot be undone. All requests using this key will be rejected.`;
+
+        const confirmBtn = dialog.querySelector('button[onclick="confirmDelete()"]');
+        confirmBtn.textContent = 'Revoke';
+        confirmBtn.onclick = () => {
+            dialog.classList.add('hidden');
+            confirmBtn.textContent = 'Delete';
+            revokeVirtualKey(id);
+        };
+
+        dialog.classList.remove('hidden');
+    }
+
+    async function revokeVirtualKey(id) {
+        try {
+            const res = await fetch(`/admin/api/virtual-keys/${id}`, { method: 'DELETE' });
+            if (!res.ok) {
+                showErrorToast('Failed to revoke virtual key');
+                return;
+            }
+            showSuccessToast('Virtual key revoked');
+            refreshVirtualKeys();
+        } catch (error) {
+            showErrorToast('Failed to revoke virtual key: ' + error.message);
+        }
+    }
+
+    async function toggleVirtualKey(id) {
+        try {
+            const res = await fetch(`/admin/api/virtual-keys/${id}`, { method: 'POST' });
+            if (!res.ok) {
+                showErrorToast('Failed to toggle virtual key');
+                return;
+            }
+            showSuccessToast('Virtual key toggled');
+            refreshVirtualKeys();
+        } catch (error) {
+            showErrorToast('Failed to toggle virtual key: ' + error.message);
+        }
+    }
 </script>
 <!-- File Browser Modal -->
 <div id="fsBrowserModal" class="fixed inset-0 z-[60] hidden">
