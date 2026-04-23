@@ -4284,14 +4284,22 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                                 statusColor = 'text-yellow-400';
                             }
                             
-                            // Key usage info
+                            // Key usage info - make it more prominent
                             let keyInfoHtml = '';
                             if (log.keyUsed) {
-                                keyInfoHtml += ` <span class="text-green-300" title="Key used successfully">key:${log.keyUsed}</span>`;
+                                keyInfoHtml += ` <span class="text-green-400 font-semibold" title="Key used successfully">✓ key:${log.keyUsed}</span>`;
                             }
                             if (log.failedKeys && log.failedKeys.length > 0) {
-                                const failedList = log.failedKeys.map(fk => `${fk.key}(${fk.status || 'err'})`).join(', ');
-                                keyInfoHtml += ` <span class="text-orange-400" title="Failed keys">failed:[${failedList}]</span>`;
+                                const failedList = log.failedKeys.map(fk => {
+                                    const statusText = fk.status ? `HTTP ${fk.status}` : (fk.reason || 'error');
+                                    return `${fk.key} (${statusText})`;
+                                }).join(', ');
+                                keyInfoHtml += ` <span class="text-red-400 font-semibold" title="Keys that failed before success">✗ FAILED: ${failedList}</span>`;
+                            }
+                            
+                            // If no successful key but we have failed keys, highlight the issue
+                            if (!log.keyUsed && log.failedKeys && log.failedKeys.length > 0) {
+                                keyInfoHtml = ` <span class="text-red-500 font-bold bg-red-900/30 px-2 py-1 rounded" title="All keys failed">⚠ ALL KEYS FAILED: ${log.failedKeys.map(fk => `${fk.key}(${fk.status || 'err'})`).join(', ')}</span>`;
                             }
 
                             const logLine = `<span class="text-gray-400">${timestamp}</span> <span class="text-blue-400">[${log.requestId}]</span> <span class="text-white">${log.method} ${log.endpoint}</span> <span class="text-cyan-400">(${log.provider})</span> <span class="${statusColor}">${status}</span> <span class="text-gray-400">${responseTime}</span>${keyInfoHtml}<span class="text-red-400">${error}</span>`;

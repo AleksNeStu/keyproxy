@@ -60,26 +60,40 @@ class BaseProvider {
           : await this._sendRequest(method, requestPath, body, headers, apiKey);
 
         if (rotationStatusCodes.has(response.statusCode)) {
-          console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] Status ${response.statusCode} triggers rotation - trying next key`);
+          console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] ✗ Status ${response.statusCode} triggers rotation - trying next key (attempt ${attempt}/${maxRetries})`);
           if (response.stream) response.stream.resume();
           requestContext.markKeyAsRateLimited(apiKey);
           this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
-          failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'rate_limited' });
+          
+          // Extract error message if available
+          let errorReason = 'rate_limited';
+          if (!streaming && response.data) {
+            try {
+              const errorData = JSON.parse(response.data);
+              if (errorData.error && errorData.error.message) {
+                errorReason = errorData.error.message.substring(0, 100);
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+          
+          failedKeys.push({ key: maskedKey, status: response.statusCode, reason: errorReason });
           lastResponse = response.stream ? { statusCode: response.statusCode, headers: response.headers, data: '' } : response;
           const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
-          console.log(`[${this.providerName.toUpperCase()}] Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
+          console.log(`[${this.providerName.toUpperCase()}] ⏳ Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
           await sleep(delay);
           continue;
         }
 
-        console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] Success (${response.statusCode})${streaming ? ' - streaming' : ''}`);
+        console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] ✓ Success (${response.statusCode})${streaming ? ' - streaming' : ''}`);
         this.keyRotator.incrementKeyUsage(apiKey);
         this.keyRotator.recordSuccessEvent(this.providerName, apiKey);
         response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
         return response;
       } catch (error) {
-        console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] Request failed: ${error.message}`);
-        failedKeys.push({ key: maskedKey, status: null, reason: error.message });
+        console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] ✗ Request failed: ${error.message}`);
+        failedKeys.push({ key: maskedKey, status: null, reason: error.message.substring(0, 100) });
         lastError = error;
         const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
         await sleep(delay);
@@ -88,12 +102,20 @@ class BaseProvider {
     }
 
     const stats = requestContext.getStats();
-    console.log(`[${this.providerName.toUpperCase()}] All ${stats.totalKeys} keys tried. ${stats.rateLimitedKeys} rate limited.`);
+    console.log(`[${this.providerName.toUpperCase()}] ⚠ All ${stats.totalKeys} keys tried. ${stats.rateLimitedKeys} rate limited.`);
+    
+    // Log detailed failure summary
+    if (failedKeys.length > 0) {
+      console.log(`[${this.providerName.toUpperCase()}] Failed keys summary:`);
+      failedKeys.forEach((fk, idx) => {
+        console.log(`  ${idx + 1}. ${fk.key} - ${fk.status ? `HTTP ${fk.status}` : 'Error'}: ${fk.reason}`);
+      });
+    }
 
     this.keyRotator.updateLastFailedKey(requestContext.getLastFailedKey());
 
     if (requestContext.allTriedKeysRateLimited()) {
-      console.log(`[${this.providerName.toUpperCase()}] All keys rate limited - returning 429`);
+      console.log(`[${this.providerName.toUpperCase()}] ❌ All keys rate limited - returning 429`);
       const response = lastResponse || {
         statusCode: 429,
         headers: { 'content-type': 'application/json' },
@@ -138,7 +160,14 @@ class BaseProvider {
       const req = https.request(options, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
-        res.on('end', () => resolve({ statusCode: res.statusCode, headers: res.headers, data }));
+        res.on('end', () => {
+          // Log HTTP 405 errors with more context
+          if (res.statusCode === 405) {
+            console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] ⚠ HTTP 405 Method Not Allowed - ${method} ${requestPath}`);
+            console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] Hint: This endpoint may require a different HTTP method (GET/POST/PUT/DELETE)`);
+          }
+          resolve({ statusCode: res.statusCode, headers: res.headers, data });
+        });
       });
 
       req.setTimeout(this.timeoutMs, () => {
@@ -146,7 +175,7 @@ class BaseProvider {
       });
 
       req.on('error', (error) => {
-        console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] HTTP request error: ${error.message}`);
+        console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] ✗ HTTP request error: ${error.message}`);
         reject(error);
       });
 
@@ -164,6 +193,11 @@ class BaseProvider {
       const options = this._buildRequestOptions(method, requestPath, body, headers, apiKey);
 
       const req = https.request(options, (res) => {
+        // Log HTTP 405 errors with more context
+        if (res.statusCode === 405) {
+          console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] ⚠ HTTP 405 Method Not Allowed - ${method} ${requestPath}`);
+          console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] Hint: This endpoint may require a different HTTP method (GET/POST/PUT/DELETE)`);
+        }
         resolve({ statusCode: res.statusCode, headers: res.headers, stream: res });
       });
 
@@ -172,7 +206,7 @@ class BaseProvider {
       });
 
       req.on('error', (error) => {
-        console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] HTTP streaming request error: ${error.message}`);
+        console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] ✗ HTTP streaming request error: ${error.message}`);
         reject(error);
       });
 

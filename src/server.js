@@ -596,6 +596,35 @@ class ProxyServer {
       failedKeys: keyInfo ? keyInfo.failedKeys : []
     };
 
+    // Enhanced console logging with key information
+    let consoleMsg = `[${new Date().toISOString().substring(11, 23)}] [${requestId}] ${method} /${provider}${endpoint}`;
+    
+    if (status) {
+      const statusColor = status < 400 ? '✓' : '✗';
+      consoleMsg += ` ${statusColor} ${status}`;
+    }
+    
+    if (responseTime) {
+      consoleMsg += ` ${responseTime}ms`;
+    }
+    
+    // Show key information prominently
+    if (keyInfo) {
+      if (keyInfo.keyUsed) {
+        consoleMsg += ` key:${keyInfo.keyUsed}`;
+      }
+      if (keyInfo.failedKeys && keyInfo.failedKeys.length > 0) {
+        const failedSummary = keyInfo.failedKeys.map(fk => `${fk.key}(${fk.status || 'err'})`).join(', ');
+        consoleMsg += ` FAILED:[${failedSummary}]`;
+      }
+    }
+    
+    if (error) {
+      consoleMsg += ` ERROR: ${error}`;
+    }
+    
+    console.log(consoleMsg);
+
     // Add to buffer (keep last 100 entries in RAM only)
     this.logBuffer.push(logEntry);
     if (this.logBuffer.length > 100) {
