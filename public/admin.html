@@ -2201,6 +2201,8 @@
             renderProviders();
             // Load RPM data after render
             loadRpmBadges();
+            // Load expiry badges
+            loadExpiryBadges();
         }
 
         function renderProviders() {
@@ -2758,7 +2760,8 @@
                                         <!-- Usage count + rotation count + RPM + Expiry -->
                                         <span class="text-xs text-muted-foreground whitespace-nowrap" title="Times used${rotationCount > 0 ? ' / Rotations: ' + rotationCount : ''}">${usageDisplay} uses${rotationCount > 0 ? ' / ' + rotationCount + ' rot' : ''}</span>
                                         <span class="rpm-badge text-xs px-1.5 py-0.5 rounded" data-key="${maskedKey}" data-provider="${provider.apiType}" title="Requests per minute">--rpm</span>
-                                        <span class="expiry-badge expiry-none" data-key="${maskedKey}" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Key TTL">--</span>
+                                        <span class="expiry-badge expiry-none expiry-slot" data-key="${maskedKey}" data-maskedkey="${keyVal.length >= 8 ? keyVal.substring(0, 4) + '...' + keyVal.slice(-4) : keyVal}" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Key TTL">${usageEntry?.expiry ? formatExpiry(usageEntry.expiry) : '—'}</span>
+                                        ${usageEntry?.expiry ? `<button onclick="extendKeyTtl('${provider.name}', this)" class="btn btn-extend px-2 py-1 text-xs font-medium" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Reset key TTL timer">Extend</button>` : ''}
                                         ${keyStatus === 'exhausted'
                                             ? `<button onclick="testAndRecoverKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">Test & Reset</button>`
                                             : `<button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
@@ -6070,6 +6073,108 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             loadRpmBadges();
         }
     }, 15000);
+
+    // ─── Key Expiry Badges ──────────────────────────────
+
+    function formatExpiry(expiry) {
+        if (!expiry) return '—';
+        if (expiry.expired) return 'Expired';
+        const ms = expiry.remainingMs;
+        if (ms >= 86400000) {
+            const d = Math.floor(ms / 86400000);
+            const h = Math.floor((ms % 86400000) / 3600000);
+            return d + 'd ' + h + 'h';
+        }
+        if (ms >= 3600000) {
+            const h = Math.floor(ms / 3600000);
+            const m = Math.floor((ms % 3600000) / 60000);
+            return h + 'h ' + m + 'm';
+        }
+        if (ms >= 60000) {
+            const m = Math.floor(ms / 60000);
+            const s = Math.floor((ms % 60000) / 1000);
+            return m + 'm ' + s + 's';
+        }
+        return '<1m';
+    }
+
+    function getExpiryColorClass(expiry) {
+        if (!expiry) return 'expiry-none';
+        if (expiry.expired) return 'expiry-gray';
+        const ms = expiry.remainingMs;
+        if (ms >= 86400000) return 'expiry-green';
+        if (ms >= 3600000) return 'expiry-yellow';
+        return 'expiry-red';
+    }
+
+    async function loadExpiryBadges() {
+        try {
+            const res = await fetch('/admin/api/key-expiry', { headers: authHeaders() });
+            if (!res.ok) return;
+            const data = await res.json();
+            // data is { providerName: [{ key: maskedKey, expiry: {...} }] }
+            document.querySelectorAll('.expiry-slot').forEach(badge => {
+                const maskedKey = badge.dataset.maskedkey;
+                const provider = badge.dataset.provider;
+                const providerEntries = data[provider];
+                if (!providerEntries) {
+                    badge.textContent = '—';
+                    badge.className = 'expiry-badge expiry-none expiry-slot';
+                    badge.title = 'Key TTL';
+                    return;
+                }
+                const entry = providerEntries.find(e => e.key === maskedKey);
+                if (!entry || !entry.expiry) {
+                    badge.textContent = '—';
+                    badge.className = 'expiry-badge expiry-none expiry-slot';
+                    badge.title = 'Key TTL';
+                    return;
+                }
+                const expiry = entry.expiry;
+                badge.textContent = formatExpiry(expiry);
+                badge.className = 'expiry-badge ' + getExpiryColorClass(expiry) + ' expiry-slot';
+                badge.title = 'Expires: ' + expiry.expiresAt;
+            });
+        } catch {}
+    }
+
+    async function extendKeyTtl(providerName, btn) {
+        const fullKey = btn.dataset.fullkey;
+        if (!fullKey) return;
+        const origText = btn.textContent;
+        btn.textContent = '...';
+        btn.disabled = true;
+        try {
+            const res = await fetch('/admin/api/key-extend', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...authHeaders() },
+                body: JSON.stringify({ provider: providerName, fullKey: fullKey })
+            });
+            if (res.ok) {
+                btn.textContent = 'Done';
+                showToast('Key TTL extended');
+                loadExpiryBadges();
+                setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 1500);
+            } else {
+                const err = await res.json().catch(() => ({}));
+                showToast(err.error || 'Failed to extend key TTL', 'error');
+                btn.textContent = origText;
+                btn.disabled = false;
+            }
+        } catch (e) {
+            showToast('Network error: ' + e.message, 'error');
+            btn.textContent = origText;
+            btn.disabled = false;
+        }
+    }
+
+    // Refresh expiry badges every 30s when API Keys tab is visible
+    setInterval(() => {
+        const envTab = document.getElementById('environment');
+        if (envTab && !envTab.classList.contains('hidden')) {
+            loadExpiryBadges();
+        }
+    }, 30000);
 
     // ─── Virtual Keys ──────────────────────────────────────────
 

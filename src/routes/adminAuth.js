@@ -60,7 +60,7 @@ async function handleAdminLogin(server, req, res, body) {
       const upgradeAvailable = !Auth.isHash(adminPassword) && !Auth.loadHashFromFile();
       res.writeHead(200, {
         'Content-Type': 'application/json',
-        'Set-Cookie': `adminSession=${server.adminSessionToken}; HttpOnly; Expires=${expires}; Path=/admin`
+        'Set-Cookie': `adminSession=${server.adminSessionToken}; HttpOnly; Secure; SameSite=Strict; Expires=${expires}; Path=/admin`
       });
       res.end(JSON.stringify({ success: true, passwordUpgradeAvailable: upgradeAvailable }));
       console.log('[SECURITY] Session token set, cookie sent');
@@ -101,7 +101,7 @@ function handleAdminLogout(server, req, res) {
   server.adminSessionToken = null;
   res.writeHead(200, {
     'Content-Type': 'application/json',
-    'Set-Cookie': 'adminSession=; HttpOnly; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/admin'
+    'Set-Cookie': 'adminSession=; HttpOnly; Secure; SameSite=Strict; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/admin'
   });
   res.end(JSON.stringify({ success: true }));
 }
