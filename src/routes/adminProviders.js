@@ -133,6 +133,10 @@ async function handleHealthReset(server, req, res, body) {
       server.healthMonitor.statusCache.delete(provider);
       server.healthMonitor.checkProvider(provider);
     }
+    // Reset circuit breaker for this provider
+    if (server.circuitBreaker) {
+      server.circuitBreaker.forceClose(provider);
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
   } catch (error) {

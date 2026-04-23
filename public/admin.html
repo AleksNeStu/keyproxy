@@ -918,12 +918,13 @@
                                     <th class="pb-2 pr-3">Keys</th>
                                     <th class="pb-2 pr-3">Requests</th>
                                     <th class="pb-2 pr-3">Avg RT</th>
+                                    <th class="pb-2 pr-3">Last Check</th>
                                     <th class="pb-2 pr-3">Last Error</th>
                                     <th class="pb-2">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="healthTableBody">
-                                <tr><td colspan="9" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
+                                <tr><td colspan="10" class="py-4 text-center text-muted-foreground">Loading...</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -2947,6 +2948,7 @@
             sortedProviders.forEach((provider, index) => {
                 const providerDiv = document.createElement('div');
                 providerDiv.className = 'key-row';
+                providerDiv.id = `provider-section-${provider.apiType}-${provider.name}`;
 
                 // Determine initial button state for access key
                 let accessKeyButtonHtml, accessKeyAction, accessKeyClass, accessKeyStyle, accessKeyTitle;
@@ -5583,17 +5585,66 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             }
         }
 
-        async function resetProviderHealth(provider) {
+        async function resetProviderHealth(provider, btn) {
+            if (!btn) btn = document.getElementById('reset-btn-' + provider);
+            const originalText = btn ? btn.textContent : 'Reset';
             try {
+                if (btn) {
+                    btn.textContent = 'Resetting...';
+                    btn.disabled = true;
+                    btn.classList.add('opacity-50', 'cursor-not-allowed');
+                }
                 const res = await fetch('/admin/api/health/reset', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ provider })
                 });
-                if (res.ok) refreshHealth();
+                if (res.ok) {
+                    showInfoToast('Provider "' + provider + '" reset successfully');
+                    refreshHealth();
+                } else {
+                    const data = await res.json();
+                    showErrorToast('Reset failed: ' + (data.error || 'Unknown error'));
+                }
             } catch (err) {
                 console.error('Failed to reset:', err);
+                showErrorToast('Reset failed: ' + err.message);
+            } finally {
+                if (btn) {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                    btn.classList.remove('opacity-50', 'cursor-not-allowed');
+                }
             }
+        }
+
+        function navigateToProviderKeys(apiType, providerName) {
+            showTab('environment');
+            const targetId = 'provider-section-' + apiType + '-' + providerName;
+            const scrollToProvider = () => {
+                const target = document.getElementById(targetId);
+                if (target) {
+                    target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    target.classList.add('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-background');
+                    setTimeout(() => {
+                        target.classList.remove('ring-2', 'ring-primary', 'ring-offset-2', 'ring-offset-background');
+                    }, 3000);
+                }
+            };
+            const existing = document.getElementById(targetId);
+            setTimeout(scrollToProvider, existing ? 50 : 500);
+        }
+
+        function formatRelativeTime(isoString) {
+            if (!isoString) return '-';
+            const diffMs = Date.now() - new Date(isoString).getTime();
+            const diffSec = Math.floor(diffMs / 1000);
+            if (diffSec < 60) return 'just now';
+            const diffMin = Math.floor(diffSec / 60);
+            if (diffMin < 60) return diffMin + 'm ago';
+            const diffHr = Math.floor(diffMin / 60);
+            if (diffHr < 24) return diffHr + 'h ago';
+            return new Date(isoString).toLocaleDateString();
         }
 
         function renderHealthSummary(summary) {
@@ -5624,16 +5675,17 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 const row = document.createElement('tr');
                 row.className = 'border-b border-border/50 hover:bg-muted/30';
                 row.innerHTML = `
-                    <td class="py-2 pr-3 font-medium text-foreground">${p.name}</td>
+                    <td class="py-2 pr-3 font-medium"><a href="javascript:void(0)" onclick="navigateToProviderKeys('${p.apiType}', '${p.name}')" class="text-primary hover:underline cursor-pointer">${p.name}</a></td>
                     <td class="py-2 pr-3">${statusBadge(p.status)}</td>
                     <td class="py-2 pr-3" id="cb-${p.name}">${statusBadge('unknown')}</td>
                     <td class="py-2 pr-3 text-xs text-muted-foreground">${p.apiType}</td>
                     <td class="py-2 pr-3 text-xs"><span class="text-green-400">${p.enabledKeys}</span>/<span class="text-muted-foreground">${p.totalKeys}</span>${p.exhaustedKeys ? ` <span class="text-red-400">(-${p.exhaustedKeys})</span>` : ''}</td>
                     <td class="py-2 pr-3 text-xs text-muted-foreground">${p.totalRequests}</td>
                     <td class="py-2 pr-3 text-xs text-muted-foreground">${p.avgResponseTime ? p.avgResponseTime + 'ms' : '-'}</td>
+                    <td class="py-2 pr-3 text-xs text-muted-foreground" title="${p.lastCheckTime ? new Date(p.lastCheckTime).toLocaleString() : 'Never'}">${formatRelativeTime(p.lastCheckTime)}</td>
                     <td class="py-2 pr-3 text-xs text-red-400">${p.lastError || '-'}</td>
                     <td class="py-2 text-xs">
-                        <button onclick="resetProviderHealth('${p.name}')" class="text-muted-foreground hover:text-foreground" title="Reset key history">Reset</button>
+                        <button id="reset-btn-${p.name}" onclick="resetProviderHealth('${p.name}', this)" class="text-muted-foreground hover:text-foreground" title="Reset key history, circuit breaker, and force re-check">Reset</button>
                     </td>
                 `;
                 tbody.appendChild(row);
