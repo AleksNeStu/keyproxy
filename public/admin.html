@@ -2232,7 +2232,8 @@
                                 baseUrl: '',
                                 accessKey: '',
                                 defaultModel: '',
-                                modelHistory: []
+                                modelHistory: [],
+                                allowedModels: []
                             };
                         }
                         const rawKeys = value.split(',').map(k => k.trim()).filter(k => k);
@@ -2243,6 +2244,27 @@
                             return { key: k, disabled: false };
                         });
                     }
+                } else if (key.endsWith('_ALLOWED_MODELS') && value) {
+                    const keyWithoutSuffix = key.replace('_ALLOWED_MODELS', '');
+                    const firstUnderscoreIndex = keyWithoutSuffix.indexOf('_');
+                    if (firstUnderscoreIndex > 0) {
+                        const apiType = keyWithoutSuffix.substring(0, firstUnderscoreIndex).toLowerCase();
+                        const providerName = keyWithoutSuffix.substring(firstUnderscoreIndex + 1).toLowerCase();
+                        const providerKey = `${apiType}_${providerName}`;
+                        if (!providers[providerKey]) {
+                            providers[providerKey] = {
+                                name: providerName,
+                                apiType: apiType,
+                                keys: [],
+                                baseUrl: '',
+                                accessKey: '',
+                                defaultModel: '',
+                                modelHistory: [],
+                                allowedModels: []
+                            };
+                        }
+                        providers[providerKey].allowedModels = value.split(',').map(m => m.trim()).filter(m => m);
+                    }
                 } else if (key.endsWith('_DISABLED') && value) {
                     const keyWithoutSuffix = key.replace('_DISABLED', '');
                     const firstUnderscoreIndex = keyWithoutSuffix.indexOf('_');
@@ -2251,7 +2273,7 @@
                         const providerName = keyWithoutSuffix.substring(firstUnderscoreIndex + 1).toLowerCase();
                         const providerKey = `${apiType}_${providerName}`;
                         if (!providers[providerKey]) {
-                            providers[providerKey] = { name: providerName, apiType: apiType, keys: [], baseUrl: '', accessKey: '', defaultModel: '', modelHistory: [] };
+                            providers[providerKey] = { name: providerName, apiType: apiType, keys: [], baseUrl: '', accessKey: '', defaultModel: '', modelHistory: [], allowedModels: [] };
                         }
                         providers[providerKey].disabled = (value.trim().toLowerCase() === 'true');
                     }
@@ -2263,7 +2285,7 @@
                         const providerName = keyWithoutSuffix.substring(firstUnderscoreIndex + 1).toLowerCase();
                         const providerKey = `${apiType}_${providerName}`;
                         if (!providers[providerKey]) {
-                            providers[providerKey] = { name: providerName, apiType: apiType, keys: [], baseUrl: '', accessKey: '', defaultModel: '', modelHistory: [] };
+                            providers[providerKey] = { name: providerName, apiType: apiType, keys: [], baseUrl: '', accessKey: '', defaultModel: '', modelHistory: [], allowedModels: [] };
                         }
                         providers[providerKey].syncEnv = (value.trim().toLowerCase() === 'true');
                     }
@@ -2282,7 +2304,8 @@
                                 baseUrl: '',
                                 accessKey: '',
                                 defaultModel: '',
-                                modelHistory: []
+                                modelHistory: [],
+                                allowedModels: []
                             };
                         }
                         providers[providerKey].baseUrl = value;
@@ -2302,7 +2325,8 @@
                                 baseUrl: '',
                                 accessKey: '',
                                 defaultModel: '',
-                                modelHistory: []
+                                modelHistory: [],
+                                allowedModels: []
                             };
                         }
                         providers[providerKey].accessKey = value;
@@ -2324,7 +2348,8 @@
                             baseUrl: '',
                             accessKey: '',
                             defaultModel: '',
-                            modelHistory: []
+                            modelHistory: [],
+                            allowedModels: []
                         };
                     }
                     providers[providerKey].defaultModel = value;
@@ -2345,7 +2370,8 @@
                             baseUrl: '',
                             accessKey: '',
                             defaultModel: '',
-                            modelHistory: []
+                            modelHistory: [],
+                            allowedModels: []
                         };
                     }
                     providers[providerKey].modelHistory = value.split(',').map(m => m.trim()).filter(m => m);
@@ -2639,6 +2665,64 @@
                                 </div>
                             </div>
                         </div>
+
+                        <!-- Model Access Control -->
+                        <div class="bg-muted/30 rounded-lg p-3 space-y-3" id="modelAccess_${provider.apiType}_${provider.name}">
+                            <div class="flex items-center justify-between">
+                                <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Model Access</div>
+                                <div class="flex items-center space-x-2">
+                                    ${provider.allowedModels && provider.allowedModels.length > 0 ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">${provider.allowedModels.length} allowed</span>` : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">All models</span>`}
+                                    <button
+                                        onclick="clearAllowedModels('${provider.apiType}', '${provider.name}')"
+                                        class="text-[10px] px-1.5 py-0.5 rounded text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 transition-colors"
+                                        title="Remove all model restrictions"
+                                    >Clear</button>
+                                </div>
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button
+                                    onclick="fetchProviderModels('${provider.apiType}', '${provider.name}')"
+                                    id="fetchModelsBtn_${provider.apiType}_${provider.name}"
+                                    class="btn btn-secondary px-2.5 py-1.5 text-xs font-medium"
+                                    title="Query provider API to discover available models"
+                                >
+                                    <svg class="w-3.5 h-3.5 inline mr-1 animate-spin hidden" id="fetchModelsSpinner_${provider.apiType}_${provider.name}" fill="none" viewBox="0 0 24 24">
+                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                    </svg>
+                                    <span id="fetchModelsBtnText_${provider.apiType}_${provider.name}">Fetch Models</span>
+                                </button>
+                                <input
+                                    type="text"
+                                    id="modelSearch_${provider.apiType}_${provider.name}"
+                                    placeholder="Filter models..."
+                                    class="input-field flex-1 px-2 py-1.5 text-xs rounded transition-colors"
+                                    oninput="filterModelList('${provider.apiType}', '${provider.name}')"
+                                >
+                            </div>
+                            <div id="modelListContainer_${provider.apiType}_${provider.name}" class="hidden">
+                                <div class="flex items-center justify-between mb-2">
+                                    <span class="text-[10px] text-muted-foreground" id="modelCount_${provider.apiType}_${provider.name}"></span>
+                                    <div class="flex items-center space-x-2">
+                                        <button onclick="selectAllModels('${provider.apiType}', '${provider.name}')" class="text-[10px] text-primary hover:underline">Select All</button>
+                                        <button onclick="deselectAllModels('${provider.apiType}', '${provider.name}')" class="text-[10px] text-muted-foreground hover:underline">Deselect All</button>
+                                    </div>
+                                </div>
+                                <div id="modelList_${provider.apiType}_${provider.name}" class="max-h-48 overflow-y-auto space-y-0.5 border border-border rounded bg-background"></div>
+                                <div class="mt-2 flex items-center justify-between">
+                                    <span class="text-[10px] text-muted-foreground" id="selectedModelCount_${provider.apiType}_${provider.name}">0 selected</span>
+                                    <button
+                                        onclick="saveAllowedModels('${provider.apiType}', '${provider.name}')"
+                                        class="btn btn-primary px-3 py-1.5 text-xs font-medium"
+                                    >Save Selection</button>
+                                </div>
+                            </div>
+                            ${provider.allowedModels && provider.allowedModels.length > 0 ? `
+                            <div class="flex flex-wrap gap-1" id="allowedModelsTags_${provider.apiType}_${provider.name}">
+                                ${provider.allowedModels.map(m => `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-primary/10 text-primary border border-primary/20">${escHtml(m)}</span>`).join('')}
+                            </div>` : ''}
+                        </div>
+
                         ${(() => {
                             const port = window.location.port || '8990';
                             const mcpMap = {
@@ -3909,6 +3993,184 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
 
             // Auto-save the selected model
             saveDefaultModel(apiType, providerName);
+        }
+
+        // --- Model Access Control Functions ---
+        const fetchedModelsCache = {};
+
+        async function fetchProviderModels(apiType, providerName) {
+            const btn = document.getElementById(`fetchModelsBtn_${apiType}_${providerName}`);
+            const spinner = document.getElementById(`fetchModelsSpinner_${apiType}_${providerName}`);
+            const btnText = document.getElementById(`fetchModelsBtnText_${apiType}_${providerName}`);
+            const container = document.getElementById(`modelListContainer_${apiType}_${providerName}`);
+
+            if (!btn || !container) return;
+
+            btn.disabled = true;
+            spinner.classList.remove('hidden');
+            btnText.textContent = 'Fetching...';
+
+            try {
+                const response = await fetch(`/admin/api/models?apiType=${encodeURIComponent(apiType)}&provider=${encodeURIComponent(providerName)}`);
+
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${response.status}`);
+                }
+
+                const data = await response.json();
+
+                if (data.message) {
+                    showSuccessToast(data.message);
+                    return;
+                }
+
+                if (!data.models || data.models.length === 0) {
+                    showErrorToast('No models found for this provider');
+                    return;
+                }
+
+                fetchedModelsCache[`${apiType}_${providerName}`] = data.models;
+
+                // Get currently allowed models
+                const envKey = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_ALLOWED_MODELS`;
+                const currentlyAllowed = envVars[envKey] ? envVars[envKey].split(',').map(m => m.trim()).filter(Boolean) : [];
+
+                renderModelList(apiType, providerName, data.models, currentlyAllowed);
+                container.classList.remove('hidden');
+
+                if (data.cached) {
+                    showSuccessToast(`Loaded ${data.models.length} models (cached)`);
+                } else {
+                    showSuccessToast(`Discovered ${data.models.length} models`);
+                }
+            } catch (error) {
+                showErrorToast(`Failed to fetch models: ${error.message}`);
+            } finally {
+                btn.disabled = false;
+                spinner.classList.add('hidden');
+                btnText.textContent = 'Fetch Models';
+            }
+        }
+
+        function renderModelList(apiType, providerName, models, allowedModels, filterText = '') {
+            const listEl = document.getElementById(`modelList_${apiType}_${providerName}`);
+            const countEl = document.getElementById(`modelCount_${apiType}_${providerName}`);
+            const selectedCountEl = document.getElementById(`selectedModelCount_${apiType}_${providerName}`);
+
+            if (!listEl) return;
+
+            const filtered = filterText
+                ? models.filter(m => m.id.toLowerCase().includes(filterText.toLowerCase()) || (m.display_name && m.display_name.toLowerCase().includes(filterText.toLowerCase())))
+                : models;
+
+            countEl.textContent = `${filtered.length} of ${models.length} models`;
+
+            listEl.innerHTML = filtered.map(m => {
+                const checked = allowedModels.includes(m.id);
+                return `
+                    <label class="flex items-center justify-between px-2.5 py-1.5 hover:bg-secondary transition-colors cursor-pointer rounded">
+                        <div class="flex items-center space-x-2 min-w-0">
+                            <input type="checkbox" class="model-checkbox flex-shrink-0" data-model="${escHtml(m.id)}" ${checked ? 'checked' : ''}>
+                            <span class="text-xs font-mono truncate" title="${escHtml(m.id)}">${escHtml(m.display_name || m.id)}</span>
+                        </div>
+                        ${m.id !== m.display_name ? `<span class="text-[10px] text-muted-foreground font-mono flex-shrink-0 ml-2">${escHtml(m.id)}</span>` : ''}
+                    </label>`;
+            }).join('');
+
+            updateSelectedCount(apiType, providerName);
+        }
+
+        function filterModelList(apiType, providerName) {
+            const searchInput = document.getElementById(`modelSearch_${apiType}_${providerName}`);
+            const models = fetchedModelsCache[`${apiType}_${providerName}`];
+            if (!models || !searchInput) return;
+
+            const allowedModels = getSelectedModelIds(apiType, providerName);
+            renderModelList(apiType, providerName, models, allowedModels, searchInput.value);
+        }
+
+        function getSelectedModelIds(apiType, providerName) {
+            const listEl = document.getElementById(`modelList_${apiType}_${providerName}`);
+            if (!listEl) return [];
+            return Array.from(listEl.querySelectorAll('.model-checkbox:checked')).map(cb => cb.dataset.model);
+        }
+
+        function updateSelectedCount(apiType, providerName) {
+            const selectedCountEl = document.getElementById(`selectedModelCount_${apiType}_${providerName}`);
+            if (!selectedCountEl) return;
+            const count = getSelectedModelIds(apiType, providerName).length;
+            selectedCountEl.textContent = `${count} selected`;
+        }
+
+        function selectAllModels(apiType, providerName) {
+            const listEl = document.getElementById(`modelList_${apiType}_${providerName}`);
+            if (!listEl) return;
+            listEl.querySelectorAll('.model-checkbox').forEach(cb => cb.checked = true);
+            updateSelectedCount(apiType, providerName);
+        }
+
+        function deselectAllModels(apiType, providerName) {
+            const listEl = document.getElementById(`modelList_${apiType}_${providerName}`);
+            if (!listEl) return;
+            listEl.querySelectorAll('.model-checkbox').forEach(cb => cb.checked = false);
+            updateSelectedCount(apiType, providerName);
+        }
+
+        async function saveAllowedModels(apiType, providerName) {
+            const selectedModels = getSelectedModelIds(apiType, providerName);
+
+            try {
+                const response = await fetch('/admin/api/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apiType, providerName, allowedModels: selectedModels })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to save');
+                }
+
+                // Update local envVars
+                const envKey = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_ALLOWED_MODELS`;
+                if (selectedModels.length > 0) {
+                    envVars[envKey] = selectedModels.join(',');
+                } else {
+                    delete envVars[envKey];
+                }
+
+                renderEnvVars();
+
+                if (selectedModels.length > 0) {
+                    showSuccessToast(`Model access updated: ${selectedModels.length} models allowed for '${providerName}'`);
+                } else {
+                    showSuccessToast(`Model restriction removed for '${providerName}' — all models allowed`);
+                }
+            } catch (error) {
+                showErrorToast(`Failed to save model selection: ${error.message}`);
+            }
+        }
+
+        async function clearAllowedModels(apiType, providerName) {
+            try {
+                const response = await fetch('/admin/api/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ apiType, providerName, allowedModels: [] })
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to clear');
+                }
+
+                const envKey = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_ALLOWED_MODELS`;
+                delete envVars[envKey];
+
+                renderEnvVars();
+                showSuccessToast(`Model restriction cleared for '${providerName}'`);
+            } catch (error) {
+                showErrorToast(`Failed to clear model restriction: ${error.message}`);
+            }
         }
 
         // Close dropdowns when clicking outside

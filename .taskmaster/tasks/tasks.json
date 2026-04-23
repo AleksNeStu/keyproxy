@@ -262,13 +262,174 @@
         "testStrategy": "Set TTL 1 hour, verify key shows expiry badge, wait (or mock), verify auto-disable",
         "subtasks": [],
         "updatedAt": "2026-04-21T14:57:32.261Z"
+      },
+      {
+        "id": "21",
+        "title": "Model Selection for Providers",
+        "description": "Add ability to select and configure available models for each provider. Include a 'Fetch Models' button that queries the provider API in real-time to discover available models, then allow users to select which models to proxy.",
+        "status": "done",
+        "priority": "high",
+        "dependencies": [],
+        "details": "Add API endpoint to fetch available models from provider (OpenAI: GET /v1/models, Gemini: GET /v1/models). Create UI button 'Fetch Models' next to each provider with loading indicator. Display fetched models in a selectable list (checkboxes or multi-select dropdown). Save selected models to provider config (e.g., OPENAI_PROVIDER_ALLOWED_MODELS). Add model filtering in proxy request handler to only allow selected models. Cache fetched models with timestamp and refresh button.",
+        "testStrategy": "Click 'Fetch Models' for OpenAI provider, verify models list appears, select specific models, save config, attempt request with non-selected model (should reject), attempt with selected model (should succeed)",
+        "subtasks": [],
+        "updatedAt": "2026-04-23T18:27:33.014Z"
+      },
+      {
+        "id": "22",
+        "title": "Settings Section Enhancement",
+        "description": "The Settings tab is currently empty. Add useful global configuration options including: default timeout, CORS settings, log level, cache settings, circuit breaker thresholds, and other system-wide parameters.",
+        "status": "pending",
+        "priority": "medium",
+        "dependencies": [],
+        "details": "Design Settings UI layout with categorized sections (General, Security, Performance, Logging). Add General settings: default timeout, CORS origin, port configuration. Add Performance settings: cache enabled/TTL/max entries, circuit breaker threshold/timeout. Add Logging settings: log level, log retention, console output format. Add Security settings: rate limiting, IP whitelist/blacklist, API key rotation policy. Implement settings persistence and validation.",
+        "testStrategy": "Open Settings tab, verify all sections present, modify settings, save, restart server, verify settings persisted",
+        "subtasks": []
+      },
+      {
+        "id": "23",
+        "title": "Environment Files Priority Management",
+        "description": "Move environment file management from Global Configuration to a dedicated Configuration section. Implement proper priority ordering (1st, 2nd, 3rd, etc.) with drag-and-drop reordering. Currently the UI only shows active .env without ability to manage priority or reorder files.",
+        "status": "pending",
+        "priority": "high",
+        "dependencies": [],
+        "details": "Create new 'Configuration' tab/section separate from Settings. Move environment file list from Global Configuration to Configuration section. Add priority numbers (1, 2, 3...) to each .env file in the list. Implement drag-and-drop reordering for .env files to change priority. Add up/down arrow buttons as alternative to drag-and-drop. Show visual indicator of which .env file is currently active. Add ability to enable/disable .env files without deleting them. Update backend to respect priority order when loading environment variables.",
+        "testStrategy": "Open Configuration tab, verify .env files listed with priority numbers, drag file to reorder, verify priority changes, disable a file, verify it's skipped during load",
+        "subtasks": []
+      },
+      {
+        "id": "24",
+        "title": "Security Hardening - Input Validation & CSRF Protection",
+        "description": "Add comprehensive input validation to all admin API endpoints and implement CSRF protection for state-changing operations. Currently missing validation on type checking, length limits, format validation, and no CSRF tokens.",
+        "status": "pending",
+        "priority": "critical",
+        "dependencies": [],
+        "details": "Add input validation library (joi or zod) and create validation schemas. Implement CSRF token generation and validation middleware. Add validation to all POST/PUT/DELETE endpoints. Add request body size limits to prevent DoS attacks. Implement password strength validation and force change from default.",
+        "testStrategy": "Attempt to submit invalid data to API endpoints (wrong types, oversized payloads, missing CSRF token), verify all rejected with proper error messages",
+        "subtasks": []
+      },
+      {
+        "id": "25",
+        "title": "API Rate Limiting & Error Handling",
+        "description": "Implement rate limiting on all API endpoints (currently only login is protected) and fix error handling gaps where try-catch blocks swallow errors silently without proper error propagation.",
+        "status": "pending",
+        "priority": "critical",
+        "dependencies": [],
+        "details": "Add rate limiting middleware for all admin API endpoints. Implement proper error propagation in async functions. Add error boundaries in frontend for unhandled promise rejections. Improve error messages with context for debugging.",
+        "testStrategy": "Make rapid requests to admin API, verify rate limiting kicks in. Trigger various error conditions, verify proper error messages returned to client",
+        "subtasks": []
+      },
+      {
+        "id": "26",
+        "title": "Auto-Recovery of Failed Keys (Enhanced)",
+        "description": "Enhance existing auto-recovery feature (Task #7) with better tracking and UI. Implement periodic retesting of keys that were rotated out due to 429/401 errors. Keys marked as exhausted should recover automatically after cooldown period.",
+        "status": "pending",
+        "priority": "high",
+        "dependencies": [
+          "7"
+        ],
+        "details": "Add cooldown tracking to KeyHistoryManager for exhausted keys. Implement periodic retest job in HealthMonitor (every 5 minutes). Auto re-enable keys that pass health check after cooldown. Add UI indicator for keys in cooldown/recovery state with countdown timer.",
+        "testStrategy": "Exhaust a key with 429 errors, verify it enters cooldown state, wait for cooldown period, verify automatic retest and recovery",
+        "subtasks": []
+      },
+      {
+        "id": "27",
+        "title": "Complete Analytics Dashboard",
+        "description": "Analytics infrastructure exists (src/core/analytics.js) but UI is incomplete. Add charts and visualizations for request count, tokens, latency per key/provider, cost estimation, and usage trends over time.",
+        "status": "pending",
+        "priority": "high",
+        "dependencies": [
+          "8"
+        ],
+        "details": "Add charting library (Chart.js or similar) to admin panel. Implement requests over time chart (daily/weekly/monthly). Add latency distribution chart (p50, p95, p99). Implement cost estimation dashboard with per-provider breakdown. Add top keys by usage table with filtering.",
+        "testStrategy": "Generate traffic through proxy, open Analytics tab, verify all charts render correctly with real data, verify cost calculations match expected values",
+        "subtasks": []
+      },
+      {
+        "id": "28",
+        "title": "Complete Circuit Breaker Integration",
+        "description": "Circuit breaker module exists (src/core/circuitBreaker.js) but not fully integrated into request flow. Wire it into proxy request handler to prevent cascading failures and protect providers from being hammered.",
+        "status": "pending",
+        "priority": "high",
+        "dependencies": [
+          "11"
+        ],
+        "details": "Integrate circuit breaker check before routing requests to provider. Add circuit breaker state tracking (closed, open, half-open). Implement probe request logic for half-open state. Add UI indicators for circuit breaker state per provider with manual reset button.",
+        "testStrategy": "Trigger multiple failures for a provider, verify circuit opens, verify requests rejected immediately, wait for timeout, verify half-open probe, verify circuit closes on success",
+        "subtasks": []
+      },
+      {
+        "id": "29",
+        "title": "Complete Fallback Provider Routing",
+        "description": "Fallback router exists (src/core/fallbackRouter.js) but not fully integrated. Add configuration UI and wire into request flow to automatically fallback to alternative provider if primary fails.",
+        "status": "pending",
+        "priority": "high",
+        "dependencies": [
+          "9"
+        ],
+        "details": "Add fallback configuration UI in admin panel with visual chain editor. Implement fallback chain configuration (provider -> model -> fallback provider + model). Wire fallback logic into proxy request handler with proper error handling. Add fallback metrics and logging to track fallback usage.",
+        "testStrategy": "Configure fallback chain (groq -> openai), disable groq keys, send request to groq endpoint, verify automatic fallback to openai, verify response success",
+        "subtasks": []
+      },
+      {
+        "id": "30",
+        "title": "Comprehensive Testing Suite",
+        "description": "Currently only 4 test files with ~10% coverage. Add comprehensive unit tests, integration tests, and end-to-end tests for routes, providers, core modules, and proxy flow.",
+        "status": "pending",
+        "priority": "high",
+        "dependencies": [],
+        "details": "Add unit tests for all core modules (config, keyRotator, analytics, etc.). Add integration tests for admin API endpoints. Add end-to-end tests for proxy request flow. Add performance tests for key rotation and health checks. Set up test coverage reporting (target: 80%).",
+        "testStrategy": "Run npm test, verify all test suites pass, verify coverage report shows >80% coverage across all modules",
+        "subtasks": []
+      },
+      {
+        "id": "31",
+        "title": "Enhanced Provider Management UI with Last Check Time and Reset Functionality",
+        "description": "Enhance the Provider Management table with additional fields and functionality: add 'Last Check' timestamp column showing when each provider was last health-checked, implement 'Reset' button functionality to clear provider state and force re-check, add clickable provider names that navigate to API Keys tab for quick configuration access.",
+        "status": "pending",
+        "priority": "high",
+        "dependencies": [
+          "3"
+        ],
+        "details": "Add 'Last Check' column to provider table showing timestamp of last health check (format: 'X minutes ago' or 'HH:MM:SS'). Implement Reset button functionality: clear circuit breaker state, reset error counters, clear cached health status, force immediate health check. Add click handler to provider name cells that switches to 'API Keys' tab and optionally filters/highlights the selected provider. Update HealthMonitor to track lastCheckTime per provider. Add API endpoint POST /admin/api/providers/:name/reset for reset functionality. Add visual feedback (loading spinner) during reset operation. Store lastCheckTime in health check results and persist to memory.",
+        "testStrategy": "1) Open Management tab, verify 'Last Check' column shows timestamps for all providers. 2) Click Reset button on a provider, verify loading indicator appears, verify provider state clears, verify immediate health check triggered. 3) Click on provider name, verify navigation to API Keys tab. 4) Verify Last Check timestamp updates after each health check cycle.",
+        "subtasks": [
+          {
+            "id": 31.1,
+            "title": "Add lastCheckTime tracking to HealthMonitor",
+            "status": "pending",
+            "details": "Modify src/core/healthCheck.js to track lastCheckTime timestamp for each provider during health checks. Store in healthResults map.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 31.2,
+            "title": "Add Last Check column to provider table UI",
+            "status": "pending",
+            "details": "Update public/admin.html Management tab table to include 'Last Check' column. Format timestamp as relative time (e.g., '2 minutes ago') or absolute time.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 31.3,
+            "title": "Implement Reset button functionality",
+            "status": "pending",
+            "details": "Add POST /admin/api/providers/:name/reset endpoint in src/server.js. Reset circuit breaker, clear error counters, force health check. Add loading state to Reset button in UI.",
+            "parentId": "undefined"
+          },
+          {
+            "id": 31.4,
+            "title": "Add provider name click navigation",
+            "status": "pending",
+            "details": "Make provider names in Management table clickable. Add click handler that switches to 'API Keys' tab and optionally highlights the provider section.",
+            "parentId": "undefined"
+          }
+        ]
       }
     ],
     "metadata": {
       "version": "1.0.0",
-      "lastModified": "2026-04-21T14:57:32.261Z",
-      "taskCount": 20,
-      "completedCount": 20,
+      "lastModified": "2026-04-23T18:27:33.015Z",
+      "taskCount": 31,
+      "completedCount": 21,
       "tags": [
         "master"
       ]

@@ -426,6 +426,28 @@ async function handleProxyRequest(server, req, res, body) {
     return;
   }
 
+  // Model filtering — reject requests with models not in the allowed list
+  if (provider && provider.allowedModels && provider.allowedModels.length > 0) {
+    try {
+      const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+      if (parsed.model) {
+        const requestedModel = parsed.model;
+        const isAllowed = provider.allowedModels.some(m =>
+          requestedModel === m || requestedModel.startsWith(m + '-') || m.startsWith(requestedModel + '-')
+        );
+        if (!isAllowed) {
+          console.log(`[REQ-${requestId}] Model '${requestedModel}' not in allowed list for '${providerName}'`);
+          if (isApiCall) {
+            const responseTime = Date.now() - startTime;
+            server.logApiRequest(requestId, req.method, apiPath, providerName, 403, responseTime, `Model '${requestedModel}' not allowed`, clientIp);
+          }
+          sendError(res, 403, `Model '${requestedModel}' is not allowed for provider '${providerName}'. Allowed models: ${provider.allowedModels.join(', ')}`);
+          return;
+        }
+      }
+    } catch {}
+  }
+
   console.log(`[REQ-${requestId}] Proxying to provider '${providerName}' (${apiType.toUpperCase()}): ${apiPath}`);
 
   // Get the appropriate header based on API type

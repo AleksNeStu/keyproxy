@@ -23,6 +23,7 @@ const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHisto
 const { handleToggleProvider, handleToggleSyncEnv, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleTestApiKey } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
+const { handleFetchModels, handleSaveModels } = require('./routes/adminModels');
 const { parseRoute, handleProxyRequest } = require('./routes/proxy');
 
 class ProxyServer {
@@ -495,6 +496,12 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/lb-weight' && req.method === 'POST') {
       return handleSetLbWeight(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/models' && req.method === 'GET') {
+      return handleFetchModels(this, req, res);
+    }
+    if (adminPath === '/admin/api/models' && req.method === 'POST') {
+      return handleSaveModels(this, req, res, body);
     }
 
     sendError(res, 404, 'Not found');

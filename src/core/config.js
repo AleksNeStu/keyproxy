@@ -242,7 +242,7 @@ class Config {
     // Parse {API_TYPE}_{PROVIDER}_API_KEYS, {API_TYPE}_{PROVIDER}_BASE_URL, and {API_TYPE}_{PROVIDER}_ACCESS_KEY format
     const providerConfigs = new Map();
 
-    const defaultConfig = () => ({ apiType: null, keys: [], allKeys: [], baseUrl: null, accessKey: null, defaultModel: null, disabled: false });
+    const defaultConfig = () => ({ apiType: null, keys: [], allKeys: [], baseUrl: null, accessKey: null, defaultModel: null, allowedModels: [], disabled: false });
 
     for (const [key, value] of Object.entries(envVars)) {
       if (key.endsWith('_API_KEYS') && value) {
@@ -320,6 +320,18 @@ class Config {
           }
 
           providerConfigs.get(provider).syncEnv = (value.trim().toLowerCase() === 'true');
+        }
+      } else if (key.endsWith('_ALLOWED_MODELS') && value) {
+        const parts = key.replace('_ALLOWED_MODELS', '').split('_');
+        if (parts.length >= 1) {
+          const apiType = parts[0].toLowerCase();
+          const provider = parts.length === 1 ? apiType : parts.slice(1).join('_').toLowerCase();
+
+          if (!providerConfigs.has(provider)) {
+            providerConfigs.set(provider, defaultConfig());
+          }
+
+          providerConfigs.get(provider).allowedModels = value.split(',').map(s => s.trim()).filter(Boolean);
         }
       }
     }
