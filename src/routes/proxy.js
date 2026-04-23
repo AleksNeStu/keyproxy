@@ -543,6 +543,13 @@ async function handleProxyRequest(server, req, res, body) {
           provider: providerName, statusCode: response.statusCode, latencyMs: responseTime,
           requestBody: body, responseBody: streamedData, apiKey: keyInfo?.actualKey, apiType
         });
+        // Circuit breaker tracking for streaming responses
+        if (response.statusCode >= 500 || response.statusCode === 429) {
+          server.circuitBreaker.recordFailure(providerName);
+        } else {
+          server.circuitBreaker.recordSuccess(providerName);
+        }
+
         if (keyInfo?.actualKey) server.rpmTracker.record(keyInfo.actualKey);
         recordBudgetSpend(server, keyInfo?.actualKey, body, streamedData, apiType);
       }
@@ -551,6 +558,7 @@ async function handleProxyRequest(server, req, res, body) {
 
     response.stream.on('error', (err) => {
       console.log(`[REQ-${requestId}] Streaming error: ${err.message}`);
+      server.circuitBreaker.recordFailure(providerName);
       if (!res.headersSent) {
         sendError(res, 502, 'Streaming error');
       }
