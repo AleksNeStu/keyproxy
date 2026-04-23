@@ -1,14 +1,16 @@
 const https = require('https');
+const crypto = require('crypto');
 const { URL } = require('url');
 const { maskApiKey, sleep } = require('../core/utils');
 
 class BaseProvider {
-  constructor(keyRotator, baseUrl, providerName, retryConfig = null, timeoutMs = 60000) {
+  constructor(keyRotator, baseUrl, providerName, retryConfig = null, timeoutMs = 60000, budgetTracker = null) {
     this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
     this.providerName = providerName;
     this.retryConfig = retryConfig || { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };
     this.timeoutMs = timeoutMs;
+    this.budgetTracker = budgetTracker;
   }
 
   /**
@@ -51,6 +53,19 @@ class BaseProvider {
     while ((apiKey = requestContext.getNextKey()) !== null && attempt < maxRetries) {
       attempt++;
       const maskedKey = maskApiKey(apiKey);
+
+      // Budget check: skip keys that have exceeded their daily/monthly budget
+      if (this.budgetTracker) {
+        const keyHash = crypto.createHash('sha256').update(apiKey).digest('hex').substring(0, 16);
+        const budgetStatus = this.budgetTracker.checkBudget(keyHash);
+        if (!budgetStatus.allowed) {
+          const limitInfo = budgetStatus.dailyLimit ? 'daily' : 'monthly';
+          console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] Budget exceeded (${limitInfo}: $${budgetStatus.dailyLimit ? budgetStatus.dailySpent.toFixed(2) + '/' + budgetStatus.dailyLimit : budgetStatus.monthlySpent.toFixed(2) + '/' + budgetStatus.monthlyLimit}) - trying next key`);
+          requestContext.markKeyAsRateLimited(apiKey);
+          failedKeys.push({ key: maskedKey, status: 429, reason: `budget_exceeded_${limitInfo}` });
+          continue;
+        }
+      }
 
       console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] Attempting ${method} ${requestPath}${streaming ? ' (streaming)' : ''}`);
 
