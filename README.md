@@ -27,9 +27,10 @@
 
 ## 🚀 Quick Start
 
-### Installation
+<details>
+<summary><b>📦 Installation (Windows, Linux, Docker)</b></summary>
 
-#### Windows (PowerShell)
+### Windows (PowerShell)
 ```powershell
 # Install as Windows service (starts on boot)
 ./manage.ps1 install
@@ -41,7 +42,7 @@
 ./manage.ps1 logs
 ```
 
-#### Linux (Systemd)
+### Linux (Systemd)
 ```bash
 # Install as systemd service
 sudo ./manage.sh install
@@ -53,7 +54,7 @@ sudo ./manage.sh status
 sudo ./manage.sh logs
 ```
 
-#### Docker
+### Docker
 ```bash
 # Using Docker Compose
 docker compose up -d
@@ -62,7 +63,10 @@ docker compose up -d
 docker compose logs -f
 ```
 
-### Configuration
+</details>
+
+<details>
+<summary><b>⚙️ Configuration</b></summary>
 
 1. **Copy environment template:**
    ```bash
@@ -92,9 +96,14 @@ docker compose logs -f
    Default password: admin123
    ```
 
+</details>
+
 ---
 
 ## 🏗️ Architecture
+
+<details>
+<summary><b>View System Architecture Diagram</b></summary>
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -128,13 +137,17 @@ docker compose logs -f
 └─────────────────────────────────────────────────────────────┘
 ```
 
+</details>
+
 ---
 
 ## 🎨 Admin Panel Features
 
 ### 📊 Available Tabs
 
-#### 1. **API Keys** — Provider & Key Management
+<details>
+<summary><b>1. API Keys — Provider & Key Management</b></summary>
+
 - ✅ View all configured providers (OpenAI, Gemini, Tavily, etc.)
 - ✅ Enable/disable individual keys
 - ✅ Reorder keys for rotation priority
@@ -145,13 +158,21 @@ docker compose logs -f
 - ✅ Fetch and configure available models per provider
 - ✅ Toggle provider sync to environment
 
-#### 2. **API Logs** — Request Monitoring
+</details>
+
+<details>
+<summary><b>2. API Logs — Request Monitoring</b></summary>
+
 - ✅ Real-time request logs (last 100 entries)
 - ✅ View request details: method, endpoint, status, latency
 - ✅ Filter by provider, status code
 - ✅ Response inspection for debugging
 
-#### 3. **Management** — Provider Health Dashboard
+</details>
+
+<details>
+<summary><b>3. Management — Provider Health Dashboard</b></summary>
+
 - ✅ Provider health status (Active, Degraded, Failed, Disabled)
 - ✅ Key counts: Total, Enabled, Disabled, Exhausted
 - ✅ Request statistics per provider
@@ -160,7 +181,11 @@ docker compose logs -f
 - ✅ Manual health check trigger
 - ✅ Provider reset functionality
 
-#### 4. **Analytics** — Usage & Cost Tracking
+</details>
+
+<details>
+<summary><b>4. Analytics — Usage & Cost Tracking</b></summary>
+
 - ✅ Request count tracking
 - ✅ Token usage estimation (input/output)
 - ✅ Cost estimation per provider/key
@@ -169,7 +194,11 @@ docker compose logs -f
 - ✅ Model breakdown
 - ⏳ Charts visualization (planned)
 
-#### 5. **Virtual Keys** — Scoped Access Control
+</details>
+
+<details>
+<summary><b>5. Virtual Keys — Scoped Access Control</b></summary>
+
 - ✅ Generate virtual API keys (vk-xxxx format)
 - ✅ Provider whitelist per virtual key
 - ✅ Model whitelist per virtual key
@@ -178,14 +207,22 @@ docker compose logs -f
 - ✅ Enable/disable virtual keys
 - ✅ Revoke virtual keys
 
-#### 6. **Budgets** — Spend Management
+</details>
+
+<details>
+<summary><b>6. Budgets — Spend Management</b></summary>
+
 - ✅ Set daily/monthly budget per key
 - ✅ Auto-disable keys when budget exceeded
 - ✅ Budget tracking and alerts
 - ✅ Reset budget counters
 - ✅ View available keys for budget assignment
 
-#### 7. **Configuration** — Environment Management
+</details>
+
+<details>
+<summary><b>7. Configuration — Environment Management</b></summary>
+
 - ✅ Multi-environment support (.env files)
 - ✅ Add/remove environment files
 - ✅ Switch between environments
@@ -195,7 +232,11 @@ docker compose logs -f
 - ✅ Hot reload configuration
 - ✅ Import/export configuration backup
 
-### ⚙️ Settings Modal
+</details>
+
+<details>
+<summary><b>⚙️ Settings Modal</b></summary>
+
 - ✅ Change admin password
 - ✅ Telegram bot configuration
 - ✅ Slack webhook notifications
@@ -207,9 +248,14 @@ docker compose logs -f
 - ✅ Load balancing strategy (round-robin, weighted-random, least-used)
 - ✅ Key weight configuration
 
+</details>
+
 ---
 
 ## 🔄 How Key Rotation Works
+
+<details>
+<summary><b>View Rotation Flow</b></summary>
 
 1. **Request arrives** → KeyProxy receives API request
 2. **Select key** → Choose next healthy key using load balancing strategy
@@ -225,9 +271,14 @@ docker compose logs -f
 - **Weighted-random** — Assign weights to prioritize certain keys
 - **Least-used** — Route to key with lowest request count
 
+</details>
+
 ---
 
 ## 🧩 Supported Providers
+
+<details>
+<summary><b>View All Supported Providers</b></summary>
 
 ### LLM Providers
 - ✅ **OpenAI** — GPT-4, GPT-3.5, embeddings
@@ -246,34 +297,37 @@ docker compose logs -f
 - ✅ **Context7** — Documentation search
 - ✅ **RTFM** — Package documentation
 
+</details>
+
 ---
 
 ## 🛠️ Advanced Features
 
-### ✅ Implemented
+<details>
+<summary><b>✅ Implemented Features</b></summary>
 
-#### Health Monitoring & Auto-Recovery
+### Health Monitoring & Auto-Recovery
 - Real-time provider health checks (every 5 minutes)
 - Automatic recovery of exhausted keys after cooldown
 - Exponential backoff for failed recovery attempts
 - Max recovery attempts limit (default: 5)
 - Configurable cooldown period (default: 5 minutes)
 
-#### Circuit Breaker
+### Circuit Breaker
 - Per-provider circuit breaker pattern
 - Threshold: 5 consecutive failures (configurable)
 - Timeout: 30 seconds before retry (configurable)
 - States: Closed → Open → Half-Open → Closed
 - Manual reset via admin panel
 
-#### Response Caching
+### Response Caching
 - In-memory LRU cache for repeated requests
 - Configurable TTL (default: 300 seconds)
 - Configurable max entries (default: 1000)
 - X-Cache HIT/MISS headers
 - Enable/disable per provider
 
-#### Virtual API Keys
+### Virtual API Keys
 - Generate scoped virtual keys (vk-xxxx format)
 - Provider whitelist
 - Model whitelist
@@ -281,33 +335,33 @@ docker compose logs -f
 - Expiration dates
 - Enable/disable/revoke functionality
 
-#### Budget Tracking
+### Budget Tracking
 - Daily/monthly spend caps per key
 - Auto-disable when cap reached
 - Notification on budget exceeded
 - Reset counters
 - Cost estimation based on token usage
 
-#### Key Exclusion Manager
+### Key Exclusion Manager
 - Exclude specific keys from environment sync
 - Pattern-based exclusion (regex support)
 - Test exclusion patterns
 - Enable/disable exclusions
 
-#### Fallback Routing
+### Fallback Routing
 - Cross-provider failover configuration
 - Fallback chains (provider → fallback provider)
 - Model mapping for fallbacks
 - Max fallback depth: 2
 
-#### Configuration Management
+### Configuration Management
 - Multi-environment support
 - Import/export configuration
 - Hot reload without restart
 - File system browser
 - Drag-and-drop priority ordering
 
-#### Security
+### Security
 - Scrypt password hashing
 - CSRF token protection
 - Input validation (Joi schemas)
@@ -315,7 +369,7 @@ docker compose logs -f
 - Session-based authentication
 - Security headers (CSP, X-Frame-Options, etc.)
 
-#### Analytics
+### Analytics
 - Request count tracking
 - Token usage estimation
 - Cost estimation per provider/key
@@ -324,20 +378,23 @@ docker compose logs -f
 - Model breakdown
 - Date range filtering
 
-#### Notifications
+### Notifications
 - Telegram bot integration
 - Slack webhook support
 - Configurable event triggers
 - Test notification functionality
 
-#### Prometheus Metrics
+### Prometheus Metrics
 - `/metrics` endpoint for monitoring
 - Request counters by provider/status
 - Latency histograms
 - Key rotation counters
 - Error counters by type
 
-### ⏳ Planned (See Roadmap)
+</details>
+
+<details>
+<summary><b>⏳ Planned Features</b></summary>
 
 - Analytics charts visualization (Task #27)
 - Complete circuit breaker UI integration (Task #28)
@@ -345,11 +402,15 @@ docker compose logs -f
 - Collapsible provider sections (Task #32)
 - Comprehensive testing suite (Task #30)
 
+</details>
+
 ---
 
 ## 📦 Deployment Options
 
-### Windows Service
+<details>
+<summary><b>Windows Service</b></summary>
+
 ```powershell
 # Install
 ./manage.ps1 install
@@ -358,7 +419,11 @@ docker compose logs -f
 # Logs: daemon/keyproxy.out.log
 ```
 
-### Linux Systemd
+</details>
+
+<details>
+<summary><b>Linux Systemd</b></summary>
+
 ```bash
 # Install
 sudo ./manage.sh install
@@ -367,7 +432,11 @@ sudo ./manage.sh install
 # Logs: journalctl -u keyproxy -f
 ```
 
-### Docker
+</details>
+
+<details>
+<summary><b>Docker</b></summary>
+
 ```yaml
 # docker-compose.yml
 version: '3.8'
@@ -387,9 +456,14 @@ services:
       retries: 3
 ```
 
+</details>
+
 ---
 
 ## 🔐 Security Best Practices
+
+<details>
+<summary><b>View Security Checklist</b></summary>
 
 1. **Change default password** immediately after first login
 2. **Use strong passwords** — Minimum 12 characters, mixed case, numbers, symbols
@@ -398,6 +472,8 @@ services:
 5. **Never commit secrets** — Keep `.env` and `data/` in `.gitignore`
 6. **Regular backups** — Export configuration regularly
 7. **Monitor logs** — Check for suspicious activity
+
+</details>
 
 ---
 
@@ -408,18 +484,6 @@ services:
 - **Memory usage**: ~50-100MB (depends on cache size)
 - **Key rotation**: <100ms failover time
 - **Health checks**: Every 5 minutes (configurable)
-
----
-
-## 🧪 Testing
-
-```bash
-# Run all tests
-npm test
-
-# Run specific test suite
-node --test test/core/auth.test.js
-```
 
 ---
 
@@ -437,7 +501,9 @@ node --test test/core/auth.test.js
 
 ## 🛣️ Roadmap
 
-### ✅ Completed (23 tasks)
+<details>
+<summary><b>✅ Completed (23 tasks)</b></summary>
+
 - [x] Secure password storage with scrypt
 - [x] Multi-environment configuration
 - [x] Provider health monitoring
@@ -462,7 +528,11 @@ node --test test/core/auth.test.js
 - [x] RPM tracking per key
 - [x] Configuration import/export
 
-### 🚧 In Progress (10 tasks)
+</details>
+
+<details>
+<summary><b>🚧 In Progress (10 tasks)</b></summary>
+
 - [ ] Settings section enhancement (Task #22)
 - [ ] API rate limiting improvements (Task #25)
 - [ ] Enhanced auto-recovery UI (Task #26)
@@ -474,12 +544,18 @@ node --test test/core/auth.test.js
 - [ ] Collapsible provider sections (Task #32)
 - [ ] Move Settings to tab level (Task #33)
 
-### 📋 Planned
+</details>
+
+<details>
+<summary><b>📋 Planned</b></summary>
+
 - [ ] Screenshots for README (Task #34 - after UI completion)
 - [ ] WebSocket support for real-time updates
 - [ ] Multi-user support with RBAC
 - [ ] Audit logging
 - [ ] Grafana dashboard templates
+
+</details>
 
 ---
 
