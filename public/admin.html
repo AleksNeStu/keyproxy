@@ -1234,6 +1234,50 @@
                         </p>
                     </div>
                 </div>
+
+                <!-- Key Sync Exclusions -->
+                <div class="section mt-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-sm font-medium text-foreground">Key Sync Exclusions</h3>
+                            <p class="text-[11px] text-muted-foreground mt-0.5">Exclude environment variable patterns from destination sync (Windows env, file sync)</p>
+                        </div>
+                    </div>
+                    <div class="border border-border rounded p-4 bg-muted/30">
+                        <!-- Patterns list -->
+                        <div id="exclusionPatternsList" class="space-y-2 mb-4">
+                            <div class="text-center text-muted-foreground text-sm py-4">Loading exclusion patterns...</div>
+                        </div>
+
+                        <!-- Add new pattern -->
+                        <details class="mb-3">
+                            <summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">+ Add exclusion pattern</summary>
+                            <div class="mt-2 space-y-2">
+                                <div class="flex items-center gap-2">
+                                    <input type="text" id="exclusionPatternInput" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Pattern (e.g. CLOUDFLARE_* or ^INTERNAL_.*$)">
+                                    <select id="exclusionTypeSelect" class="input-field px-2 py-1.5 text-sm rounded" style="min-width: 80px;">
+                                        <option value="auto">Auto</option>
+                                        <option value="glob">Glob</option>
+                                        <option value="regex">Regex</option>
+                                    </select>
+                                    <input type="text" id="exclusionDescInput" class="input-field w-1/4 px-2 py-1.5 text-sm rounded" placeholder="Description (optional)">
+                                    <button onclick="addExclusion()" class="btn btn-primary px-3 py-1.5 text-sm">Add</button>
+                                </div>
+                                <p class="text-[11px] text-muted-foreground">Glob: use <code class="text-foreground">*</code> and <code class="text-foreground">?</code> wildcards (e.g. <code class="text-foreground">CLOUDFLARE_*</code>). Regex: full JavaScript regex (e.g. <code class="text-foreground">^INTERNAL_.*_SECRET$</code>).</p>
+                            </div>
+                        </details>
+
+                        <!-- Test pattern -->
+                        <div class="pt-3 border-t border-border">
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-muted-foreground">Test:</span>
+                                <input type="text" id="exclusionTestInput" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Enter env var name to test (e.g. CLOUDFLARE_API_KEY)">
+                                <button onclick="testExclusion()" class="btn btn-secondary px-3 py-1.5 text-sm">Test</button>
+                                <span id="exclusionTestResult" class="text-xs"></span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
         </main>
@@ -2740,6 +2784,162 @@
             } catch (err) {
                 showErrorToast('Failed to remove: ' + err.message);
             }
+        }
+
+        // ─── Exclusion Patterns ────
+
+        let exclusionPatterns = [];
+
+        async function loadExclusions() {
+            try {
+                const res = await fetch('/admin/api/exclusions');
+                const data = await res.json();
+                exclusionPatterns = data.patterns || [];
+                renderExclusionsTable();
+            } catch (err) {
+                const list = document.getElementById('exclusionPatternsList');
+                if (list) list.innerHTML = '<div class="text-center text-muted-foreground text-sm py-4">Failed to load exclusions</div>';
+            }
+        }
+
+        function renderExclusionsTable() {
+            const list = document.getElementById('exclusionPatternsList');
+            if (!list) return;
+
+            if (exclusionPatterns.length === 0) {
+                list.innerHTML = '<div class="text-center text-muted-foreground text-sm py-4">No exclusion patterns configured</div>';
+                return;
+            }
+
+            list.innerHTML = exclusionPatterns.map(p => {
+                const typeBadge = p.type === 'regex'
+                    ? '<span class="px-1.5 py-0.5 text-[10px] bg-purple-500/20 text-purple-400 rounded">regex</span>'
+                    : '<span class="px-1.5 py-0.5 text-[10px] bg-blue-500/20 text-blue-400 rounded">glob</span>';
+                const enabledBadge = p.enabled
+                    ? '<span class="px-1.5 py-0.5 text-[10px] bg-green-500/20 text-green-400 rounded">active</span>'
+                    : '<span class="px-1.5 py-0.5 text-[10px] bg-red-500/20 text-red-400 rounded">disabled</span>';
+
+                return `
+                    <div class="flex items-center gap-3 p-2 rounded ${p.enabled ? 'bg-card' : 'bg-card opacity-60'}">
+                        <code class="text-sm font-mono flex-1 text-foreground">${escapeHtml(p.pattern)}</code>
+                        ${typeBadge}
+                        ${enabledBadge}
+                        ${p.description ? `<span class="text-[11px] text-muted-foreground truncate max-w-[200px]">${escapeHtml(p.description)}</span>` : ''}
+                        <button onclick="toggleExclusion('${p.id}')" class="p-1 text-muted-foreground hover:text-foreground" title="${p.enabled ? 'Disable' : 'Enable'}">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="${p.enabled ? 'M18.364 18.364A9 9 0 015.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636' : 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z'}"/></svg>
+                        </button>
+                        <button onclick="removeExclusion('${p.id}')" class="p-1 text-muted-foreground hover:text-red-500" title="Remove">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                        </button>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function addExclusion() {
+            const patternInput = document.getElementById('exclusionPatternInput');
+            const typeSelect = document.getElementById('exclusionTypeSelect');
+            const descInput = document.getElementById('exclusionDescInput');
+
+            const pattern = patternInput.value.trim();
+            if (!pattern) {
+                showErrorToast('Enter a pattern');
+                return;
+            }
+
+            try {
+                const body = { pattern };
+                if (typeSelect.value !== 'auto') body.type = typeSelect.value;
+                if (descInput.value.trim()) body.description = descInput.value.trim();
+
+                const res = await fetch('/admin/api/exclusions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (data.success) {
+                    patternInput.value = '';
+                    descInput.value = '';
+                    typeSelect.value = 'auto';
+                    showSuccessToast(`Pattern "${pattern}" added`);
+                    loadExclusions();
+                } else {
+                    showErrorToast(data.error || 'Failed to add pattern');
+                }
+            } catch (err) {
+                showErrorToast('Failed to add: ' + err.message);
+            }
+        }
+
+        async function removeExclusion(id) {
+            try {
+                const res = await fetch('/admin/api/exclusions', {
+                    method: 'DELETE',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showSuccessToast('Pattern removed');
+                    loadExclusions();
+                } else {
+                    showErrorToast(data.error || 'Failed to remove');
+                }
+            } catch (err) {
+                showErrorToast('Failed to remove: ' + err.message);
+            }
+        }
+
+        async function toggleExclusion(id) {
+            try {
+                const res = await fetch('/admin/api/exclusions/toggle', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    showSuccessToast(`Pattern ${data.pattern.enabled ? 'enabled' : 'disabled'}`);
+                    loadExclusions();
+                } else {
+                    showErrorToast(data.error || 'Failed to toggle');
+                }
+            } catch (err) {
+                showErrorToast('Failed to toggle: ' + err.message);
+            }
+        }
+
+        async function testExclusion() {
+            const input = document.getElementById('exclusionTestInput');
+            const result = document.getElementById('exclusionTestResult');
+            const name = input.value.trim();
+            if (!name) {
+                result.textContent = '';
+                return;
+            }
+
+            try {
+                const res = await fetch('/admin/api/exclusions/test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name })
+                });
+                const data = await res.json();
+                if (data.excluded) {
+                    result.innerHTML = '<span class="text-red-400 font-medium">BLOCKED</span> <span class="text-muted-foreground">by ' + escapeHtml(data.matchedBy) + '</span>';
+                } else {
+                    result.innerHTML = '<span class="text-green-400 font-medium">ALLOWED</span>';
+                }
+            } catch (err) {
+                result.textContent = 'Error: ' + err.message;
+            }
+        }
+
+        function escapeHtml(str) {
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
         }
 
         let originalValues = {};
@@ -5551,6 +5751,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             // Load configuration if configuration tab is selected
             if (tabName === 'configuration') {
                 loadConfiguration();
+                loadExclusions();
             }
         }
         

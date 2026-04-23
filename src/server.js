@@ -27,6 +27,7 @@ const { handleToggleProvider, handleToggleSyncEnv, handleGetHealth, handleHealth
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
 const { handleFetchModels, handleSaveModels } = require('./routes/adminModels');
+const { handleGetExclusions, handleAddExclusion, handleRemoveExclusion, handleToggleExclusion, handleTestExclusion } = require('./routes/adminExclusions');
 const { parseRoute, handleProxyRequest } = require('./routes/proxy');
 
 class ProxyServer {
@@ -608,6 +609,23 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/models' && req.method === 'POST') {
       return handleSaveModels(this, req, res, body);
+    }
+
+    // Exclusion pattern management
+    if (adminPath === '/admin/api/exclusions' && req.method === 'GET') {
+      return handleGetExclusions(this, res);
+    }
+    if (adminPath === '/admin/api/exclusions' && req.method === 'POST') {
+      return handleAddExclusion(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/exclusions' && req.method === 'DELETE') {
+      return handleRemoveExclusion(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/exclusions/toggle' && req.method === 'POST') {
+      return handleToggleExclusion(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/exclusions/test' && req.method === 'POST') {
+      return handleTestExclusion(this, req, res, body);
     }
 
     sendError(res, 404, 'Not found');
