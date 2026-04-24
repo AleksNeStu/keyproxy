@@ -265,7 +265,11 @@ async function handleTestApiKey(server, req, res, body) {
     const { apiType, apiKey, baseUrl } = JSON.parse(body);
     let testResult = { success: false, error: 'Unknown API type' };
 
-    if (apiType === 'gemini') {
+    // MCP providers (search/parse services) - validate key format only
+    const mcpProviders = ['brave', 'tavily', 'exa', 'firecrawl', 'context7', 'jina', 'searchapi', 'onref'];
+    if (mcpProviders.includes(apiType.toLowerCase())) {
+      testResult = validateMcpKey(apiType, apiKey);
+    } else if (apiType === 'gemini') {
       testResult = await testGeminiKey(server, apiKey, baseUrl);
     } else if (apiType === 'openai') {
       testResult = await testOpenaiKey(server, apiKey, baseUrl);
@@ -403,6 +407,43 @@ async function testOpenaiKey(server, apiKey, baseUrl = null) {
 
     return { success: false, error: error.message };
   }
+}
+
+/**
+ * Validate MCP provider API key format.
+ * MCP providers (search/parse services) don't have standard /models endpoints,
+ * so we just validate the key format and confirm it's loaded.
+ */
+function validateMcpKey(apiType, apiKey) {
+  if (!apiKey || typeof apiKey !== 'string') {
+    return {
+      success: false,
+      error: 'Invalid API key format'
+    };
+  }
+
+  // Basic validation: key should be non-empty and reasonable length
+  if (apiKey.trim().length < 10) {
+    return {
+      success: false,
+      error: 'API key too short (minimum 10 characters)'
+    };
+  }
+
+  // Check for common placeholder values
+  const placeholders = ['your-api-key', 'your_api_key', 'api-key-here', 'replace-me', 'xxx', 'test'];
+  if (placeholders.some(p => apiKey.toLowerCase().includes(p))) {
+    return {
+      success: false,
+      error: 'API key appears to be a placeholder value'
+    };
+  }
+
+  // Key format looks valid
+  return {
+    success: true,
+    message: `${apiType.toUpperCase()} API key format validated. Key is loaded and ready for use. Note: MCP providers don't support endpoint testing, but the key will be used for actual requests.`
+  };
 }
 
 module.exports = {
