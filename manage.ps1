@@ -141,7 +141,34 @@ switch ($Command) {
         $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
         if ($svc) {
             Assert-Admin
-            Restart-Service -Name $ServiceName -Force
+
+            # Force-kill any process on the port before restarting
+            $conns = netstat -ano 2>$null | findstr ":$Port.*LISTENING"
+            if ($conns) {
+                $pidStr = ((($conns -split "`n")[0].Trim() -split '\s+')[-1])
+                if ($pidStr -match '^\d+$' -and [int]$pidStr -ne 0) {
+                    Write-Host "Killing existing process on port $Port (PID: $pidStr)..." -ForegroundColor Gray
+                    Stop-Process -Id ([int]$pidStr) -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 2
+                }
+            }
+
+            # Stop service cleanly, then kill if hung
+            Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+
+            # Double-check port is free
+            $conns2 = netstat -ano 2>$null | findstr ":$Port.*LISTENING"
+            if ($conns2) {
+                $pidStr2 = ((($conns2 -split "`n")[0].Trim() -split '\s+')[-1])
+                if ($pidStr2 -match '^\d+$' -and [int]$pidStr2 -ne 0) {
+                    Write-Host "Process still alive, force-killing PID: $pidStr2..." -ForegroundColor Yellow
+                    Stop-Process -Id ([int]$pidStr2) -Force -ErrorAction SilentlyContinue
+                    Start-Sleep -Seconds 2
+                }
+            }
+
+            Start-Service -Name $ServiceName
             Start-Sleep -Seconds 2
             $svc = Get-Service -Name $ServiceName
             Write-Host "Service restarted (Status: $($svc.Status))." -ForegroundColor Green
