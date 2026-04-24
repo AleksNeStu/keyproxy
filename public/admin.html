@@ -515,13 +515,6 @@
                         </span>
                     </div>
                     <div class="flex items-center space-x-3">
-                        <!-- Settings Button -->
-                        <button onclick="openSettingsModal()" class="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-muted transition-colors" title="Settings">
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                        </button>
                         <!-- Dark Mode Toggle -->
                         <div class="flex items-center space-x-1.5">
                             <svg class="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -550,7 +543,7 @@
         <div id="navigationTabs" class="header-bg border-b border-border sticky-nav-tabs">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between">
-                    <nav class="flex space-x-6">
+                    <nav class="flex space-x-4 overflow-x-auto">
                         <button 
                             onclick="showTab('environment')" 
                             class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors active flex items-center space-x-2"
@@ -622,6 +615,17 @@
                             </svg>
                             <span class="text-sm">Configuration</span>
                         </button>
+                        <button
+                            onclick="showTab('settings')"
+                            class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
+                            data-tab="settings"
+                        >
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                            </svg>
+                            <span class="text-sm">Settings</span>
+                        </button>
                     </nav>
                     
                     <!-- Header Notifications Area (placeholder for positioning) -->
@@ -656,7 +660,7 @@
                     <div class="flex items-center justify-between mb-3">
                         <div>
                             <h3 class="text-sm font-medium text-foreground">Per-Provider Retry Overrides</h3>
-                            <p class="text-xs text-muted-foreground mt-0.5">Leave empty to use global settings (configured in Settings modal)</p>
+                            <p class="text-xs text-muted-foreground mt-0.5">Leave empty to use global settings (configured in Settings tab)</p>
                         </div>
                         <button onclick="saveRetryConfig(this)" class="btn btn-primary px-3 py-1 text-xs">Save Overrides</button>
                     </div>
@@ -674,7 +678,7 @@
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                 </svg>
-                                <span>Providers using global settings show empty fields. Configure global defaults in <button onclick="openSettingsModal()" class="text-primary hover:underline font-medium">Settings</button>.</span>
+                                <span>Providers using global settings show empty fields. Configure global defaults in <button onclick="showTab('settings')" class="text-primary hover:underline font-medium">Settings</button>.</span>
                             </p>
                         </div>
                     </div>
@@ -1275,6 +1279,257 @@
                                 <button onclick="testExclusion()" class="btn btn-secondary px-3 py-1.5 text-sm">Test</button>
                                 <span id="exclusionTestResult" class="text-xs"></span>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content hidden">
+                <div class="section-header">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-lg font-semibold text-foreground">Settings</h2>
+                            <p class="text-muted-foreground text-xs mt-1">Global configuration, security, notifications, and integrations</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="space-y-5">
+                    <!-- Default Status Codes Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Key Rotation
+                        </h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">Default Status Codes to Rotate <span class="text-muted-foreground font-normal">(comma-separated)</span></label>
+                                <input type="text" id="defaultStatusCodes" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="429" value="429">
+                            </div>
+                            <p class="text-xs text-muted-foreground">When the API returns any of these status codes, the proxy will rotate to the next API key. This is reflected in all generated cURL commands.</p>
+                            <div class="mt-3">
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">Keep-Alive Interval <span class="text-muted-foreground font-normal">(minutes, 0 to disable)</span></label>
+                                <input type="number" id="keepAliveMinutes" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="10" value="10" min="0" step="1">
+                            </div>
+                            <p class="text-xs text-muted-foreground">Pings the server periodically to prevent hosting platforms from shutting it down due to inactivity. Set to 0 to disable.</p>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Global Retry & Throttle Settings -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            Global Retry & Throttle Settings
+                        </h4>
+                        <div class="space-y-3">
+                            <p class="text-xs text-muted-foreground">Default retry behavior for all providers. Override per-provider on the API Keys tab.</p>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Max Retries</label>
+                                    <input type="number" id="globalMaxRetries" min="1" max="20" value="3" class="input-field w-full px-3 py-2 rounded-md text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Delay (ms)</label>
+                                    <input type="number" id="globalRetryDelay" min="100" max="30000" step="100" value="1000" class="input-field w-full px-3 py-2 rounded-md text-sm">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Backoff</label>
+                                    <input type="number" id="globalRetryBackoff" min="1" max="10" step="0.5" value="2" class="input-field w-full px-3 py-2 rounded-md text-sm">
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="saveGlobalRetrySettings()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save Global Settings</button>
+                                <span id="globalRetryStatus" class="text-xs"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Load Balancing Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            </svg>
+                            Load Balancing
+                        </h4>
+                        <p class="text-xs text-muted-foreground mb-3">Configure per-provider key rotation strategy and key weights.</p>
+                        <div id="lbStrategyList" class="space-y-3 mb-3"></div>
+                        <div id="lbWeightEditors" class="space-y-2"></div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Security Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                            </svg>
+                            Security
+                        </h4>
+
+                        <div id="passwordUpgradeBanner" class="hidden mb-3 p-3 rounded-md bg-amber-500/10 border border-amber-500/30">
+                            <p class="text-xs text-amber-400 mb-2">Your password is stored in plaintext. Upgrade to secure hashing.</p>
+                            <button onclick="upgradePassword()" class="btn btn-primary py-1.5 px-3 text-xs font-medium">Upgrade to Hashed Password</button>
+                        </div>
+
+                        <div class="space-y-2">
+                            <div>
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">Current Password</label>
+                                <input type="password" id="currentPassword" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="Enter current password">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">New Password</label>
+                                <input type="password" id="newPassword" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="Enter new password (min 6 chars)">
+                            </div>
+                            <button onclick="changePassword()" class="btn btn-primary w-full py-2 text-sm font-medium">Change Password</button>
+                            <div id="passwordChangeStatus" class="text-xs"></div>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Notifications Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+                            </svg>
+                            Notifications
+                        </h4>
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">Slack Webhook URL</label>
+                                <div class="flex items-center space-x-2">
+                                    <input type="text" id="slackWebhookUrl" class="input-field flex-1 px-3 py-2 rounded-md text-sm" placeholder="https://hooks.slack.com/services/...">
+                                    <button onclick="testNotification('slack')" class="btn btn-secondary px-3 py-1.5 text-xs">Test</button>
+                                </div>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">Slack Events</label>
+                                <input type="text" id="slackNotifyOn" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="failures,health">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">Telegram Events</label>
+                                <input type="text" id="telegramNotifyOn" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="failures,health">
+                            </div>
+                            <div class="flex items-center space-x-2">
+                                <button onclick="saveNotifications()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save Notifications</button>
+                                <span id="notificationStatus" class="text-xs"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Telegram Bot Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+                            </svg>
+                            Telegram Bot
+                        </h4>
+
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">Bot Token</label>
+                                <input type="password" id="telegramBotToken" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="123456789:ABCdefGhIjKlMnOpQrStUvWxYz">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-medium text-muted-foreground mb-1">Allowed User IDs <span class="text-muted-foreground font-normal">(comma-separated, leave empty to allow all)</span></label>
+                                <input type="text" id="telegramAllowedUsers" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="123456789, 987654321">
+                            </div>
+                            <div id="telegramBotStatus" class="text-xs"></div>
+
+                            <button onclick="saveTelegramSettings()" class="btn btn-primary w-full py-2 text-sm font-medium">Save Telegram Settings</button>
+
+                            <div class="border border-border rounded-md p-3 bg-muted/30">
+                                <p class="text-xs font-medium text-foreground mb-2">How to set up:</p>
+                                <ol class="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
+                                    <li>Open Telegram and search for <strong>@BotFather</strong></li>
+                                    <li>Send <code class="bg-muted px-1 rounded">/newbot</code> and follow the prompts</li>
+                                    <li>Copy the bot token and paste it above</li>
+                                    <li>To get your User ID, search for <strong>@userinfobot</strong> on Telegram and send it any message</li>
+                                    <li>Add your User ID to the allowed list (or leave empty to allow anyone)</li>
+                                </ol>
+                                <div class="mt-2 pt-2 border-t border-border">
+                                    <p class="text-xs font-medium text-foreground mb-1">Bot commands:</p>
+                                    <div class="text-xs text-muted-foreground space-y-0.5">
+                                        <p><code class="bg-muted px-1 rounded">/models</code> - Select provider & model</p>
+                                        <p><code class="bg-muted px-1 rounded">/clear</code> - Clear conversation history</p>
+                                        <p><code class="bg-muted px-1 rounded">/logs</code> - View recent API logs</p>
+                                        <p><code class="bg-muted px-1 rounded">/status</code> - Show current model info</p>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Fallback Routing Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            Fallback Routing
+                        </h4>
+                        <p class="text-xs text-muted-foreground mb-3">When a provider's keys are exhausted, retry on a fallback provider.</p>
+                        <div id="fallbackList" class="space-y-2 mb-3"></div>
+                        <div class="flex items-end gap-2">
+                            <div class="flex-1">
+                                <label class="block text-xs text-muted-foreground mb-1">Provider</label>
+                                <select id="fbFromProvider" class="input-field w-full px-3 py-2 rounded-md text-sm"></select>
+                            </div>
+                            <span class="text-muted-foreground pb-2">&rarr;</span>
+                            <div class="flex-1">
+                                <label class="block text-xs text-muted-foreground mb-1">Fallback to</label>
+                                <select id="fbToProvider" class="input-field w-full px-3 py-2 rounded-md text-sm"></select>
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-xs text-muted-foreground mb-1">Model (optional)</label>
+                                <input id="fbModel" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="auto">
+                            </div>
+                            <button onclick="addFallback()" class="btn btn-primary px-3 py-2 text-xs">Add</button>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Import/Export Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                            </svg>
+                            Import / Export Configuration
+                        </h4>
+                        <div class="space-y-3">
+                            <div class="flex items-center gap-2">
+                                <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                    <input type="checkbox" id="exportIncludeSecrets" class="rounded">
+                                    Include API keys (secrets)
+                                </label>
+                            </div>
+                            <div class="flex gap-2">
+                                <button onclick="exportConfig()" class="btn btn-secondary px-4 py-1.5 text-xs">Export JSON</button>
+                                <label class="btn btn-secondary px-4 py-1.5 text-xs cursor-pointer">
+                                    Import JSON
+                                    <input type="file" accept=".json" onchange="importConfig(event)" class="hidden">
+                                </label>
+                            </div>
+                            <div id="importExportStatus" class="text-xs"></div>
                         </div>
                     </div>
                 </div>
@@ -2162,7 +2417,7 @@
                 const res = await fetch('/admin/api/retry-config');
                 const data = await res.json();
                 if (data.global) {
-                    // Populate both Settings modal and (hidden) API Keys tab global fields
+                    // Populate Settings tab and (hidden) API Keys tab global fields
                     document.getElementById('globalMaxRetries').value = data.global.maxRetries;
                     document.getElementById('globalRetryDelay').value = data.global.retryDelayMs;
                     document.getElementById('globalRetryBackoff').value = data.global.retryBackoff;
@@ -2190,7 +2445,7 @@
             } catch (e) { console.error('Failed to load retry config:', e); }
         }
 
-        // Save global retry settings from Settings modal
+        // Save global retry settings from Settings tab
         async function saveGlobalRetrySettings() {
             const statusEl = document.getElementById('globalRetryStatus');
             statusEl.textContent = 'Saving...';
@@ -5753,6 +6008,15 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 loadConfiguration();
                 loadExclusions();
             }
+            // Load settings if settings tab is selected
+            if (tabName === 'settings') {
+                loadTelegramSettings();
+                checkPasswordUpgrade();
+                loadNotifications();
+                loadFallbacks();
+                loadLbSettings();
+                loadRetryConfig();
+            }
         }
         
         // Health monitoring
@@ -6074,261 +6338,6 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             checkAuth();
         });
     </script>
-<!-- Settings Modal -->
-<div id="settingsModal" class="fixed inset-0 z-50 hidden">
-    <div class="absolute inset-0 bg-black/50 backdrop-blur-sm" onclick="closeSettingsModal()"></div>
-    <div class="absolute inset-0 flex items-center justify-center p-4">
-        <div class="bg-card border border-border rounded-lg shadow-xl w-full max-w-lg relative">
-            <div class="flex items-center justify-between p-4 border-b border-border">
-                <h3 class="text-lg font-semibold text-foreground">Settings</h3>
-                <button onclick="closeSettingsModal()" class="text-muted-foreground hover:text-foreground p-1">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
-            </div>
-            <div class="p-4 space-y-5 max-h-[70vh] overflow-y-auto">
-                <!-- Default Status Codes Section -->
-                <div>
-                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Key Rotation
-                    </h4>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">Default Status Codes to Rotate <span class="text-muted-foreground font-normal">(comma-separated)</span></label>
-                            <input type="text" id="defaultStatusCodes" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="429" value="429">
-                        </div>
-                        <p class="text-xs text-muted-foreground">When the API returns any of these status codes, the proxy will rotate to the next API key. This is reflected in all generated cURL commands.</p>
-                        <div class="mt-3">
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">Keep-Alive Interval <span class="text-muted-foreground font-normal">(minutes, 0 to disable)</span></label>
-                            <input type="number" id="keepAliveMinutes" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="10" value="10" min="0" step="1">
-                        </div>
-                        <p class="text-xs text-muted-foreground">Pings the server periodically to prevent hosting platforms from shutting it down due to inactivity. Set to 0 to disable.</p>
-                    </div>
-                </div>
-
-                <hr class="border-border">
-
-                <!-- Global Retry & Throttle Settings -->
-                <div>
-                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                        </svg>
-                        Global Retry & Throttle Settings
-                    </h4>
-                    <div class="space-y-3">
-                        <p class="text-xs text-muted-foreground">Default retry behavior for all providers. Override per-provider on the API Keys tab.</p>
-                        <div class="grid grid-cols-3 gap-3">
-                            <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">Max Retries</label>
-                                <input type="number" id="globalMaxRetries" min="1" max="20" value="3" class="input-field w-full px-3 py-2 rounded-md text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">Delay (ms)</label>
-                                <input type="number" id="globalRetryDelay" min="100" max="30000" step="100" value="1000" class="input-field w-full px-3 py-2 rounded-md text-sm">
-                            </div>
-                            <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">Backoff</label>
-                                <input type="number" id="globalRetryBackoff" min="1" max="10" step="0.5" value="2" class="input-field w-full px-3 py-2 rounded-md text-sm">
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="saveGlobalRetrySettings()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save Global Settings</button>
-                            <span id="globalRetryStatus" class="text-xs"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <hr class="border-border">
-
-                <!-- Load Balancing Section -->
-                <div>
-                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        </svg>
-                        Load Balancing
-                    </h4>
-                    <p class="text-xs text-muted-foreground mb-3">Configure per-provider key rotation strategy and key weights.</p>
-                    <div id="lbStrategyList" class="space-y-3 mb-3"></div>
-                    <div id="lbWeightEditors" class="space-y-2"></div>
-                </div>
-
-                <hr class="border-border">
-
-                <!-- Security Section -->
-                <div>
-                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-                        </svg>
-                        Security
-                    </h4>
-
-                    <div id="passwordUpgradeBanner" class="hidden mb-3 p-3 rounded-md bg-amber-500/10 border border-amber-500/30">
-                        <p class="text-xs text-amber-400 mb-2">Your password is stored in plaintext. Upgrade to secure hashing.</p>
-                        <button onclick="upgradePassword()" class="btn btn-primary py-1.5 px-3 text-xs font-medium">Upgrade to Hashed Password</button>
-                    </div>
-
-                    <div class="space-y-2">
-                        <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">Current Password</label>
-                            <input type="password" id="currentPassword" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="Enter current password">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">New Password</label>
-                            <input type="password" id="newPassword" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="Enter new password (min 6 chars)">
-                        </div>
-                        <button onclick="changePassword()" class="btn btn-primary w-full py-2 text-sm font-medium">Change Password</button>
-                        <div id="passwordChangeStatus" class="text-xs"></div>
-                    </div>
-                </div>
-
-                <hr class="border-border">
-
-                <!-- Notifications Section -->
-                <div>
-                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/>
-                        </svg>
-                        Notifications
-                    </h4>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">Slack Webhook URL</label>
-                            <div class="flex items-center space-x-2">
-                                <input type="text" id="slackWebhookUrl" class="input-field flex-1 px-3 py-2 rounded-md text-sm" placeholder="https://hooks.slack.com/services/...">
-                                <button onclick="testNotification('slack')" class="btn btn-secondary px-3 py-1.5 text-xs">Test</button>
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">Slack Events</label>
-                            <input type="text" id="slackNotifyOn" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="failures,health">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">Telegram Events</label>
-                            <input type="text" id="telegramNotifyOn" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="failures,health">
-                        </div>
-                        <div class="flex items-center space-x-2">
-                            <button onclick="saveNotifications()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save Notifications</button>
-                            <span id="notificationStatus" class="text-xs"></span>
-                        </div>
-                    </div>
-                </div>
-
-                <hr class="border-border">
-
-                <!-- Telegram Bot Section -->
-                <div>
-                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
-                        </svg>
-                        Telegram Bot
-                    </h4>
-
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">Bot Token</label>
-                            <input type="password" id="telegramBotToken" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="123456789:ABCdefGhIjKlMnOpQrStUvWxYz">
-                        </div>
-                        <div>
-                            <label class="block text-xs font-medium text-muted-foreground mb-1">Allowed User IDs <span class="text-muted-foreground font-normal">(comma-separated, leave empty to allow all)</span></label>
-                            <input type="text" id="telegramAllowedUsers" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="123456789, 987654321">
-                        </div>
-                        <div id="telegramBotStatus" class="text-xs"></div>
-
-                        <button onclick="saveTelegramSettings()" class="btn btn-primary w-full py-2 text-sm font-medium">Save Telegram Settings</button>
-
-                        <div class="border border-border rounded-md p-3 bg-muted/30">
-                            <p class="text-xs font-medium text-foreground mb-2">How to set up:</p>
-                            <ol class="text-xs text-muted-foreground space-y-1.5 list-decimal list-inside">
-                                <li>Open Telegram and search for <strong>@BotFather</strong></li>
-                                <li>Send <code class="bg-muted px-1 rounded">/newbot</code> and follow the prompts</li>
-                                <li>Copy the bot token and paste it above</li>
-                                <li>To get your User ID, search for <strong>@userinfobot</strong> on Telegram and send it any message</li>
-                                <li>Add your User ID to the allowed list (or leave empty to allow anyone)</li>
-                            </ol>
-                            <div class="mt-2 pt-2 border-t border-border">
-                                <p class="text-xs font-medium text-foreground mb-1">Bot commands:</p>
-                                <div class="text-xs text-muted-foreground space-y-0.5">
-                                    <p><code class="bg-muted px-1 rounded">/models</code> - Select provider & model</p>
-                                    <p><code class="bg-muted px-1 rounded">/clear</code> - Clear conversation history</p>
-                                    <p><code class="bg-muted px-1 rounded">/logs</code> - View recent API logs</p>
-                                    <p><code class="bg-muted px-1 rounded">/status</code> - Show current model info</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <hr class="border-border">
-
-                <!-- Fallback Routing Section -->
-                <div>
-                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                        Fallback Routing
-                    </h4>
-                    <p class="text-xs text-muted-foreground mb-3">When a provider's keys are exhausted, retry on a fallback provider.</p>
-                    <div id="fallbackList" class="space-y-2 mb-3"></div>
-                    <div class="flex items-end gap-2">
-                        <div class="flex-1">
-                            <label class="block text-xs text-muted-foreground mb-1">Provider</label>
-                            <select id="fbFromProvider" class="input-field w-full px-3 py-2 rounded-md text-sm"></select>
-                        </div>
-                        <span class="text-muted-foreground pb-2">&rarr;</span>
-                        <div class="flex-1">
-                            <label class="block text-xs text-muted-foreground mb-1">Fallback to</label>
-                            <select id="fbToProvider" class="input-field w-full px-3 py-2 rounded-md text-sm"></select>
-                        </div>
-                        <div class="flex-1">
-                            <label class="block text-xs text-muted-foreground mb-1">Model (optional)</label>
-                            <input id="fbModel" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="auto">
-                        </div>
-                        <button onclick="addFallback()" class="btn btn-primary px-3 py-2 text-xs">Add</button>
-                    </div>
-                </div>
-
-                <hr class="border-border">
-
-                <!-- Import/Export Section -->
-                <div>
-                    <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
-                        </svg>
-                        Import / Export Configuration
-                    </h4>
-                    <div class="space-y-3">
-                        <div class="flex items-center gap-2">
-                            <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
-                                <input type="checkbox" id="exportIncludeSecrets" class="rounded">
-                                Include API keys (secrets)
-                            </label>
-                        </div>
-                        <div class="flex gap-2">
-                            <button onclick="exportConfig()" class="btn btn-secondary px-4 py-1.5 text-xs">Export JSON</button>
-                            <label class="btn btn-secondary px-4 py-1.5 text-xs cursor-pointer">
-                                Import JSON
-                                <input type="file" accept=".json" onchange="importConfig(event)" class="hidden">
-                            </label>
-                        </div>
-                        <div id="importExportStatus" class="text-xs"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-</div>
-
 <script>
     // CSRF Token Management
     let csrfToken = null;
@@ -6419,19 +6428,6 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             return response;
         });
     };
-
-    function openSettingsModal() {
-        document.getElementById('settingsModal').classList.remove('hidden');
-        loadTelegramSettings();
-        checkPasswordUpgrade();
-        loadNotifications();
-        loadFallbacks();
-        loadLbSettings();
-    }
-
-    function closeSettingsModal() {
-        document.getElementById('settingsModal').classList.add('hidden');
-    }
 
     function checkPasswordUpgrade() {
         const loginData = JSON.parse(sessionStorage.getItem('loginResponse') || '{}');
@@ -6837,9 +6833,6 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
 
     // Close on Escape
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !document.getElementById('settingsModal').classList.contains('hidden')) {
-            closeSettingsModal();
-        }
         if (e.key === 'Escape' && !document.getElementById('createVirtualKeyDialog').classList.contains('hidden')) {
             closeCreateVirtualKeyDialog();
         }
