@@ -738,6 +738,12 @@
                         <div class="flex gap-2 mb-3">
                             <button onclick="expandAllProviders()" class="btn btn-secondary px-3 py-1.5 text-xs">Expand All</button>
                             <button onclick="collapseAllProviders()" class="btn btn-secondary px-3 py-1.5 text-xs">Collapse All</button>
+                            <button onclick="copyAllAgentContext()" class="btn btn-info px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Copy complete configuration context for AI agents (all providers)">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                </svg>
+                                Copy All Agent Context
+                            </button>
                         </div>
                         <div id="providersContainer" class="space-y-3 mb-4"></div>
                     </div>
@@ -3513,6 +3519,16 @@
                                     </svg>
                                     Rename
                                 </button>
+                                <button
+                                    onclick="copyAgentContext('${provider.apiType}', '${provider.name}')"
+                                    class="btn btn-info px-2 py-1 text-xs font-medium"
+                                    title="Copy configuration context for AI agents (MCP servers, API clients, etc.)"
+                                >
+                                    <svg class="w-3.5 h-3.5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                    </svg>
+                                    Agent Context
+                                </button>
                                 <div class="relative inline-flex" id="curlBtnWrap_${provider.apiType}_${provider.name}">
                                     <button
                                         onclick="copyProviderCurl('${provider.apiType}', '${provider.name}', 'completions')"
@@ -4645,6 +4661,41 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             } catch (error) {
                 console.error('Export error:', error);
                 showErrorToast('Failed to export configuration: ' + error.message);
+            }
+        }
+
+        // Copy agent configuration context for a specific provider
+        async function copyAgentContext(apiType, providerName) {
+            try {
+                const providerKey = `${apiType}_${providerName}`;
+                const response = await fetch(`/admin/api/agent-context?provider=${encodeURIComponent(providerKey)}`);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch agent context: ${response.statusText}`);
+                }
+
+                const markdown = await response.text();
+                await copyToClipboard(markdown, `📋 Agent context for '${providerName}' copied! Ready to paste into AI agent configuration.`);
+            } catch (error) {
+                console.error('Copy agent context error:', error);
+                showErrorToast('Failed to copy agent context: ' + error.message);
+            }
+        }
+
+        // Copy agent configuration context for all providers
+        async function copyAllAgentContext() {
+            try {
+                const response = await fetch('/admin/api/agent-context');
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch agent context: ${response.statusText}`);
+                }
+
+                const markdown = await response.text();
+                await copyToClipboard(markdown, '📋 Complete agent context copied! Includes all providers, usage examples, and troubleshooting guide.');
+            } catch (error) {
+                console.error('Copy all agent context error:', error);
+                showErrorToast('Failed to copy agent context: ' + error.message);
             }
         }
 

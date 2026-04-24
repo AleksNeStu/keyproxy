@@ -28,7 +28,9 @@ const { handleGetNotifications, handleUpdateNotifications, handleTestNotificatio
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
 const { handleFetchModels, handleSaveModels } = require('./routes/adminModels');
 const { handleGetExclusions, handleAddExclusion, handleRemoveExclusion, handleToggleExclusion, handleTestExclusion } = require('./routes/adminExclusions');
+const { handleGetAgentContext } = require('./routes/adminMcp');
 const KeyExclusionManager = require('./core/exclusions');
+const AgentContextGenerator = require('./core/mcpInstructions');
 const destinationManager = require('./destinations/manager');
 const { parseRoute, handleProxyRequest } = require('./routes/proxy');
 
@@ -638,6 +640,11 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/exclusions/test' && req.method === 'POST') {
       return handleTestExclusion(this, req, res, body);
+    }
+
+    // Agent Configuration Context
+    if (adminPath === '/admin/api/agent-context' && req.method === 'GET') {
+      return handleGetAgentContext(this, res, params);
     }
 
     sendError(res, 404, 'Not found');
