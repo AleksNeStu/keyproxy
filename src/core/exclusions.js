@@ -85,15 +85,19 @@ class KeyExclusionManager {
       return { error: 'Pattern is required' };
     }
 
-    const detectedType = type || this._detectType(pattern);
-    const validation = this._validatePattern(pattern, detectedType);
+    const trimmed = pattern.trim();
+    const existing = this.patterns.find(p => p.pattern === trimmed);
+    if (existing) return { error: 'Pattern already exists' };
+
+    const detectedType = type || this._detectType(trimmed);
+    const validation = this._validatePattern(trimmed, detectedType);
     if (!validation.valid) {
       return { error: `Invalid pattern: ${validation.error}` };
     }
 
     const entry = {
       id: this._generateId(),
-      pattern: pattern.trim(),
+      pattern: trimmed,
       type: detectedType,
       enabled: true,
       description: description || '',

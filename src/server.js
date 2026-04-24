@@ -28,6 +28,8 @@ const { handleGetNotifications, handleUpdateNotifications, handleTestNotificatio
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
 const { handleFetchModels, handleSaveModels } = require('./routes/adminModels');
 const { handleGetExclusions, handleAddExclusion, handleRemoveExclusion, handleToggleExclusion, handleTestExclusion } = require('./routes/adminExclusions');
+const KeyExclusionManager = require('./core/exclusions');
+const destinationManager = require('./destinations/manager');
 const { parseRoute, handleProxyRequest } = require('./routes/proxy');
 
 class ProxyServer {
@@ -100,6 +102,10 @@ class ProxyServer {
 
     // Telegram bot (started after server.listen in start())
     this.telegramBot = new TelegramBot(this);
+
+    // Key exclusion manager (destination sync filtering)
+    this.exclusionManager = new KeyExclusionManager();
+    destinationManager.setExclusionManager(this.exclusionManager);
   }
 
   start() {
