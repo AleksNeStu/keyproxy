@@ -12,6 +12,7 @@ class HealthMonitor {
     this.intervalMs = 5 * 60 * 1000; // 5 minutes
     this.statusCache = new Map();
     this.lastFullCheck = null;
+    this.lastRecoveryScan = null;
     this.recoveryEnabled = true;
     this.recoveryCooldownMs = 5 * 60 * 1000; // 5 minutes base cooldown
     this.maxRecoveryAttempts = 5; // Stop auto-probing after this many failed recoveries
@@ -136,6 +137,7 @@ class HealthMonitor {
   }
 
   async recoverExhaustedKeys() {
+    this.lastRecoveryScan = new Date().toISOString();
     const providers = this.server.config.providers;
     const historyManager = this.server.historyManager;
     if (!historyManager) return;
@@ -243,6 +245,157 @@ class HealthMonitor {
       failed: statuses.filter(s => s.status === 'failed').length,
       disabled: statuses.filter(s => s.status === 'disabled').length,
       lastFullCheck: this.lastFullCheck
+    };
+  }
+
+  /**
+   * Get recovery status for all exhausted keys across all providers
+   * @returns {Object} Recovery status with keys array
+   */
+  getRecoveryStatus() {
+    const providers = this.server.config.providers;
+    const historyManager = this.server.historyManager;
+    if (!historyManager) {
+      return {
+        recoveryEnabled: this.recoveryEnabled,
+        baseCooldownSec: Math.round(this.backoffBaseMs / 1000),
+        maxAttempts: this.maxRecoveryAttempts,
+        backoffCapSec: Math.round(this.backoffMaxMs / 1000),
+        lastScanAt: this.lastRecoveryScan,
+        nextScanAt: null,
+        keys: []
+      };
+    }
+
+    const keys = [];
+    const now = Date.now();
+
+    for (const [providerName, providerConfig] of providers.entries()) {
+      if (providerConfig.disabled) continue;
+
+      const allKeys = providerConfig.allKeys
+        ? providerConfig.allKeys.map(k => k.key)
+        : providerConfig.keys;
+
+      // Get all exhausted keys (no cooldown filter)
+      const exhausted = historyManager.getExhaustedKeys(
+        providerName,
+        0, // no minimum cooldown
+        allKeys,
+        0  // no max attempt filter
+      );
+
+      for (const entry of exhausted) {
+        if (!entry.fullKey) continue;
+
+        const attempts = entry.recoveryAttempts || 0;
+        const backoffMs = Math.min(this.backoffBaseMs * Math.pow(2, attempts), this.backoffMaxMs);
+        const exhaustedAt = new Date(entry.rotatedOutAt).getTime();
+        const elapsed = now - exhaustedAt;
+        const remainingMs = Math.max(0, backoffMs - elapsed);
+        const nextProbeAt = new Date(now + remainingMs).toISOString();
+
+        // Mask the key for display
+        const masked = this.maskApiKey(entry.fullKey);
+
+        keys.push({
+          provider: providerName,
+          keyMask: masked,
+          keyHash: entry.hash,
+          status: attempts >= this.maxRecoveryAttempts ? 'maxed-out' : 'exhausted',
+          exhaustedAt: entry.rotatedOutAt,
+          recoveryAttempts: attempts,
+          maxAttempts: this.maxRecoveryAttempts,
+          nextProbeAt: nextProbeAt,
+          cooldownRemainingSec: Math.round(remainingMs / 1000),
+          rotationReason: entry.rotationReason || 'unknown'
+        });
+      }
+    }
+
+    // Calculate next scan time
+    let nextScanAt = null;
+    if (this.lastRecoveryScan) {
+      const lastScan = new Date(this.lastRecoveryScan).getTime();
+      nextScanAt = new Date(lastScan + this.intervalMs).toISOString();
+    }
+
+    return {
+      recoveryEnabled: this.recoveryEnabled,
+      baseCooldownSec: Math.round(this.backoffBaseMs / 1000),
+      maxAttempts: this.maxRecoveryAttempts,
+      backoffCapSec: Math.round(this.backoffMaxMs / 1000),
+      lastScanAt: this.lastRecoveryScan,
+      nextScanAt: nextScanAt,
+      keys: keys
+    };
+  }
+
+  /**
+   * Mask API key for display (first 8 chars + ... + last 4)
+   */
+  maskApiKey(key) {
+    if (!key || key.length < 12) return '***';
+    return key.substring(0, 8) + '...' + key.substring(key.length - 4);
+  }
+
+  /**
+   * Probe a single key immediately (for manual force probe)
+   * @param {string} providerName - Provider name
+   * @param {string} keyHash - Hash of the key to probe
+   * @returns {Object} Result with success, error, and key info
+   */
+  async probeSingleKey(providerName, keyHash) {
+    const providerConfig = this.server.config.getProvider(providerName);
+    if (!providerConfig) {
+      return { success: false, error: 'Provider not found' };
+    }
+
+    const historyManager = this.server.historyManager;
+    if (!historyManager) {
+      return { success: false, error: 'History manager not available' };
+    }
+
+    // Find the full key from the hash
+    const allKeys = providerConfig.allKeys
+      ? providerConfig.allKeys.map(k => k.key)
+      : providerConfig.keys;
+
+    let fullKey = null;
+    for (const key of allKeys) {
+      if (historyManager.hashKey(key) === keyHash) {
+        fullKey = key;
+        break;
+      }
+    }
+
+    if (!fullKey) {
+      return { success: false, error: 'Key not found' };
+    }
+
+    // Reset recovery attempts to allow this probe
+    historyManager.resetRecoveryAttempts(providerName, fullKey);
+
+    // Probe the key
+    const result = await this.probeKey(providerName, providerConfig, fullKey);
+
+    if (result.success) {
+      historyManager.recoverKey(providerName, fullKey);
+      console.log(`[RECOVERY] Force probe successful for key ${this.maskApiKey(fullKey)} for '${providerName}'`);
+
+      if (this.server.notifier) {
+        this.server.notifier.send(`Key ${this.maskApiKey(fullKey)} recovered for '${providerName}' (manual force probe)`, 'recovery');
+      }
+    } else {
+      // Re-record exhaustion with new recovery attempt
+      historyManager.recordKeyExhausted(providerName, fullKey, 'force-probe-failed');
+      console.log(`[RECOVERY] Force probe failed for key ${this.maskApiKey(fullKey)} for '${providerName}': ${result.error}`);
+    }
+
+    return {
+      ...result,
+      keyMask: this.maskApiKey(fullKey),
+      provider: providerName
     };
   }
 }

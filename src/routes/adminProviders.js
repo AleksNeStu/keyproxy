@@ -153,44 +153,106 @@ async function handleGetRecoveryStatus(server, res) {
       sendError(res, 503, 'Health monitor not initialized');
       return;
     }
-    const recoveryStatus = {};
-    const providers = server.config.providers;
-    for (const [name, config] of providers.entries()) {
-      if (config.disabled) continue;
-      const allKeys = config.allKeys ? config.allKeys.map(k => k.key) : config.keys;
-      // Get all exhausted keys regardless of cooldown (use 0) and without max filter
-      const exhausted = server.historyManager.getExhaustedKeys(name, 0, allKeys, 0);
-      if (exhausted.length > 0) {
-        const maxAttempts = server.healthMonitor.maxRecoveryAttempts;
-        recoveryStatus[name] = exhausted.map(e => {
-          const attempts = e.recoveryAttempts || 0;
-          const baseSec = Math.round(server.healthMonitor.backoffBaseMs / 1000);
-          const nextBackoffSec = Math.min(baseSec * Math.pow(2, attempts), server.healthMonitor.backoffMaxMs / 1000);
-          const elapsed = Date.now() - new Date(e.rotatedOutAt).getTime();
-          const nextProbeInSec = Math.max(0, Math.round(nextBackoffSec - elapsed / 1000));
-          return {
-            hash: e.hash,
-            fullKey: e.fullKey,
-            rotatedOutAt: e.rotatedOutAt,
-            rotationReason: e.rotationReason,
-            recoveryAttempts: attempts,
-            maxRecoveryAttempts: maxAttempts,
-            permanentlyExhausted: attempts >= maxAttempts,
-            nextProbeInSec: attempts >= maxAttempts ? null : nextProbeInSec
-          };
-        });
-      }
-    }
+    const status = server.healthMonitor.getRecoveryStatus();
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({
-      enabled: server.healthMonitor.recoveryEnabled,
-      baseCooldownSec: Math.round(server.healthMonitor.backoffBaseMs / 1000),
-      maxRecoveryAttempts: server.healthMonitor.maxRecoveryAttempts,
-      backoffMaxSec: Math.round(server.healthMonitor.backoffMaxMs / 1000),
-      providers: recoveryStatus
-    }));
+    res.end(JSON.stringify(status));
   } catch (error) {
     sendError(res, 500, 'Failed to get recovery status: ' + error.message);
+  }
+}
+
+/**
+ * POST /admin/api/recovery/scan — trigger immediate recovery scan.
+ * Rate limited to once per 30 seconds.
+ */
+let lastRecoveryScanTime = 0;
+const RECOVERY_SCAN_COOLDOWN_MS = 30000;
+
+async function handleRecoveryScan(server, req, res) {
+  try {
+    if (!server.healthMonitor) {
+      sendError(res, 503, 'Health monitor not initialized');
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastRecoveryScanTime < RECOVERY_SCAN_COOLDOWN_MS) {
+      const remainingSec = Math.ceil((RECOVERY_SCAN_COOLDOWN_MS - (now - lastRecoveryScanTime)) / 1000);
+      sendError(res, 429, `Recovery scan rate limited. Please wait ${remainingSec}s.`);
+      return;
+    }
+
+    lastRecoveryScanTime = now;
+
+    // Capture before/after states
+    const beforeStatus = server.healthMonitor.getRecoveryStatus();
+    const beforeKeys = new Set(beforeStatus.keys.map(k => `${k.provider}:${k.keyHash}`));
+
+    await server.healthMonitor.recoverExhaustedKeys();
+
+    const afterStatus = server.healthMonitor.getRecoveryStatus();
+    const afterKeys = new Set(afterStatus.keys.map(k => `${k.provider}:${k.keyHash}`));
+
+    // Calculate results
+    const recovered = [];
+    const stillFailing = [];
+    const skipped = [];
+
+    for (const key of beforeStatus.keys) {
+      const keyId = `${key.provider}:${key.keyHash}`;
+      if (!afterKeys.has(keyId)) {
+        recovered.push({ provider: key.provider, keyMask: key.keyMask });
+      } else {
+        const afterKey = afterStatus.keys.find(k => k.keyHash === key.keyHash && k.provider === key.provider);
+        if (afterKey && afterKey.recoveryAttempts > key.recoveryAttempts) {
+          stillFailing.push({ provider: key.provider, keyMask: key.keyMask, attempts: afterKey.recoveryAttempts });
+        } else {
+          skipped.push({ provider: key.provider, keyMask: key.keyMask, reason: 'cooldown not elapsed' });
+        }
+      }
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: true,
+      results: {
+        recovered: recovered.length,
+        stillFailing: stillFailing.length,
+        skipped: skipped.length,
+        details: { recovered, stillFailing, skipped }
+      },
+      status: afterStatus
+    }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to run recovery scan: ' + error.message);
+  }
+}
+
+/**
+ * POST /admin/api/recovery/probe/:provider/:keyHash — force probe a single key.
+ */
+async function handleRecoveryProbe(server, req, res, adminPath) {
+  try {
+    if (!server.healthMonitor) {
+      sendError(res, 503, 'Health monitor not initialized');
+      return;
+    }
+
+    // Parse provider and keyHash from path
+    const match = adminPath.match(/^\/admin\/api\/recovery\/probe\/([^/]+)\/(.+)$/);
+    if (!match) {
+      sendError(res, 400, 'Invalid path format');
+      return;
+    }
+
+    const [, provider, keyHash] = match;
+
+    const result = await server.healthMonitor.probeSingleKey(provider, keyHash);
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+  } catch (error) {
+    sendError(res, 500, 'Failed to probe key: ' + error.message);
   }
 }
 
@@ -350,6 +412,8 @@ module.exports = {
   handleHealthCheckAll,
   handleHealthReset,
   handleGetRecoveryStatus,
+  handleRecoveryScan,
+  handleRecoveryProbe,
   handleTestApiKey,
   testGeminiKey,
   testOpenaiKey

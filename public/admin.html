@@ -885,6 +885,7 @@
                                 Refresh
                             </button>
                             <button onclick="checkAllHealth()" class="btn btn-primary px-3 py-1.5 text-xs font-medium">Check All</button>
+                            <button onclick="runRecoveryScan()" class="btn px-3 py-1.5 text-xs font-medium" style="background:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.3)">Recover All</button>
                         </div>
                     </div>
                 </div>
@@ -3821,7 +3822,8 @@
                                     const badgeHtml = keyStatus === 'active'
                                         ? '<span class="key-badge badge-active">ACTIVE</span>'
                                         : keyStatus === 'exhausted'
-                                            ? `<span class="key-badge badge-exhausted">EXHAUSTED${rotationReason ? ' ' + rotationReason : ''}</span>`
+                                            ? `<span class="key-badge badge-exhausted">EXHAUSTED${rotationReason ? ' ' + rotationReason : ''}</span>
+                                               <span class="recovery-countdown text-xs text-amber-400" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Recovery status">...</span>`
                                             : '<span class="key-badge badge-fresh">FRESH</span>';
                                     return `
                                     <div class="flex items-center space-x-2${isKeyDisabled ? ' opacity-50' : ''} ${statusClass}" style="border-left:3px solid ${keyStatus === 'active' ? '#ef4444' : keyStatus === 'exhausted' ? '#6b7280' : '#22c55e'}; padding-left:8px; border-radius:4px;${keyStatus === 'exhausted' ? ' opacity:0.5;' : ''}">
@@ -3854,7 +3856,8 @@
                                         <span class="expiry-badge expiry-none expiry-slot" data-key="${maskedKey}" data-maskedkey="${keyVal.length >= 8 ? keyVal.substring(0, 4) + '...' + keyVal.slice(-4) : keyVal}" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Key TTL">${usageEntry?.expiry ? formatExpiry(usageEntry.expiry) : '—'}</span>
                                         ${usageEntry?.expiry ? `<button onclick="extendKeyTtl('${provider.name}', this)" class="btn btn-extend px-2 py-1 text-xs font-medium" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Reset key TTL timer">Extend</button>` : ''}
                                         ${keyStatus === 'exhausted'
-                                            ? `<button onclick="testAndRecoverKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">Test & Reset</button>`
+                                            ? `<button onclick="testAndRecoverKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">Test & Reset</button>
+                                               <button onclick="forceProbeKey('${provider.name}', '${keyVal}', this)" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3)" title="Force immediate recovery probe">Force Probe</button>`
                                             : `<button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
                                         }
                                         <button
@@ -5244,7 +5247,155 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 showErrorToast(`Key test failed: ${error.message}`);
             }
         }
-        
+
+        /**
+         * Force immediate probe of a single key for recovery
+         * Uses the new recovery probe endpoint
+         */
+        async function forceProbeKey(providerName, fullKey, buttonElement) {
+            const maskedKey = fullKey.length > 16 ? fullKey.substring(0, 8) + '...' + fullKey.slice(-4) : fullKey;
+
+            // Compute SHA-256 hash of the full key (matches backend hashing)
+            const keyHash = await computeKeyHash(fullKey);
+
+            if (buttonElement) {
+                const originalText = buttonElement.textContent;
+                buttonElement.disabled = true;
+                buttonElement.textContent = 'Probing...';
+            }
+
+            showInfoToast(`Force probing key ${maskedKey}...`);
+
+            try {
+                const response = await fetch(`/admin/api/recovery/probe/${encodeURIComponent(providerName)}/${encodeURIComponent(keyHash)}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    showSuccessToast(`Key ${maskedKey} recovered successfully!`);
+                    loadProviders();
+                } else {
+                    showErrorToast(`Key ${maskedKey} probe failed: ${result.error || 'Unknown error'}`);
+                    loadProviders(); // Refresh to show updated recovery attempts
+                }
+            } catch (error) {
+                showErrorToast(`Force probe failed: ${error.message}`);
+            } finally {
+                if (buttonElement) {
+                    buttonElement.disabled = false;
+                    buttonElement.textContent = 'Force Probe';
+                }
+            }
+        }
+
+        /**
+         * Compute SHA-256 hash of a key (first 16 hex chars)
+         * Matches the backend KeyHistoryManager.hashKey() method
+         */
+        async function computeKeyHash(key) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(key);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+            return hashHex.substring(0, 16); // First 16 chars, matches backend
+        }
+
+        /**
+         * Recovery status poller - updates countdown timers for exhausted keys
+         */
+        let recoveryPollerInterval = null;
+
+        function startRecoveryPoller() {
+            if (recoveryPollerInterval) return; // Already running
+
+            // Poll every 15 seconds
+            recoveryPollerInterval = setInterval(updateRecoveryCountdowns, 15000);
+            updateRecoveryCountdowns(); // Initial update
+        }
+
+        function stopRecoveryPoller() {
+            if (recoveryPollerInterval) {
+                clearInterval(recoveryPollerInterval);
+                recoveryPollerInterval = null;
+            }
+        }
+
+        async function updateRecoveryCountdowns() {
+            try {
+                const response = await fetch('/admin/api/recovery-status');
+                if (!response.ok) return;
+
+                const data = await response.json();
+
+                // Build a lookup map for quick access
+                const recoveryMap = new Map();
+                for (const key of data.keys || []) {
+                    // Use provider+keyMask as the key
+                    recoveryMap.set(`${key.provider}:${key.keyMask}`, key);
+                }
+
+                // Update all recovery countdown elements
+                const countdownElements = document.querySelectorAll('.recovery-countdown');
+                for (const el of countdownElements) {
+                    const provider = el.dataset.provider;
+                    const fullKey = el.dataset.fullkey;
+                    // Match the backend masking format: first 8 chars + ... + last 4 chars
+                    const maskedKey = fullKey && fullKey.length > 12
+                        ? fullKey.substring(0, 8) + '...' + fullKey.slice(-4)
+                        : fullKey || null;
+
+                    if (!maskedKey) {
+                        el.textContent = '';
+                        continue;
+                    }
+
+                    const recoveryKey = `${provider}:${maskedKey}`;
+                    const recoveryInfo = recoveryMap.get(recoveryKey);
+
+                    if (!recoveryInfo) {
+                        el.textContent = '';
+                        continue;
+                    }
+
+                    if (recoveryInfo.status === 'maxed-out') {
+                        el.textContent = 'max attempts reached';
+                        el.className = 'recovery-countdown text-xs text-red-400';
+                        el.title = `Key reached maximum recovery attempts (${recoveryInfo.maxAttempts}). Manual intervention required.`;
+                    } else if (recoveryInfo.cooldownRemainingSec > 0) {
+                        const formatted = formatCountdown(recoveryInfo.cooldownRemainingSec);
+                        const attempts = recoveryInfo.recoveryAttempts || 0;
+                        const maxAttempts = recoveryInfo.maxAttempts || 5;
+                        el.textContent = `next probe in ${formatted} (${attempts}/${maxAttempts})`;
+                        el.className = 'recovery-countdown text-xs text-amber-400';
+                        el.title = `Next automatic recovery probe: ${new Date(recoveryInfo.nextProbeAt).toLocaleString()}`;
+                    } else {
+                        el.textContent = 'probe pending';
+                        el.className = 'recovery-countdown text-xs text-yellow-300';
+                    }
+                }
+            } catch (error) {
+                console.error('Failed to update recovery countdowns:', error);
+            }
+        }
+
+        function formatCountdown(seconds) {
+            if (seconds < 60) {
+                return `${seconds}s`;
+            } else if (seconds < 3600) {
+                const mins = Math.floor(seconds / 60);
+                const secs = seconds % 60;
+                return secs > 0 ? `${mins}m ${secs}s` : `${mins}m`;
+            } else {
+                const hrs = Math.floor(seconds / 3600);
+                const mins = Math.floor((seconds % 3600) / 60);
+                return mins > 0 ? `${hrs}h ${mins}m` : `${hrs}h`;
+            }
+        }
+
         function showDeleteKeyConfirmation(apiType, providerName, keyIndex) {
             const dialog = document.getElementById('confirmDialog');
             const message = document.getElementById('confirmMessage');
@@ -5967,22 +6118,25 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.add('hidden');
             });
-            
+
             // Remove active state from all tab buttons
             document.querySelectorAll('.tab-btn').forEach(btn => {
                 btn.classList.remove('active');
                 btn.classList.add('text-muted-foreground');
                 btn.classList.remove('text-foreground', 'border-primary');
             });
-            
+
             // Show selected tab
             document.getElementById(tabName).classList.remove('hidden');
-            
+
             // Set active state on clicked tab button
             const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
             activeBtn.classList.add('active', 'text-foreground', 'border-primary');
             activeBtn.classList.remove('text-muted-foreground');
-            
+
+            // Stop recovery poller when switching away from relevant tabs
+            stopRecoveryPoller();
+
             // Load logs if logs tab is selected
             if (tabName === 'logs') {
                 refreshLogs();
@@ -5990,6 +6144,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             // Load health data if management tab is selected
             if (tabName === 'management') {
                 refreshHealth();
+            }
+            // Start recovery poller when on environment (API Keys) tab
+            if (tabName === 'environment') {
+                startRecoveryPoller();
             }
             // Load analytics data if analytics tab is selected
             if (tabName === 'analytics') {
@@ -6047,6 +6205,47 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 }
             } catch (err) {
                 console.error('Failed to check health:', err);
+            }
+        }
+
+        /**
+         * Run immediate recovery scan for all exhausted keys
+         */
+        async function runRecoveryScan() {
+            showInfoToast('Running recovery scan for all exhausted keys...');
+
+            try {
+                const res = await fetch('/admin/api/recovery/scan', { method: 'POST' });
+
+                if (res.ok) {
+                    const data = await res.json();
+
+                    if (data.success) {
+                        const { recovered, stillFailing, skipped } = data.results;
+
+                        if (recovered > 0) {
+                            showSuccessToast(`Recovery complete: ${recovered} key(s) recovered, ${stillFailing} still failing, ${skipped} skipped (cooldown)`);
+                        } else if (stillFailing > 0) {
+                            showInfoToast(`Recovery scan: ${stillFailing} key(s) still failing, ${skipped} skipped (cooldown). Will retry after backoff.`);
+                        } else {
+                            showInfoToast(`Recovery scan: ${skipped} key(s) in cooldown period. Nothing to probe yet.`);
+                        }
+
+                        // Refresh both Management and API Keys tabs
+                        refreshHealth();
+                        loadProviders();
+                    } else {
+                        showErrorToast('Recovery scan failed');
+                    }
+                } else if (res.status === 429) {
+                    const err = await res.json();
+                    showErrorToast(err.error || 'Recovery scan rate limited. Please wait.');
+                } else {
+                    showErrorToast('Failed to run recovery scan');
+                }
+            } catch (err) {
+                console.error('Failed to run recovery scan:', err);
+                showErrorToast('Recovery scan failed: ' + err.message);
             }
         }
 
@@ -6216,6 +6415,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     document.getElementById('adminPanel').classList.remove('hidden');
                     loadEnvVars();
                     loadRetryConfig();
+
+                    // Start recovery poller (API Keys tab is default)
+                    startRecoveryPoller();
+
                     // Fix header positioning after panel is shown
                     setTimeout(adjustStickyHeaderPositioning, 100);
                 }

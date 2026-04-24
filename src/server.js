@@ -23,7 +23,7 @@ const { sendError, sendResponse, readRequestBody, getStatusText } = require('./r
 const { isAdminAuthenticated, handleAdminLogin, handleAdminLogout, handleAuthCheck, handleChangePassword, handleUpgradePassword } = require('./routes/adminAuth');
 const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./routes/adminEnv');
 const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm } = require('./routes/adminKeys');
-const { handleToggleProvider, handleToggleSyncEnv, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleTestApiKey } = require('./routes/adminProviders');
+const { handleToggleProvider, handleToggleSyncEnv, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
 const { handleFetchModels, handleSaveModels } = require('./routes/adminModels');
@@ -507,6 +507,12 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/recovery-status' && req.method === 'GET') {
       return handleGetRecoveryStatus(this, res);
+    }
+    if (adminPath === '/admin/api/recovery/scan' && req.method === 'POST') {
+      return handleRecoveryScan(this, req, res);
+    }
+    if (adminPath.startsWith('/admin/api/recovery/probe/') && req.method === 'POST') {
+      return handleRecoveryProbe(this, req, res, adminPath);
     }
     if (adminPath === '/admin/api/health' && req.method === 'GET') {
       return handleGetHealth(this, res);
