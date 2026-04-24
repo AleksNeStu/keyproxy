@@ -7,6 +7,7 @@ class Notifier {
     this.channels = {};
     this.lastSent = {};
     this.minInterval = 60000; // 1 minute dedup per event type
+    this.notifyOn = { slack: [], telegram: [] };
   }
 
   configure(config) {
