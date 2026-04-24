@@ -3928,7 +3928,14 @@
                                         ${keyStatus === 'exhausted'
                                             ? `<button onclick="testAndRecoverKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">Test & Reset</button>
                                                <button onclick="forceProbeKey('${provider.name}', '${keyVal}', this)" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3)" title="Force immediate recovery probe">Force Probe</button>`
-                                            : `<button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
+                                            : (() => {
+                                                // Hide Test button for MCP providers (they don't support /models endpoint)
+                                                const mcpProviders = ['brave', 'tavily', 'tavily_mcp', 'exa', 'firecrawl', 'context7', 'onref', 'searchapi', 'jina'];
+                                                const isMcpProvider = mcpProviders.includes(provider.name.toLowerCase());
+                                                return isMcpProvider 
+                                                    ? `<span class="text-xs text-muted-foreground px-2 py-1" title="Test not available for MCP/Search providers">—</span>`
+                                                    : `<button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`;
+                                            })()
                                         }
                                         <button
                                             onclick="showDeleteKeyConfirmation('${provider.apiType}', '${provider.name}', ${keyIndex})"
@@ -3946,18 +3953,33 @@
                                         class="input-field flex-1 px-2 py-1 text-xs rounded transition-colors" 
                                         placeholder="Enter new API key"
                                     >
-                                    <button 
-                                        onclick="testProviderNewKey('${provider.apiType}', '${provider.name}')" 
-                                        class="btn btn-secondary px-2 py-1 text-xs font-medium"
-                                    >
-                                        Test
-                                    </button>
-                                    <button 
-                                        onclick="saveProviderKey('${provider.apiType}', '${provider.name}')" 
-                                        class="btn btn-primary px-2 py-1 text-xs font-medium"
-                                    >
-                                        Test & Save
-                                    </button>
+                                    ${(() => {
+                                        // Hide Test buttons for MCP providers
+                                        const mcpProviders = ['brave', 'tavily', 'tavily_mcp', 'exa', 'firecrawl', 'context7', 'onref', 'searchapi', 'jina'];
+                                        const isMcpProvider = mcpProviders.includes(provider.name.toLowerCase());
+                                        
+                                        if (isMcpProvider) {
+                                            return `<button 
+                                                onclick="saveProviderKey('${provider.apiType}', '${provider.name}')" 
+                                                class="btn btn-primary px-2 py-1 text-xs font-medium"
+                                            >
+                                                Save
+                                            </button>`;
+                                        }
+                                        
+                                        return `<button 
+                                            onclick="testProviderNewKey('${provider.apiType}', '${provider.name}')" 
+                                            class="btn btn-secondary px-2 py-1 text-xs font-medium"
+                                        >
+                                            Test
+                                        </button>
+                                        <button 
+                                            onclick="saveProviderKey('${provider.apiType}', '${provider.name}')" 
+                                            class="btn btn-primary px-2 py-1 text-xs font-medium"
+                                        >
+                                            Test & Save
+                                        </button>`;
+                                    })()}
                                 </div>
                                 <div id="newKeyResult_${provider.apiType}_${provider.name}" class="mt-2"></div>
                                 <!-- Reset History Button -->
