@@ -350,6 +350,78 @@ $form.Dispose()
     sendError(res, 500, 'Failed to launch file picker: ' + error.message);
   }
 }
+async function handleGetGeneralSettings(server, res) {
+  try {
+    const ev = server.config.envVars || {};
+    const settings = {
+      corsOrigin: ev.CORS_ORIGIN || '*',
+      defaultTimeoutMs: parseInt(ev.KEYPROXY_DEFAULT_TIMEOUT_MS) || 60000,
+      cacheEnabled: ev.KEYPROXY_CACHE_ENABLED !== 'false',
+      cacheTtlSec: parseInt(ev.KEYPROXY_CACHE_TTL_SEC) || 300,
+      cacheMaxEntries: parseInt(ev.KEYPROXY_CACHE_MAX_ENTRIES) || 1000,
+      cbThreshold: parseInt(ev.KEYPROXY_CB_THRESHOLD) || 5,
+      cbTimeoutSec: parseInt(ev.KEYPROXY_CB_TIMEOUT_SEC) || 30,
+      recoveryCooldownSec: parseInt(ev.KEYPROXY_RECOVERY_COOLDOWN_SEC) || 300,
+      recoveryEnabled: ev.KEYPROXY_RECOVERY_ENABLED !== 'false',
+      logLevel: ev.KEYPROXY_LOG_LEVEL || 'info',
+      logBufferMax: parseInt(ev.KEYPROXY_LOG_BUFFER_MAX) || 200,
+      rateLimitWindowMs: parseInt(ev.KEYPROXY_RATE_LIMIT_WINDOW_MS) || 60000,
+      rateLimitMax: parseInt(ev.KEYPROXY_RATE_LIMIT_MAX) || 100
+    };
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(settings));
+  } catch (error) {
+    sendError(res, 500, 'Failed to get general settings: ' + error.message);
+  }
+}
+
+async function handleUpdateGeneralSettings(server, req, res, body) {
+  try {
+    const data = JSON.parse(body);
+    const envPath = path.join(process.cwd(), '.env');
+    let envContent = '';
+    if (fs.existsSync(envPath)) {
+      envContent = fs.readFileSync(envPath, 'utf8');
+    }
+    const envVars = server.config.parseEnvFile(envContent);
+
+    const mapping = {
+      corsOrigin: 'CORS_ORIGIN',
+      defaultTimeoutMs: 'KEYPROXY_DEFAULT_TIMEOUT_MS',
+      cacheTtlSec: 'KEYPROXY_CACHE_TTL_SEC',
+      cacheMaxEntries: 'KEYPROXY_CACHE_MAX_ENTRIES',
+      cbThreshold: 'KEYPROXY_CB_THRESHOLD',
+      cbTimeoutSec: 'KEYPROXY_CB_TIMEOUT_SEC',
+      recoveryCooldownSec: 'KEYPROXY_RECOVERY_COOLDOWN_SEC',
+      logLevel: 'KEYPROXY_LOG_LEVEL',
+      logBufferMax: 'KEYPROXY_LOG_BUFFER_MAX',
+      rateLimitWindowMs: 'KEYPROXY_RATE_LIMIT_WINDOW_MS',
+      rateLimitMax: 'KEYPROXY_RATE_LIMIT_MAX'
+    };
+
+    for (const [dataKey, envKey] of Object.entries(mapping)) {
+      if (data[dataKey] !== undefined) {
+        envVars[envKey] = String(data[dataKey]);
+      }
+    }
+
+    if (data.cacheEnabled !== undefined) {
+      envVars.KEYPROXY_CACHE_ENABLED = data.cacheEnabled ? 'true' : 'false';
+    }
+    if (data.recoveryEnabled !== undefined) {
+      envVars.KEYPROXY_RECOVERY_ENABLED = data.recoveryEnabled ? 'true' : 'false';
+    }
+
+    server.writeEnvFile(envVars);
+    server.config.loadConfig();
+    server.reinitializeClients();
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to update general settings: ' + error.message);
+  }
+}
 
 module.exports = {
   handleGetEnvVars,
@@ -359,6 +431,8 @@ module.exports = {
   handleReloadConfig,
   handleGetRetryConfig,
   handleUpdateRetryConfig,
+  handleGetGeneralSettings,
+  handleUpdateGeneralSettings,
   handleGetEnvFiles,
   handleAddEnvFile,
   handleRemoveEnvFile,

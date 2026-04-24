@@ -21,7 +21,7 @@ const { addSecurityHeaders, sanitizeInput, adminApiLimiter, adminReadLimiter, ad
 // Route modules
 const { sendError, sendResponse, readRequestBody, getStatusText } = require('./routes/httpHelpers');
 const { isAdminAuthenticated, handleAdminLogin, handleAdminLogout, handleAuthCheck, handleChangePassword, handleUpgradePassword } = require('./routes/adminAuth');
-const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./routes/adminEnv');
+const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetGeneralSettings, handleUpdateGeneralSettings, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./routes/adminEnv');
 const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm } = require('./routes/adminKeys');
 const { handleToggleProvider, handleToggleSyncEnv, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
@@ -490,6 +490,12 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/settings' && req.method === 'POST') {
       return handleUpdateSettings(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/general-settings' && req.method === 'GET') {
+      return handleGetGeneralSettings(this, res);
+    }
+    if (adminPath === '/admin/api/general-settings' && req.method === 'POST') {
+      return handleUpdateGeneralSettings(this, req, res, body);
     }
     if (adminPath === '/admin/api/env-files' && req.method === 'GET') {
       return handleGetEnvFiles(this, res);

@@ -1371,6 +1371,140 @@
                 </div>
 
                 <div class="space-y-5">
+                    <!-- General Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
+                            </svg>
+                            General
+                        </h4>
+                        <div class="space-y-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Default Timeout <span class="font-normal">(ms)</span></label>
+                                    <input type="number" id="settingTimeoutMs" class="input-field w-full px-3 py-2 rounded-md text-sm" min="1000" max="300000" step="1000" value="60000">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">CORS Origin</label>
+                                    <input type="text" id="settingCorsOrigin" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="*" value="*">
+                                </div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Rate Limit Window <span class="font-normal">(ms)</span></label>
+                                    <input type="number" id="settingRateLimitWindow" class="input-field w-full px-3 py-2 rounded-md text-sm" min="1000" max="3600000" step="1000" value="60000">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Rate Limit Max Requests</label>
+                                    <input type="number" id="settingRateLimitMax" class="input-field w-full px-3 py-2 rounded-md text-sm" min="1" max="10000" value="100">
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <button onclick="saveGeneralSettings()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save General Settings</button>
+                                <span id="generalSettingsStatus" class="text-xs"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Performance Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/>
+                            </svg>
+                            Performance
+                        </h4>
+                        <div class="space-y-3">
+                            <h5 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Response Cache</h5>
+                            <div class="grid grid-cols-3 gap-3">
+                                <div>
+                                    <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <input type="checkbox" id="settingCacheEnabled" checked class="rounded">
+                                        Enabled
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">TTL <span class="font-normal">(sec)</span></label>
+                                    <input type="number" id="settingCacheTtl" class="input-field w-full px-3 py-2 rounded-md text-sm" min="0" max="86400" value="300">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Max Entries</label>
+                                    <input type="number" id="settingCacheMax" class="input-field w-full px-3 py-2 rounded-md text-sm" min="10" max="100000" value="1000">
+                                </div>
+                            </div>
+
+                            <h5 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-3">Circuit Breaker</h5>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Failure Threshold</label>
+                                    <input type="number" id="settingCbThreshold" class="input-field w-full px-3 py-2 rounded-md text-sm" min="1" max="50" value="5">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Timeout <span class="font-normal">(sec)</span></label>
+                                    <input type="number" id="settingCbTimeout" class="input-field w-full px-3 py-2 rounded-md text-sm" min="1" max="300" value="30">
+                                </div>
+                            </div>
+
+                            <h5 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-3">Auto-Recovery</h5>
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="flex items-center gap-1.5 text-xs text-muted-foreground">
+                                        <input type="checkbox" id="settingRecoveryEnabled" checked class="rounded">
+                                        Recovery Enabled
+                                    </label>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Cooldown <span class="font-normal">(sec)</span></label>
+                                    <input type="number" id="settingRecoveryCooldown" class="input-field w-full px-3 py-2 rounded-md text-sm" min="30" max="3600" value="300">
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 mt-2">
+                                <button onclick="savePerformanceSettings()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save Performance Settings</button>
+                                <span id="performanceSettingsStatus" class="text-xs"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Logging Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/>
+                            </svg>
+                            Logging
+                        </h4>
+                        <div class="space-y-3">
+                            <div class="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Log Level</label>
+                                    <select id="settingLogLevel" class="input-field w-full px-3 py-2 rounded-md text-sm">
+                                        <option value="debug">Debug</option>
+                                        <option value="info" selected>Info</option>
+                                        <option value="warn">Warning</option>
+                                        <option value="error">Error</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Log Buffer Size</label>
+                                    <input type="number" id="settingLogBufferMax" class="input-field w-full px-3 py-2 rounded-md text-sm" min="10" max="1000" value="200">
+                                </div>
+                            </div>
+                            <p class="text-xs text-muted-foreground">Log level controls verbosity: Debug (all messages) → Error (critical only). Log buffer controls how many recent entries are kept for the admin UI.</p>
+                            <div class="flex items-center gap-2">
+                                <button onclick="saveLoggingSettings()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save Logging Settings</button>
+                                <span id="loggingSettingsStatus" class="text-xs"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
                     <!-- Default Status Codes Section -->
                     <div>
                         <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
@@ -2519,6 +2653,94 @@
                     }
                 }
             } catch (e) { console.error('Failed to load retry config:', e); }
+        }
+
+        // ─── General / Performance / Logging Settings ────────────
+        async function loadGeneralSettings() {
+            try {
+                const res = await fetch('/admin/api/general-settings', { headers: authHeaders() });
+                const s = await res.json();
+                document.getElementById('settingTimeoutMs').value = s.defaultTimeoutMs || 60000;
+                document.getElementById('settingCorsOrigin').value = s.corsOrigin || '*';
+                document.getElementById('settingRateLimitWindow').value = s.rateLimitWindowMs || 60000;
+                document.getElementById('settingRateLimitMax').value = s.rateLimitMax || 100;
+                document.getElementById('settingCacheEnabled').checked = s.cacheEnabled !== false;
+                document.getElementById('settingCacheTtl').value = s.cacheTtlSec || 300;
+                document.getElementById('settingCacheMax').value = s.cacheMaxEntries || 1000;
+                document.getElementById('settingCbThreshold').value = s.cbThreshold || 5;
+                document.getElementById('settingCbTimeout').value = s.cbTimeoutSec || 30;
+                document.getElementById('settingRecoveryEnabled').checked = s.recoveryEnabled !== false;
+                document.getElementById('settingRecoveryCooldown').value = s.recoveryCooldownSec || 300;
+                document.getElementById('settingLogLevel').value = s.logLevel || 'info';
+                document.getElementById('settingLogBufferMax').value = s.logBufferMax || 200;
+            } catch (e) { console.error('Failed to load general settings:', e); }
+        }
+
+        async function saveGeneralSettings() {
+            const statusEl = document.getElementById('generalSettingsStatus');
+            statusEl.textContent = 'Saving...';
+            statusEl.className = 'text-xs text-muted-foreground';
+            try {
+                const data = {
+                    defaultTimeoutMs: parseInt(document.getElementById('settingTimeoutMs').value),
+                    corsOrigin: document.getElementById('settingCorsOrigin').value,
+                    rateLimitWindowMs: parseInt(document.getElementById('settingRateLimitWindow').value),
+                    rateLimitMax: parseInt(document.getElementById('settingRateLimitMax').value)
+                };
+                const res = await fetch('/admin/api/general-settings', {
+                    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const r = await res.json();
+                if (r.success) { statusEl.textContent = '✓ Saved'; statusEl.className = 'text-xs text-green-600'; }
+                else { statusEl.textContent = '✗ Failed'; statusEl.className = 'text-xs text-red-500'; }
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
+            } catch (e) { statusEl.textContent = '✗ Error'; statusEl.className = 'text-xs text-red-500'; }
+        }
+
+        async function savePerformanceSettings() {
+            const statusEl = document.getElementById('performanceSettingsStatus');
+            statusEl.textContent = 'Saving...';
+            statusEl.className = 'text-xs text-muted-foreground';
+            try {
+                const data = {
+                    cacheEnabled: document.getElementById('settingCacheEnabled').checked,
+                    cacheTtlSec: parseInt(document.getElementById('settingCacheTtl').value),
+                    cacheMaxEntries: parseInt(document.getElementById('settingCacheMax').value),
+                    cbThreshold: parseInt(document.getElementById('settingCbThreshold').value),
+                    cbTimeoutSec: parseInt(document.getElementById('settingCbTimeout').value),
+                    recoveryEnabled: document.getElementById('settingRecoveryEnabled').checked,
+                    recoveryCooldownSec: parseInt(document.getElementById('settingRecoveryCooldown').value)
+                };
+                const res = await fetch('/admin/api/general-settings', {
+                    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const r = await res.json();
+                if (r.success) { statusEl.textContent = '✓ Saved'; statusEl.className = 'text-xs text-green-600'; }
+                else { statusEl.textContent = '✗ Failed'; statusEl.className = 'text-xs text-red-500'; }
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
+            } catch (e) { statusEl.textContent = '✗ Error'; statusEl.className = 'text-xs text-red-500'; }
+        }
+
+        async function saveLoggingSettings() {
+            const statusEl = document.getElementById('loggingSettingsStatus');
+            statusEl.textContent = 'Saving...';
+            statusEl.className = 'text-xs text-muted-foreground';
+            try {
+                const data = {
+                    logLevel: document.getElementById('settingLogLevel').value,
+                    logBufferMax: parseInt(document.getElementById('settingLogBufferMax').value)
+                };
+                const res = await fetch('/admin/api/general-settings', {
+                    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+                const r = await res.json();
+                if (r.success) { statusEl.textContent = '✓ Saved'; statusEl.className = 'text-xs text-green-600'; }
+                else { statusEl.textContent = '✗ Failed'; statusEl.className = 'text-xs text-red-500'; }
+                setTimeout(() => { statusEl.textContent = ''; }, 3000);
+            } catch (e) { statusEl.textContent = '✗ Error'; statusEl.className = 'text-xs text-red-500'; }
         }
 
         // Save global retry settings from Settings tab
@@ -6412,6 +6634,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 loadNotifications();
                 loadFallbacks();
                 loadLbSettings();
+                loadGeneralSettings();
                 loadRetryConfig();
             }
         }
