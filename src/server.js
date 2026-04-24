@@ -17,6 +17,7 @@ const TelegramBot = require('./core/telegramBot');
 const { refreshCsrfToken, getCsrfToken } = require('./middleware/csrf');
 const { validateBody, limitBodySize } = require('./middleware/validation');
 const { addSecurityHeaders, sanitizeInput, adminApiLimiter, adminReadLimiter, adminWriteLimiter, adminFileOpsLimiter, adminHighRiskLimiter } = require('./middleware/securityHeaders');
+const globalMiddleware = require('./middleware/globalMiddleware');
 
 // Route modules
 const { sendError, sendResponse, readRequestBody, getStatusText } = require('./routes/httpHelpers');
@@ -161,19 +162,72 @@ class ProxyServer {
   }
 
   async handleRequest(req, res) {
-    // Apply security headers
-    addSecurityHeaders(req, res, () => {});
-
     // Sanitize input (remove null bytes, excessive whitespace)
     sanitizeInput(req, res, () => {});
 
-    // Set CORS headers — configurable via CORS_ORIGIN env var (defaults to * for backward compat)
-    const corsOrigin = this.config.envVars.CORS_ORIGIN || '*';
-    res.setHeader('Access-Control-Allow-Origin', corsOrigin);
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token');
-    res.setHeader('Access-Control-Allow-Credentials', 'true'); // Required for cookies
-    res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
+    // Serve static files from public directory
+    if (req.url === '/tailwind-3.4.17.js' && (req.method === 'GET' || req.method === 'HEAD')) {
+      try {
+        const filePath = path.join(process.cwd(), 'public', 'tailwind-3.4.17.js');
+        console.log(`[STATIC] Serving file from: ${filePath}`);
+
+        if (req.method === 'HEAD') {
+          const stats = fs.statSync(filePath);
+          res.writeHead(200, {
+            'Content-Type': 'application/javascript',
+            'Content-Length': stats.size,
+            'Cache-Control': 'public, max-age=31536000'
+          });
+          res.end();
+        } else {
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'application/javascript',
+            'Content-Length': Buffer.byteLength(fileContent),
+            'Cache-Control': 'public, max-age=31536000'
+          });
+          res.end(fileContent);
+        }
+        console.log(`[STATIC] Successfully served: ${req.url}`);
+      } catch (error) {
+        console.log(`[STATIC] Error serving file: ${error.message}`);
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('File not found');
+      }
+      return;
+    }
+
+    // Serve Chart.js locally
+    if (req.url === '/chart.min.js' && (req.method === 'GET' || req.method === 'HEAD')) {
+      try {
+        const filePath = path.join(process.cwd(), 'public', 'chart.min.js');
+        console.log(`[STATIC] Serving file from: ${filePath}`);
+
+        if (req.method === 'HEAD') {
+          const stats = fs.statSync(filePath);
+          res.writeHead(200, {
+            'Content-Type': 'application/javascript',
+            'Content-Length': stats.size,
+            'Cache-Control': 'public, max-age=31536000'
+          });
+          res.end();
+        } else {
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'application/javascript',
+            'Content-Length': Buffer.byteLength(fileContent),
+            'Cache-Control': 'public, max-age=31536000'
+          });
+          res.end(fileContent);
+        }
+        console.log(`[STATIC] Successfully served: ${req.url}`);
+      } catch (error) {
+        console.log(`[STATIC] Error serving file: ${error.message}`);
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('File not found');
+      }
+      return;
+    }
 
     // Handle preflight OPTIONS requests
     if (req.method === 'OPTIONS') {
@@ -188,6 +242,38 @@ class ProxyServer {
     if (req.url === '/tailwind-3.4.17.js' && (req.method === 'GET' || req.method === 'HEAD')) {
       try {
         const filePath = path.join(process.cwd(), 'public', 'tailwind-3.4.17.js');
+        console.log(`[STATIC] Serving file from: ${filePath}`);
+
+        if (req.method === 'HEAD') {
+          const stats = fs.statSync(filePath);
+          res.writeHead(200, {
+            'Content-Type': 'application/javascript',
+            'Content-Length': stats.size,
+            'Cache-Control': 'public, max-age=31536000'
+          });
+          res.end();
+        } else {
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'application/javascript',
+            'Content-Length': Buffer.byteLength(fileContent),
+            'Cache-Control': 'public, max-age=31536000'
+          });
+          res.end(fileContent);
+        }
+        console.log(`[STATIC] Successfully served: ${req.url}`);
+      } catch (error) {
+        console.log(`[STATIC] Error serving file: ${error.message}`);
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('File not found');
+      }
+      return;
+    }
+
+    // Serve Chart.js locally
+    if (req.url === '/chart.min.js' && (req.method === 'GET' || req.method === 'HEAD')) {
+      try {
+        const filePath = path.join(process.cwd(), 'public', 'chart.min.js');
         console.log(`[STATIC] Serving file from: ${filePath}`);
 
         if (req.method === 'HEAD') {

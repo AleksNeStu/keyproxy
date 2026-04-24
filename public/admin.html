@@ -5,15 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>API Key KeyProxy - Admin Panel</title>
     
-    <!-- Tailwind CSS - Using CDN for development, consider building for production -->
-    <script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>
+    <!-- Tailwind CSS - Using local file for development -->
+    <script src="/tailwind-3.4.17.js" crossorigin="anonymous"></script>
     
-    <!-- Chart.js with SRI integrity check -->
-    <script 
-        src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" 
-        integrity="sha384-5fXkQPmQ0qNXmGqKqVvN5eFvJLqKqKqKqKqKqKqKqKqKqKqKqKqKqKqKqKqKqKqK"
+    <!-- Chart.js - Using local file for development -->
+    <script
+        src="/chart.min.js"
+        integrity="sha384-9nhczxUqK87bcKHh20fSQcTGD4qq5GhayNYSYWqwBkINBhOfQLg/P5HG5lF1urn4"
         crossorigin="anonymous"
-        onerror="console.error('Failed to load Chart.js from CDN')">
+        onerror="console.error('Failed to load Chart.js from local file')">
     </script>
     
     <style>
@@ -448,6 +448,63 @@
     </script>
 </head>
 <body class="min-h-screen bg-background" id="mainBody">
+    <!-- Global login function -->
+    <script>
+        async function login() {
+            const password = document.getElementById('password').value;
+            const errorDiv = document.getElementById('loginError');
+
+            try {
+                const response = await fetch('/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password }),
+                    credentials: 'include' // Required to send/receive cookies
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    // Store CSRF token from login response
+                    if (data.csrfToken) {
+                        csrfToken = data.csrfToken;
+                        localStorage.setItem('keyproxy_csrf_token', data.csrfToken);
+                    }
+
+                    document.getElementById('loginForm').classList.add('hidden');
+                    document.getElementById('adminPanel').classList.remove('hidden');
+                    if (data.passwordUpgradeAvailable) {
+                        sessionStorage.setItem('loginResponse', JSON.stringify(data));
+                    }
+                    loadEnvVars();
+                    // Fix header positioning after panel is shown
+                    setTimeout(adjustStickyHeaderPositioning, 100);
+                } else if (response.status === 429) {
+                    // Rate limited - show countdown timer UI
+                    const passwordInput = document.getElementById('password');
+                    const loginButton = document.getElementById('loginButton');
+                    passwordInput.disabled = true;
+                    loginButton.disabled = true;
+
+                    // Start countdown timer (this will hide inputs and show timer)
+                    if (data.remainingSeconds) {
+                        startLoginCountdown(data.remainingSeconds, passwordInput, loginButton, errorDiv);
+                    }
+                } else {
+                    // Show error with attempts remaining if available
+                    errorDiv.textContent = data.error || 'Invalid password';
+                    if (data.attemptsRemaining !== undefined) {
+                        errorDiv.textContent += ` (${data.attemptsRemaining} attempt(s) remaining)`;
+                    }
+                    errorDiv.classList.remove('hidden');
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Login failed: ' + error.message;
+                errorDiv.classList.remove('hidden');
+            }
+        }
+    </script>
+
     <!-- Login Form -->
     <div id="loginForm" class="min-h-screen flex items-center justify-center p-4">
         <div class="w-full max-w-md space-y-8">
