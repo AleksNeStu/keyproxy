@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>API Key KeyProxy - Admin Panel</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
     <style>
         :root {
           --background: #fafafa;
@@ -734,6 +735,10 @@
                                 Copy .env
                             </button>
                         </div>
+                        <div class="flex gap-2 mb-3">
+                            <button onclick="expandAllProviders()" class="btn btn-secondary px-3 py-1.5 text-xs">Expand All</button>
+                            <button onclick="collapseAllProviders()" class="btn btn-secondary px-3 py-1.5 text-xs">Collapse All</button>
+                        </div>
                         <div id="providersContainer" class="space-y-3 mb-4"></div>
                     </div>
 
@@ -958,7 +963,7 @@
                 </div>
 
                 <!-- Summary Cards -->
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
                     <div class="bg-card border border-border rounded-lg p-4">
                         <div class="text-xs text-muted-foreground uppercase tracking-wide">Total Requests</div>
                         <div id="analyticsTotalReqs" class="text-2xl font-bold mt-1">0</div>
@@ -968,8 +973,16 @@
                         <div id="analyticsAvgLatency" class="text-2xl font-bold mt-1">0ms</div>
                     </div>
                     <div class="bg-card border border-border rounded-lg p-4">
+                        <div class="text-xs text-muted-foreground uppercase tracking-wide">P95 Latency</div>
+                        <div id="analyticsP95Latency" class="text-2xl font-bold mt-1">0ms</div>
+                    </div>
+                    <div class="bg-card border border-border rounded-lg p-4">
                         <div class="text-xs text-muted-foreground uppercase tracking-wide">Est. Cost</div>
                         <div id="analyticsTotalCost" class="text-2xl font-bold mt-1">$0.00</div>
+                    </div>
+                    <div class="bg-card border border-border rounded-lg p-4">
+                        <div class="text-xs text-muted-foreground uppercase tracking-wide">Total Tokens</div>
+                        <div id="analyticsTotalTokens" class="text-2xl font-bold mt-1">0</div>
                     </div>
                     <div class="bg-card border border-border rounded-lg p-4">
                         <div class="text-xs text-muted-foreground uppercase tracking-wide">Error Rate</div>
@@ -977,17 +990,31 @@
                     </div>
                 </div>
 
-                <!-- Charts Row -->
+                <!-- Charts Row 1 -->
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <!-- Requests Over Time -->
                     <div class="bg-card border border-border rounded-lg p-4">
                         <h3 class="text-sm font-medium text-foreground mb-3">Requests Over Time</h3>
-                        <canvas id="chartRequests" width="500" height="200" class="w-full"></canvas>
+                        <canvas id="chartRequests"></canvas>
                     </div>
-                    <!-- Cost Per Provider (Pie-like bar) -->
+                    <!-- Cost Per Provider (Doughnut) -->
                     <div class="bg-card border border-border rounded-lg p-4">
                         <h3 class="text-sm font-medium text-foreground mb-3">Cost Breakdown by Provider</h3>
-                        <canvas id="chartCost" width="500" height="200" class="w-full"></canvas>
+                        <canvas id="chartCost"></canvas>
+                    </div>
+                </div>
+
+                <!-- Charts Row 2 -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <!-- Latency Distribution -->
+                    <div class="bg-card border border-border rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-foreground mb-3">Latency Distribution</h3>
+                        <canvas id="chartLatency"></canvas>
+                    </div>
+                    <!-- Latency Trend -->
+                    <div class="bg-card border border-border rounded-lg p-4">
+                        <h3 class="text-sm font-medium text-foreground mb-3">Latency Trend</h3>
+                        <canvas id="chartLatencyTrend"></canvas>
                     </div>
                 </div>
 
@@ -3210,6 +3237,8 @@
             loadRpmBadges();
             // Load expiry badges
             loadExpiryBadges();
+            // Restore collapse state
+            loadCollapseState();
         }
 
         function renderProviders() {
@@ -3456,12 +3485,15 @@
                 const totalKeyCount = provider.keys.length;
                 const isProviderDisabled = provider.disabled || false;
 
+                const providerCollapseId = `${provider.apiType}_${provider.name}`;
+
                 providerDiv.innerHTML = `
                     <div class="space-y-4${isProviderDisabled ? ' opacity-60' : ''}">
                         <!-- Header with provider name and actions -->
-                        <div class="flex items-center justify-between">
+                        <div class="flex items-center justify-between cursor-pointer select-none provider-header" onclick="toggleProviderCollapse('${providerCollapseId}')">
                             <div class="flex items-center space-x-3">
-                                <label class="toggle-switch" title="${isProviderDisabled ? 'Enable provider' : 'Disable provider'}">
+                                <svg id="provider-chevron-${providerCollapseId}" class="w-4 h-4 text-muted-foreground transition-transform duration-200 provider-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                <label class="toggle-switch" title="${isProviderDisabled ? 'Enable provider' : 'Disable provider'}" onclick="event.stopPropagation()">
                                     <input type="checkbox" ${!isProviderDisabled ? 'checked' : ''} onchange="toggleProvider('${provider.apiType}', '${provider.name}', !this.checked)">
                                     <span class="toggle-slider"></span>
                                 </label>
@@ -3470,7 +3502,7 @@
                                     <p class="text-xs text-muted-foreground">${provider.apiType.toUpperCase()} Compatible • ${enabledKeyCount}/${totalKeyCount} keys active</p>
                                 </div>
                             </div>
-                            <div class="flex items-center space-x-2">
+                            <div class="flex items-center space-x-2" onclick="event.stopPropagation()">
                                 <button
                                     onclick="startRenameProvider('${provider.apiType}', '${provider.name}')"
                                     class="btn btn-secondary px-2 py-1 text-xs font-medium"
@@ -3519,6 +3551,9 @@
                                 </button>
                             </div>
                         </div>
+
+                        <!-- Collapsible content container -->
+                        <div class="provider-keys-container" id="provider-keys-${providerCollapseId}" style="display: none;">
 
                         <!-- Configuration Section -->
                         <div class="bg-muted/30 rounded-lg p-3 space-y-3">
@@ -3896,6 +3931,7 @@
                                 </div>
                             </div>
                         </div>
+                        </div>
                     </div>
                 `;
                 providersContainer.appendChild(providerDiv);
@@ -3905,7 +3941,52 @@
                 providersContainer.innerHTML = '<div class="text-muted-foreground text-sm text-center py-4">No providers configured yet. Add one below.</div>';
             }
         }
-        
+
+        // --- Collapsible provider sections ---
+        function toggleProviderCollapse(name) {
+            const container = document.getElementById(`provider-keys-${name}`);
+            const chevron = document.getElementById(`provider-chevron-${name}`);
+            if (!container) return;
+            const isExpanded = container.style.display !== 'none';
+            container.style.display = isExpanded ? 'none' : 'block';
+            if (chevron) chevron.classList.toggle('rotate-90', !isExpanded);
+            saveCollapseState();
+        }
+
+        function saveCollapseState() {
+            const state = {};
+            document.querySelectorAll('.provider-keys-container').forEach(el => {
+                const name = el.id.replace('provider-keys-', '');
+                state[name] = el.style.display !== 'none';
+            });
+            localStorage.setItem('keyproxy_provider_collapse_state', JSON.stringify(state));
+        }
+
+        function loadCollapseState() {
+            try {
+                const saved = JSON.parse(localStorage.getItem('keyproxy_provider_collapse_state'));
+                if (!saved) return; // default: all collapsed
+                Object.entries(saved).forEach(([name, expanded]) => {
+                    const container = document.getElementById(`provider-keys-${name}`);
+                    const chevron = document.getElementById(`provider-chevron-${name}`);
+                    if (container) container.style.display = expanded ? 'block' : 'none';
+                    if (chevron) chevron.classList.toggle('rotate-90', expanded);
+                });
+            } catch {}
+        }
+
+        function expandAllProviders() {
+            document.querySelectorAll('.provider-keys-container').forEach(el => el.style.display = 'block');
+            document.querySelectorAll('.provider-chevron').forEach(el => el.classList.add('rotate-90'));
+            saveCollapseState();
+        }
+
+        function collapseAllProviders() {
+            document.querySelectorAll('.provider-keys-container').forEach(el => el.style.display = 'none');
+            document.querySelectorAll('.provider-chevron').forEach(el => el.classList.remove('rotate-90'));
+            saveCollapseState();
+        }
+
         // Removed legacy key rendering - now everything is managed as providers
         
         function updateEnvVar(key, value) {
@@ -5534,6 +5615,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         function cancelRenameProvider(apiType, providerName) {
             // Just refresh the provider list to restore original state
             renderProviders();
+            loadCollapseState();
         }
 
         async function confirmRenameProvider(apiType, oldName) {
@@ -7239,6 +7321,13 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         // Summary cards
         document.getElementById('analyticsTotalReqs').textContent = data.totalRequests.toLocaleString();
         document.getElementById('analyticsAvgLatency').textContent = data.avgLatencyMs + 'ms';
+        document.getElementById('analyticsP95Latency').textContent = (data.p95LatencyMs || 0) + 'ms';
+
+        const totalTokens = (data.totalInputTokens || 0) + (data.totalOutputTokens || 0);
+        document.getElementById('analyticsTotalTokens').textContent = totalTokens >= 1000000
+            ? (totalTokens / 1000000).toFixed(1) + 'M'
+            : totalTokens >= 1000 ? (totalTokens / 1000).toFixed(1) + 'K' : totalTokens.toLocaleString();
+
         document.getElementById('analyticsTotalCost').textContent = '$' + data.totalCost.toFixed(4);
         const errRate = data.totalRequests > 0 ? ((data.totalErrors / data.totalRequests) * 100).toFixed(1) : '0';
         document.getElementById('analyticsErrorRate').textContent = errRate + '%';
@@ -7293,100 +7382,306 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         // Draw charts
         drawRequestsChart(data.dailyRequests);
         drawCostChart(data.providers);
+        drawLatencyDistributionChart(data.latencyBuckets, data.p50LatencyMs, data.p95LatencyMs, data.p99LatencyMs);
+        drawLatencyTrendChart(data.dailyLatency);
+    }
+
+    // ─── Chart.js helpers ─────────────────────────────────
+    // Track Chart.js instances to destroy before recreating
+    window.chartInstances = window.chartInstances || {};
+
+    const chartDarkTheme = {
+        grid: { color: 'rgba(255,255,255,0.06)' },
+        ticks: { color: '#888' },
+        border: { color: 'rgba(255,255,255,0.1)' },
+    };
+
+    function destroyChart(name) {
+        if (window.chartInstances[name]) {
+            window.chartInstances[name].destroy();
+            window.chartInstances[name] = null;
+        }
     }
 
     function drawRequestsChart(dailyRequests) {
+        destroyChart('requests');
         const canvas = document.getElementById('chartRequests');
         if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const W = canvas.width = canvas.offsetWidth || 500;
-        const H = canvas.height = canvas.offsetHeight || 200;
-        ctx.clearRect(0, 0, W, H);
 
         if (!dailyRequests || dailyRequests.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#888';
             ctx.font = '13px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('No data', W / 2, H / 2);
+            ctx.fillText('No data', canvas.width / 2, canvas.height / 2);
             return;
         }
 
-        const maxVal = Math.max(...dailyRequests.map(d => d.count), 1);
-        const padL = 40, padB = 30, padT = 10, padR = 10;
-        const chartW = W - padL - padR;
-        const chartH = H - padT - padB;
+        const labels = dailyRequests.map(d => d.date.slice(5));
+        const counts = dailyRequests.map(d => d.count);
 
-        // Y axis
-        ctx.strokeStyle = '#333';
-        ctx.fillStyle = '#888';
-        ctx.font = '10px sans-serif';
-        ctx.textAlign = 'right';
-        for (let i = 0; i <= 4; i++) {
-            const y = padT + chartH - (chartH * i / 4);
-            ctx.beginPath();
-            ctx.moveTo(padL, y);
-            ctx.lineTo(W - padR, y);
-            ctx.strokeStyle = '#222';
-            ctx.stroke();
-            ctx.fillText(Math.round(maxVal * i / 4), padL - 4, y + 3);
-        }
-
-        // Bars
-        const barW = Math.max(4, chartW / dailyRequests.length - 2);
-        ctx.fillStyle = '#3b82f6';
-        dailyRequests.forEach((d, i) => {
-            const x = padL + (chartW / dailyRequests.length) * i + 1;
-            const barH = (d.count / maxVal) * chartH;
-            ctx.fillRect(x, padT + chartH - barH, barW, barH);
-
-            // Date label
-            if (dailyRequests.length <= 14 || i % Math.ceil(dailyRequests.length / 14) === 0) {
-                ctx.fillStyle = '#888';
-                ctx.font = '9px sans-serif';
-                ctx.textAlign = 'center';
-                ctx.fillText(d.date.slice(5), x + barW / 2, H - 5);
-                ctx.fillStyle = '#3b82f6';
+        window.chartInstances.requests = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Requests',
+                    data: counts,
+                    borderColor: '#3b82f6',
+                    backgroundColor: 'rgba(59, 130, 246, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#3b82f6',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => {
+                                const idx = items[0].dataIndex;
+                                return dailyRequests[idx].date;
+                            },
+                            label: (item) => `Requests: ${item.raw.toLocaleString()}`
+                        }
+                    }
+                },
+                scales: {
+                    x: { ...chartDarkTheme, grid: { display: false } },
+                    y: { ...chartDarkTheme, beginAtZero: true }
+                }
             }
         });
     }
 
     function drawCostChart(providers) {
+        destroyChart('cost');
         const canvas = document.getElementById('chartCost');
         if (!canvas) return;
-        const ctx = canvas.getContext('2d');
-        const W = canvas.width = canvas.offsetWidth || 500;
-        const H = canvas.height = canvas.offsetHeight || 200;
-        ctx.clearRect(0, 0, W, H);
 
         const entries = Object.entries(providers).filter(([, p]) => p.estimatedCost > 0);
         if (entries.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#888';
             ctx.font = '13px sans-serif';
             ctx.textAlign = 'center';
-            ctx.fillText('No cost data', W / 2, H / 2);
+            ctx.fillText('No cost data', canvas.width / 2, canvas.height / 2);
             return;
         }
 
         const totalCost = entries.reduce((s, [, p]) => s + p.estimatedCost, 0);
         const colors = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899'];
-        const pad = 20;
-        const chartW = W - pad * 2;
-        const chartH = H - pad * 2;
-
-        // Horizontal bar chart
         entries.sort((a, b) => b[1].estimatedCost - a[1].estimatedCost);
-        const barH = Math.min(30, (chartH - entries.length * 4) / entries.length);
 
-        entries.forEach(([name, p], i) => {
-            const y = pad + i * (barH + 4);
-            const w = Math.max(2, (p.estimatedCost / totalCost) * chartW * 0.7);
-            ctx.fillStyle = colors[i % colors.length];
-            ctx.fillRect(pad, y, w, barH);
+        const labels = entries.map(([name]) => name);
+        const values = entries.map(([, p]) => p.estimatedCost);
+        const bgColors = entries.map((_, i) => colors[i % colors.length]);
 
-            ctx.fillStyle = '#ccc';
-            ctx.font = '11px sans-serif';
-            ctx.textAlign = 'left';
-            ctx.fillText(`${name}  $${p.estimatedCost.toFixed(4)}`, pad + w + 6, y + barH / 2 + 4);
+        // Center text plugin
+        const centerTextPlugin = {
+            id: 'centerText',
+            afterDraw(chart) {
+                const { ctx: c, chartArea: { left, right, top, bottom } } = chart;
+                const cx = (left + right) / 2;
+                const cy = (top + bottom) / 2;
+                c.save();
+                c.font = 'bold 16px sans-serif';
+                c.fillStyle = '#ccc';
+                c.textAlign = 'center';
+                c.textBaseline = 'middle';
+                c.fillText('$' + totalCost.toFixed(4), cx, cy - 8);
+                c.font = '11px sans-serif';
+                c.fillStyle = '#888';
+                c.fillText('Total Cost', cx, cy + 10);
+                c.restore();
+            }
+        };
+
+        window.chartInstances.cost = new Chart(canvas, {
+            type: 'doughnut',
+            data: {
+                labels,
+                datasets: [{
+                    data: values,
+                    backgroundColor: bgColors,
+                    borderColor: 'rgba(0,0,0,0.3)',
+                    borderWidth: 2,
+                }]
+            },
+            plugins: [centerTextPlugin],
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                cutout: '60%',
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#aaa', font: { size: 11 }, padding: 12 }
+                    },
+                    tooltip: {
+                        callbacks: {
+                            label: (item) => `${item.label}: $${item.raw.toFixed(4)}`
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function drawLatencyDistributionChart(buckets, p50, p95, p99) {
+        destroyChart('latency');
+        const canvas = document.getElementById('chartLatency');
+        if (!canvas) return;
+
+        if (!buckets) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#888';
+            ctx.font = '13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('No data', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        const bucketLabels = ['<100', '100-250', '250-500', '500-1000', '1000-3000', '3000-10000', '>10000'];
+        const displayLabels = ['<100ms', '100-250ms', '250-500ms', '500ms-1s', '1s-3s', '3s-10s', '>10s'];
+        const values = bucketLabels.map(k => buckets[k] || 0);
+        const total = values.reduce((a, b) => a + b, 0);
+
+        // Color gradient: green (fast) -> red (slow)
+        const barColors = [
+            '#22c55e', '#84cc16', '#eab308', '#f97316', '#ef4444', '#dc2626', '#991b1b'
+        ];
+
+        window.chartInstances.latency = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: displayLabels,
+                datasets: [{
+                    label: 'Requests',
+                    data: values,
+                    backgroundColor: barColors,
+                    borderColor: barColors,
+                    borderWidth: 1,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: (item) => {
+                                const pct = total > 0 ? ((item.raw / total) * 100).toFixed(1) : 0;
+                                return `${item.raw.toLocaleString()} requests (${pct}%)`;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        ...chartDarkTheme,
+                        grid: { display: false },
+                        ticks: { ...chartDarkTheme.ticks, maxRotation: 45, font: { size: 10 } }
+                    },
+                    y: { ...chartDarkTheme, beginAtZero: true }
+                }
+            },
+            plugins: [{
+                id: 'percentileLines',
+                afterDraw(chart) {
+                    if (!p50 && !p95 && !p99) return;
+                    const { ctx: c, chartArea: { top, bottom, left, right } } = chart;
+                    const maxMs = 30000;
+
+                    const drawPLine = (val, color, label) => {
+                        if (!val || val <= 0) return;
+                        const ratio = Math.min(val / maxMs, 1);
+                        const px = left + ratio * (right - left);
+                        if (px < left || px > right) return;
+                        c.save();
+                        c.strokeStyle = color;
+                        c.lineWidth = 2;
+                        c.setLineDash([4, 3]);
+                        c.beginPath();
+                        c.moveTo(px, top);
+                        c.lineTo(px, bottom);
+                        c.stroke();
+                        c.setLineDash([]);
+                        c.fillStyle = color;
+                        c.font = 'bold 10px sans-serif';
+                        c.textAlign = 'center';
+                        c.fillText(label, px, top - 4);
+                        c.restore();
+                    };
+                    drawPLine(p50, '#22c55e', 'p50');
+                    drawPLine(p95, '#f59e0b', 'p95');
+                    drawPLine(p99, '#ef4444', 'p99');
+                }
+            }]
+        });
+    }
+
+    function drawLatencyTrendChart(dailyLatency) {
+        destroyChart('latencyTrend');
+        const canvas = document.getElementById('chartLatencyTrend');
+        if (!canvas) return;
+
+        if (!dailyLatency || dailyLatency.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#888';
+            ctx.font = '13px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('No data', canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        const labels = dailyLatency.map(d => d.date.slice(5));
+        const values = dailyLatency.map(d => d.avgMs);
+
+        window.chartInstances.latencyTrend = new Chart(canvas, {
+            type: 'line',
+            data: {
+                labels,
+                datasets: [{
+                    label: 'Avg Latency (ms)',
+                    data: values,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+                    fill: true,
+                    tension: 0.3,
+                    pointRadius: 3,
+                    pointBackgroundColor: '#f59e0b',
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: true,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            title: (items) => {
+                                const idx = items[0].dataIndex;
+                                return dailyLatency[idx].date;
+                            },
+                            label: (item) => `Avg Latency: ${item.raw}ms`
+                        }
+                    }
+                },
+                scales: {
+                    x: { ...chartDarkTheme, grid: { display: false } },
+                    y: { ...chartDarkTheme, beginAtZero: true, title: { display: true, text: 'ms', color: '#888' } }
+                }
+            }
         });
     }
 
