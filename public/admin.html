@@ -673,17 +673,6 @@
                             <span class="text-sm">Budgets</span>
                         </button>
                         <button
-                            onclick="showTab('configuration')"
-                            class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
-                            data-tab="configuration"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                            </svg>
-                            <span class="text-sm">Configuration</span>
-                        </button>
-                        <button
                             onclick="showTab('settings')"
                             class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
                             data-tab="settings"
@@ -1316,22 +1305,18 @@
                 <p class="text-xs text-muted-foreground mt-2">Auto-refreshes every 30 seconds when tab is visible. <span id="budgetLastRefresh"></span></p>
             </div>
 
-            <!-- Configuration Tab -->
-            <div id="configuration" class="tab-content hidden">
+            <!-- Settings Tab -->
+            <div id="settings" class="tab-content hidden">
                 <div class="section-header">
                     <div class="flex items-center justify-between">
                         <div>
-                            <h2 class="text-lg font-semibold text-foreground">Configuration</h2>
-                            <p class="text-muted-foreground text-xs mt-1">Manage environment files and loading priority</p>
+                            <h2 class="text-lg font-semibold text-foreground">Settings</h2>
+                            <p class="text-muted-foreground text-xs mt-1">Environment files, global configuration, security, notifications, and integrations</p>
                         </div>
-                        <button onclick="loadConfiguration()" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Reload configuration">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                            Reload
-                        </button>
                     </div>
                 </div>
 
-                <!-- Env Files Priority Management -->
+                <!-- Environment Files Priority Management -->
                 <div class="section">
                     <div class="flex items-center justify-between mb-3">
                         <h3 class="text-sm font-medium text-foreground">Environment Files Priority</h3>
@@ -1411,18 +1396,6 @@
                                 <button onclick="testExclusion()" class="btn btn-secondary px-3 py-1.5 text-sm">Test</button>
                                 <span id="exclusionTestResult" class="text-xs"></span>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Settings Tab -->
-            <div id="settings" class="tab-content hidden">
-                <div class="section-header">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-foreground">Settings</h2>
-                            <p class="text-muted-foreground text-xs mt-1">Global configuration, security, notifications, and integrations</p>
                         </div>
                     </div>
                 </div>
@@ -1796,6 +1769,96 @@
                                 </label>
                             </div>
                             <div id="importExportStatus" class="text-xs"></div>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Environment Files Priority Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            Environment Files Priority
+                        </h4>
+                        <div class="text-xs text-muted-foreground mb-3">Drag to reorder • Higher priority loads first</div>
+                        <div class="border border-border rounded p-4 bg-muted/30">
+                            <!-- Active File Indicator -->
+                            <div class="mb-3 pb-3 border-b border-border">
+                                <div class="flex items-center gap-2 text-sm">
+                                    <span class="text-muted-foreground">Currently Active:</span>
+                                    <span id="configActiveFile" class="font-medium text-foreground">-</span>
+                                    <span id="configActiveFileBadge" class="hidden px-2 py-0.5 text-xs bg-green-500/20 text-green-400 rounded-full">Active</span>
+                                </div>
+                            </div>
+
+                            <!-- Env Files List with Priority -->
+                            <div id="configEnvFileList" class="space-y-2">
+                                <div class="text-center text-muted-foreground text-sm py-4">Loading environment files...</div>
+                            </div>
+
+                            <!-- Add New Env File -->
+                            <details class="mt-4">
+                                <summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">+ Add environment file</summary>
+                                <div class="mt-2 flex items-center gap-2">
+                                    <input type="text" id="configNewEnvName" class="input-field w-1/3 px-2 py-1.5 text-sm rounded" placeholder="Name (e.g. staging)">
+                                    <input type="text" id="configNewEnvPath" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Full path to .env file">
+                                    <button onclick="addConfigEnvFile()" class="btn btn-primary px-3 py-1.5 text-sm">Add</button>
+                                </div>
+                            </details>
+
+                            <p class="text-[11px] text-muted-foreground mt-3">
+                                Priority determines loading order. Files are merged in priority order (1st → 2nd → 3rd...).
+                                Disabled files are skipped during loading. Drag files or use arrows to change priority.
+                            </p>
+                        </div>
+                    </div>
+
+                    <hr class="border-border">
+
+                    <!-- Key Sync Exclusions Section -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-foreground mb-3 flex items-center gap-2">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v12m0-12l-4 4m4-4l4-4" />
+                            </svg>
+                            Key Sync Exclusions
+                        </h4>
+                        <p class="text-[11px] text-muted-foreground mb-3">Exclude environment variable patterns from destination sync (Windows env, file sync)</p>
+                        <div class="border border-border rounded p-4 bg-muted/30">
+                            <!-- Patterns list -->
+                            <div id="exclusionPatternsList" class="space-y-2 mb-4">
+                                <div class="text-center text-muted-foreground text-sm py-4">Loading exclusion patterns...</div>
+                            </div>
+
+                            <!-- Add new pattern -->
+                            <details class="mb-3">
+                                <summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">+ Add exclusion pattern</summary>
+                                <div class="mt-2 space-y-2">
+                                    <div class="flex items-center gap-2">
+                                        <input type="text" id="exclusionPatternInput" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Pattern (e.g. CLOUDFLARE_* or ^INTERNAL_.*$)">
+                                        <select id="exclusionTypeSelect" class="input-field px-2 py-1.5 text-sm rounded" style="min-width: 80px;">
+                                            <option value="auto">Auto</option>
+                                            <option value="glob">Glob</option>
+                                            <option value="regex">Regex</option>
+                                        </select>
+                                        <input type="text" id="exclusionDescInput" class="input-field w-1/4 px-2 py-1.5 text-sm rounded" placeholder="Description (optional)">
+                                        <button onclick="addExclusion()" class="btn btn-primary px-3 py-1.5 text-sm">Add</button>
+                                    </div>
+                                    <p class="text-[11px] text-muted-foreground">Glob: use <code class="text-foreground">*</code> and <code class="text-foreground">?</code> wildcards (e.g. <code class="text-foreground">CLOUDFLARE_*</code>). Regex: full JavaScript regex (e.g. <code class="text-foreground">^INTERNAL_.*_SECRET$</code>).</p>
+                                </div>
+                            </details>
+
+                            <!-- Test pattern -->
+                            <div class="pt-3 border-t border-border">
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs text-muted-foreground">Test:</span>
+                                    <input type="text" id="exclusionTestInput" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Enter env var name to test (e.g. CLOUDFLARE_API_KEY)">
+                                    <button onclick="testExclusion()" class="btn btn-secondary px-3 py-1.5 text-sm">Test</button>
+                                    <span id="exclusionTestResult" class="text-xs"></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -6678,13 +6741,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             if (tabName === 'budgets') {
                 loadBudgets();
             }
-            // Load configuration if configuration tab is selected
-            if (tabName === 'configuration') {
-                loadConfiguration();
-                loadExclusions();
-            }
             // Load settings if settings tab is selected
             if (tabName === 'settings') {
+                loadConfiguration();
+                loadExclusions();
                 loadTelegramSettings();
                 checkPasswordUpgrade();
                 loadNotifications();
