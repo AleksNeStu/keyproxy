@@ -3725,8 +3725,26 @@
                             </div>
                         </div>
 
-                        <!-- Model Access Control -->
-                        <div class="bg-muted/30 rounded-lg p-3 space-y-3" id="modelAccess_${provider.apiType}_${provider.name}">
+                        <!-- Model Access Control (only for AI providers) -->
+                        ${(() => {
+                            // MCP providers don't have models concept
+                            const mcpProviders = ['brave', 'tavily', 'tavily_mcp', 'exa', 'firecrawl', 'context7', 'onref', 'searchapi', 'jina'];
+                            const isMcpProvider = mcpProviders.includes(provider.name.toLowerCase());
+                            
+                            if (isMcpProvider) {
+                                return `<div class="bg-muted/30 rounded-lg p-3">
+                                    <div class="text-xs text-muted-foreground text-center py-2">
+                                        <svg class="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                        Model selection not applicable for this provider type
+                                    </div>
+                                </div>`;
+                            }
+                            
+                            return `
+                        <div class="bg-muted/30 rounded-lg p-3 space-y-3" id="modelAccess_${provider.apiType}_${provider.name}">`
+                        })()}
                             <div class="flex items-center justify-between">
                                 <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Model Access</div>
                                 <div class="flex items-center space-x-2">
@@ -3781,6 +3799,7 @@
                                 ${provider.allowedModels.map(m => `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-primary/10 text-primary border border-primary/20">${escHtml(m)}</span>`).join('')}
                             </div>` : ''}
                         </div>
+                        ` : ''}
 
                         ${(() => {
                             const port = window.location.port || '8990';
@@ -5141,6 +5160,13 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         const fetchedModelsCache = {};
 
         async function fetchProviderModels(apiType, providerName) {
+            // Check if provider supports models
+            const mcpProviders = ['brave', 'tavily', 'tavily_mcp', 'exa', 'firecrawl', 'context7', 'onref', 'searchapi', 'jina'];
+            if (mcpProviders.includes(providerName.toLowerCase())) {
+                showErrorToast('This provider does not support model selection (MCP/Search service)');
+                return;
+            }
+
             const btn = document.getElementById(`fetchModelsBtn_${apiType}_${providerName}`);
             const spinner = document.getElementById(`fetchModelsSpinner_${apiType}_${providerName}`);
             const btnText = document.getElementById(`fetchModelsBtnText_${apiType}_${providerName}`);
