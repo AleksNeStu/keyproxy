@@ -81,7 +81,8 @@ class AnalyticsTracker {
         estimatedOutputTokens: 0,
         estimatedCost: 0,
         keys: {},
-        models: {}
+        models: {},
+        latencyBuckets: { '<100': 0, '100-250': 0, '250-500': 0, '500-1000': 0, '1000-3000': 0, '3000-10000': 0, '>10000': 0 }
       };
     }
     return day.providers[providerName];
@@ -99,6 +100,15 @@ class AnalyticsTracker {
     day.totalLatencyMs += latencyMs;
     prov.requests++;
     prov.latencyMs += latencyMs;
+
+    // Latency bucket assignment
+    if (latencyMs < 100) prov.latencyBuckets['<100']++;
+    else if (latencyMs < 250) prov.latencyBuckets['100-250']++;
+    else if (latencyMs < 500) prov.latencyBuckets['250-500']++;
+    else if (latencyMs < 1000) prov.latencyBuckets['500-1000']++;
+    else if (latencyMs < 3000) prov.latencyBuckets['1000-3000']++;
+    else if (latencyMs < 10000) prov.latencyBuckets['3000-10000']++;
+    else prov.latencyBuckets['>10000']++;
 
     if (statusCode >= 400) {
       day.totalErrors++;
@@ -165,6 +175,8 @@ class AnalyticsTracker {
       providers: {},
       dailyRequests: [],
       dailyCost: [],
+      dailyLatency: [],
+      latencyBuckets: { '<100': 0, '100-250': 0, '250-500': 0, '500-1000': 0, '1000-3000': 0, '3000-10000': 0, '>10000': 0 },
       topKeys: [],
       modelBreakdown: {}
     };
@@ -178,6 +190,10 @@ class AnalyticsTracker {
       summary.totalLatencyMs += day.totalLatencyMs;
 
       summary.dailyRequests.push({ date, count: day.totalRequests });
+
+      // Daily latency average
+      const dayAvgLatency = day.totalRequests > 0 ? Math.round(day.totalLatencyMs / day.totalRequests) : 0;
+      summary.dailyLatency.push({ date, avgMs: dayAvgLatency });
 
       let dayCost = 0;
 
@@ -195,6 +211,17 @@ class AnalyticsTracker {
         sp.estimatedCost += prov.estimatedCost;
         sp.estimatedInputTokens += prov.estimatedInputTokens;
         sp.estimatedOutputTokens += prov.estimatedOutputTokens;
+
+        // Accumulate into summary totals
+        summary.totalInputTokens += prov.estimatedInputTokens;
+        summary.totalOutputTokens += prov.estimatedOutputTokens;
+
+        // Aggregate latency buckets
+        if (prov.latencyBuckets) {
+          for (const [bucket, count] of Object.entries(prov.latencyBuckets)) {
+            summary.latencyBuckets[bucket] = (summary.latencyBuckets[bucket] || 0) + count;
+          }
+        }
 
         dayCost += prov.estimatedCost;
 
@@ -220,6 +247,11 @@ class AnalyticsTracker {
     summary.avgLatencyMs = summary.totalRequests > 0
       ? Math.round(summary.totalLatencyMs / summary.totalRequests) : 0;
 
+    // Compute percentile estimates from bucket distribution
+    summary.p50LatencyMs = this._estimatePercentile(summary.latencyBuckets, 0.50);
+    summary.p95LatencyMs = this._estimatePercentile(summary.latencyBuckets, 0.95);
+    summary.p99LatencyMs = this._estimatePercentile(summary.latencyBuckets, 0.99);
+
     // Top keys by usage
     summary.topKeys = Object.entries(keyMap)
       .map(([key, stats]) => ({ key, ...stats }))
@@ -229,6 +261,45 @@ class AnalyticsTracker {
     summary.modelBreakdown = modelMap;
 
     return summary;
+  }
+
+  /**
+   * Estimate a latency percentile from bucket distribution.
+   * Uses the midpoint of each bucket range for approximation.
+   * @param {Object} buckets - { '<100': n, '100-250': n, ... }
+   * @param {number} percentile - 0-1 (e.g. 0.95 for p95)
+   * @returns {number} estimated latency in ms
+   */
+  _estimatePercentile(buckets, percentile) {
+    const bucketDefs = [
+      { key: '<100', min: 0, max: 100 },
+      { key: '100-250', min: 100, max: 250 },
+      { key: '250-500', min: 250, max: 500 },
+      { key: '500-1000', min: 500, max: 1000 },
+      { key: '1000-3000', min: 1000, max: 3000 },
+      { key: '3000-10000', min: 3000, max: 10000 },
+      { key: '>10000', min: 10000, max: 30000 },
+    ];
+
+    const total = bucketDefs.reduce((s, b) => s + (buckets[b.key] || 0), 0);
+    if (total === 0) return 0;
+
+    const target = total * percentile;
+    let cumulative = 0;
+
+    for (const bucket of bucketDefs) {
+      const count = buckets[bucket.key] || 0;
+      cumulative += count;
+      if (cumulative >= target) {
+        // Interpolate within this bucket
+        const prevCumulative = cumulative - count;
+        const fraction = (target - prevCumulative) / count;
+        return Math.round(bucket.min + fraction * (bucket.max - bucket.min));
+      }
+    }
+
+    // Fallback: return upper bound of last bucket
+    return bucketDefs[bucketDefs.length - 1].max;
   }
 
   /**
