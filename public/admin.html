@@ -3301,10 +3301,8 @@
 
             // Render providers
             renderProviders();
-            // Load RPM data after render
-            loadRpmBadges();
-            // Load expiry badges
-            loadExpiryBadges();
+            // Load unified status (RPM + Expiry) after render
+            loadUnifiedStatus();
             // Restore collapse state
             loadCollapseState();
         }
@@ -8045,13 +8043,8 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         }
     }
 
-    // Refresh expiry badges every 30s when API Keys tab is visible
-    setInterval(() => {
-        const envTab = document.getElementById('environment');
-        if (envTab && !envTab.classList.contains('hidden')) {
-            loadExpiryBadges();
-        }
-    }, 30000);
+    // Note: Unified status (RPM + Expiry) is now loaded via single setInterval above
+    // Old separate intervals for loadRpmBadges and loadExpiryBadges have been removed
 
     // ─── Virtual Keys ──────────────────────────────────────────
 
