@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node main.js",
     "dev": "node index.js",
-    "test": "node --test test/**/*.test.js"
+    "test": "node --test test/**/*.test.js",
+    "test:coverage": "node --experimental-test-coverage --test test/**/*.test.js",
+    "test:watch": "node --test --watch test/**/*.test.js"
   },
   "keywords": [
     "api-key",
