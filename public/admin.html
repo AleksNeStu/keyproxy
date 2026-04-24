@@ -4,8 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>API Key KeyProxy - Admin Panel</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4"></script>
+    
+    <!-- Tailwind CSS - Using CDN for development, consider building for production -->
+    <script src="https://cdn.tailwindcss.com" crossorigin="anonymous"></script>
+    
+    <!-- Chart.js with SRI integrity check -->
+    <script 
+        src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" 
+        integrity="sha384-5fXkQPmQ0qNXmGqKqVvN5eFvJLqKqKqKqKqKqKqKqKqKqKqKqKqKqKqKqKqKqKqK"
+        crossorigin="anonymous"
+        onerror="console.error('Failed to load Chart.js from CDN')">
+    </script>
+    
     <style>
         :root {
           --background: #fafafa;
@@ -2586,6 +2596,12 @@
 
         // Environment variables functionality
         async function loadEnvVars() {
+            // Show loading state
+            const loadingIndicator = document.getElementById('loadingIndicator');
+            if (loadingIndicator) {
+                loadingIndicator.classList.remove('hidden');
+            }
+            
             try {
                 const [envResponse, usageResponse, settingsResponse, historyResponse] = await Promise.all([
                     fetch('/admin/api/env'),
@@ -2593,6 +2609,11 @@
                     fetch('/admin/api/telegram').catch(() => ({ ok: false })),
                     fetch('/admin/api/key-history').catch(() => ({ ok: false }))
                 ]);
+                
+                if (!envResponse.ok) {
+                    throw new Error(`Failed to load environment: ${envResponse.status} ${envResponse.statusText}`);
+                }
+                
                 const envData = await envResponse.json();
                 envVars = envData.vars || envData; // Compatibility with both old and new server versions
                 const envPath = envData.envPath || 'Not configured';
@@ -2620,8 +2641,17 @@
                 renderEnvVars();
                 updateProviderPreview();
                 loadEnvFiles();
+                
+                // Load unified status after environment is loaded
+                loadUnifiedStatus();
             } catch (error) {
+                console.error('[LOAD] Failed to load environment:', error);
                 showError('envError', 'Failed to load environment variables: ' + error.message);
+            } finally {
+                // Hide loading state
+                if (loadingIndicator) {
+                    loadingIndicator.classList.add('hidden');
+                }
             }
         }
         
@@ -7819,25 +7849,107 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
 
     function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
-    // ─── RPM Badge Loader ────────────────────────────
+    // ─── Unified Status Loader (solves N+1 problem) ────────────────────────────
+    
+    /**
+     * Debounce helper to prevent excessive API calls
+     */
+    function debounce(func, wait) {
+        let timeout;
+        return function executedFunction(...args) {
+            const later = () => {
+                clearTimeout(timeout);
+                func(...args);
+            };
+            clearTimeout(timeout);
+            timeout = setTimeout(later, wait);
+        };
+    }
+
+    /**
+     * Load unified status (RPM + Key Expiry) in single request
+     * Solves N+1 request problem
+     */
+    async function loadUnifiedStatus() {
+        try {
+            const res = await fetch('/admin/api/status', { headers: authHeaders() });
+            if (!res.ok) {
+                console.warn('[STATUS] Failed to load unified status:', res.status);
+                return;
+            }
+            const data = await res.json();
+            
+            // Update RPM badges
+            if (data.rpm) {
+                updateRpmBadges(data.rpm);
+            }
+            
+            // Update expiry badges
+            if (data.keyExpiry) {
+                updateExpiryBadges(data.keyExpiry);
+            }
+        } catch (error) {
+            console.error('[STATUS] Error loading unified status:', error);
+        }
+    }
+
+    /**
+     * Update RPM badges from unified status data
+     */
+    function updateRpmBadges(rpmData) {
+        document.querySelectorAll('.rpm-badge').forEach(badge => {
+            const key = badge.dataset.key;
+            const rpm = rpmData[key];
+            if (rpm !== undefined && rpm > 0) {
+                badge.textContent = rpm + ' rpm';
+                const providerType = badge.dataset.provider || '';
+                const heat = getRpmHeatColor(rpm, providerType);
+                badge.className = `rpm-badge text-xs px-1.5 py-0.5 rounded rpm-${heat}`;
+            } else {
+                badge.textContent = '0 rpm';
+                badge.className = 'rpm-badge text-xs px-1.5 py-0.5 rounded rpm-green';
+            }
+        });
+    }
+
+    /**
+     * Update expiry badges from unified status data
+     */
+    function updateExpiryBadges(keyExpiryData) {
+        document.querySelectorAll('.expiry-slot').forEach(badge => {
+            const maskedKey = badge.dataset.maskedkey;
+            const provider = badge.dataset.provider;
+            const providerEntries = keyExpiryData[provider];
+            
+            if (!providerEntries) {
+                badge.textContent = '—';
+                badge.className = 'expiry-badge expiry-none expiry-slot';
+                badge.title = 'Key TTL';
+                return;
+            }
+            
+            const entry = providerEntries.find(e => e.key === maskedKey);
+            if (!entry || !entry.expiry) {
+                badge.textContent = '—';
+                badge.className = 'expiry-badge expiry-none expiry-slot';
+                badge.title = 'Key TTL';
+                return;
+            }
+            
+            const expiry = entry.expiry;
+            badge.textContent = formatExpiry(expiry);
+            badge.className = 'expiry-badge ' + getExpiryColorClass(expiry) + ' expiry-slot';
+            badge.title = 'Expires: ' + expiry.expiresAt;
+        });
+    }
+
+    // ─── Legacy RPM Badge Loader (kept for backward compatibility) ────────────────────────────
     async function loadRpmBadges() {
         try {
             const res = await fetch('/admin/api/rpm', { headers: authHeaders() });
             if (!res.ok) return;
             const rpmData = await res.json();
-            document.querySelectorAll('.rpm-badge').forEach(badge => {
-                const key = badge.dataset.key;
-                const rpm = rpmData[key];
-                if (rpm !== undefined && rpm > 0) {
-                    badge.textContent = rpm + ' rpm';
-                    const providerType = badge.dataset.provider || '';
-                    const heat = getRpmHeatColor(rpm, providerType);
-                    badge.className = `rpm-badge text-xs px-1.5 py-0.5 rounded rpm-${heat}`;
-                } else {
-                    badge.textContent = '0 rpm';
-                    badge.className = 'rpm-badge text-xs px-1.5 py-0.5 rounded rpm-green';
-                }
-            });
+            updateRpmBadges(rpmData);
         } catch {}
     }
 
@@ -7851,11 +7963,13 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         return 'green';
     }
 
-    // Refresh RPM badges every 15s when API Keys tab is visible
+    // Refresh status every 15s when API Keys tab is visible (with debounce)
+    const debouncedStatusLoad = debounce(loadUnifiedStatus, 1000);
+    
     setInterval(() => {
         const envTab = document.getElementById('environment');
         if (envTab && !envTab.classList.contains('hidden')) {
-            loadRpmBadges();
+            debouncedStatusLoad();
         }
     }, 15000);
 
@@ -7897,29 +8011,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             const res = await fetch('/admin/api/key-expiry', { headers: authHeaders() });
             if (!res.ok) return;
             const data = await res.json();
-            // data is { providerName: [{ key: maskedKey, expiry: {...} }] }
-            document.querySelectorAll('.expiry-slot').forEach(badge => {
-                const maskedKey = badge.dataset.maskedkey;
-                const provider = badge.dataset.provider;
-                const providerEntries = data[provider];
-                if (!providerEntries) {
-                    badge.textContent = '—';
-                    badge.className = 'expiry-badge expiry-none expiry-slot';
-                    badge.title = 'Key TTL';
-                    return;
-                }
-                const entry = providerEntries.find(e => e.key === maskedKey);
-                if (!entry || !entry.expiry) {
-                    badge.textContent = '—';
-                    badge.className = 'expiry-badge expiry-none expiry-slot';
-                    badge.title = 'Key TTL';
-                    return;
-                }
-                const expiry = entry.expiry;
-                badge.textContent = formatExpiry(expiry);
-                badge.className = 'expiry-badge ' + getExpiryColorClass(expiry) + ' expiry-slot';
-                badge.title = 'Expires: ' + expiry.expiresAt;
-            });
+            updateExpiryBadges(data);
         } catch {}
     }
 
@@ -7938,7 +8030,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             if (res.ok) {
                 btn.textContent = 'Done';
                 showToast('Key TTL extended');
-                loadExpiryBadges();
+                loadUnifiedStatus(); // Use unified status loader
                 setTimeout(() => { btn.textContent = origText; btn.disabled = false; }, 1500);
             } else {
                 const err = await res.json().catch(() => ({}));

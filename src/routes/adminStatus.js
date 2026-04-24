@@ -1,0 +1,77 @@
+/**
+ * Admin unified status endpoint.
+ * Combines RPM, key expiry, and other status data into single response.
+ * Solves N+1 request problem.
+ */
+
+const { sendError } = require('./httpHelpers');
+
+/**
+ * GET /admin/api/status — unified status endpoint.
+ * Returns: { rpm: {...}, keyExpiry: {...}, health: {...} }
+ * 
+ * This endpoint combines multiple status checks into one request
+ * to prevent N+1 problem on frontend.
+ */
+async function handleGetStatus(server, res, params) {
+  try {
+    const response = {
+      rpm: {},
+      keyExpiry: {},
+      health: null,
+      timestamp: Date.now()
+    };
+
+    // Get RPM data
+    try {
+      const rpmData = server.rpmTracker.getAll();
+      for (const [key, count] of rpmData.entries()) {
+        response.rpm[key] = count;
+      }
+    } catch (error) {
+      console.error('[STATUS] Failed to get RPM data:', error.message);
+    }
+
+    // Get key expiry data
+    try {
+      const providers = server.config.getProviders();
+      for (const [providerName, providerConfig] of providers.entries()) {
+        const keyExpiryList = [];
+        for (const key of providerConfig.keys) {
+          const keyHash = server.historyManager.hashKey(key);
+          const maskedKey = server.historyManager.maskKey(key);
+          const expiryInfo = server.historyManager.getKeyExpiry(providerName, keyHash);
+          keyExpiryList.push({
+            key: maskedKey,
+            expiry: expiryInfo
+          });
+        }
+        response.keyExpiry[providerName] = keyExpiryList;
+      }
+    } catch (error) {
+      console.error('[STATUS] Failed to get key expiry data:', error.message);
+    }
+
+    // Get health summary (optional, only if requested)
+    if (params.includeHealth === 'true' && server.healthMonitor) {
+      try {
+        response.health = {
+          summary: server.healthMonitor.getSummary(),
+          providers: server.healthMonitor.getAllStatuses()
+        };
+      } catch (error) {
+        console.error('[STATUS] Failed to get health data:', error.message);
+      }
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(response));
+  } catch (error) {
+    console.error('[STATUS] Failed to get unified status:', error.message);
+    sendError(res, 500, 'Failed to get status: ' + error.message);
+  }
+}
+
+module.exports = {
+  handleGetStatus
+};

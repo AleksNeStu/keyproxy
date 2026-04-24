@@ -25,6 +25,7 @@ const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSet
 const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm } = require('./routes/adminKeys');
 const { handleToggleProvider, handleToggleSyncEnv, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
+const { handleGetStatus } = require('./routes/adminStatus');
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
 const { handleFetchModels, handleSaveModels } = require('./routes/adminModels');
 const { handleGetExclusions, handleAddExclusion, handleRemoveExclusion, handleToggleExclusion, handleTestExclusion } = require('./routes/adminExclusions');
@@ -558,6 +559,10 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/import-config' && req.method === 'POST') {
       return handleImportConfig(this, req, res, body);
+    }
+    // Unified status endpoint (combines RPM, key expiry, health)
+    if (adminPath === '/admin/api/status' && req.method === 'GET') {
+      return handleGetStatus(this, res, params);
     }
     if (adminPath === '/admin/api/rpm' && req.method === 'GET') {
       return handleGetRpm(this, res);
