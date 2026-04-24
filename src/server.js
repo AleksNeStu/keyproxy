@@ -171,6 +171,7 @@ class ProxyServer {
     res.setHeader('Access-Control-Allow-Origin', corsOrigin);
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, PATCH, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Origin, X-CSRF-Token');
+    res.setHeader('Access-Control-Allow-Credentials', 'true'); // Required for cookies
     res.setHeader('Access-Control-Max-Age', '86400'); // Cache preflight for 24 hours
 
     // Handle preflight OPTIONS requests
