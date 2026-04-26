@@ -4210,8 +4210,7 @@
                             }
                             
                             return `
-                        <div class="bg-muted/30 rounded-lg p-3 space-y-3" id="modelAccess_${provider.apiType}_${provider.name}">`
-                        })()}
+                        <div class="bg-muted/30 rounded-lg p-3 space-y-3" id="modelAccess_${provider.apiType}_${provider.name}">
                             <div class="flex items-center justify-between">
                                 <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Model Access</div>
                                 <div class="flex items-center space-x-2">
@@ -4265,7 +4264,8 @@
                             <div class="flex flex-wrap gap-1" id="allowedModelsTags_${provider.apiType}_${provider.name}">
                                 ${provider.allowedModels.map(m => `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-primary/10 text-primary border border-primary/20">${escHtml(m)}</span>`).join('')}
                             </div>` : ''}
-                        </div>
+                        </div>`;
+                        })()}
 
                         ${(() => {
                             const port = window.location.port || '8990';
