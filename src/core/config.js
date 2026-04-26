@@ -77,8 +77,8 @@ class Config {
    * Automatically discovers and groups keys from root .env based on naming patterns
    */
   autoDiscoverGlobalKeys(rootVars, localVars) {
-    // Known service defaults
-    const knownDefaults = {
+    // Known service defaults (also accessible via this.knownDefaults)
+    const knownDefaults = this.knownDefaults = {
       gemini: { type: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
       firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer' },
       tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', authHeader: 'Authorization', authPrefix: 'Bearer' },
@@ -364,6 +364,15 @@ class Config {
           } else if (config.apiType === 'gemini') {
             config.baseUrl = 'https://generativelanguage.googleapis.com/v1';
           }
+        }
+
+        // Apply authHeader/authPrefix from knownDefaults if not explicitly set
+        const known = this.knownDefaults?.[provider];
+        if (!config.authHeader && known?.authHeader) {
+          config.authHeader = known.authHeader;
+        }
+        if (config.authPrefix === null && known?.authPrefix !== undefined) {
+          config.authPrefix = known.authPrefix;
         }
 
         this.providers.set(provider, config);
