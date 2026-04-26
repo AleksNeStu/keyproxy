@@ -751,14 +751,16 @@
                             <h2 class="text-lg font-semibold text-foreground">API Keys Management</h2>
                             <p class="text-muted-foreground text-xs mt-1">Manage and test your API keys</p>
                         </div>
-                        <button onclick="reloadConfig(this)" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Reload configuration from .env files">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-                            Reload Config
-                        </button>
-                        <button onclick="checkAllKeys(this)" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Test all API keys and update verification status">
-                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                            Check All Keys
-                        </button>
+                        <div class="flex items-center gap-2">
+                            <button onclick="reloadConfig(this)" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Refresh keys from .env files">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                                Refresh
+                            </button>
+                            <button onclick="checkAllKeys(this)" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Test all API keys and update verification status">
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                Check All Keys
+                            </button>
+                        </div>
                     </div>
                 </div>
 
@@ -766,39 +768,6 @@
 
 
                 <div class="space-y-4 pt-4">
-                    <!-- Global Configuration -->
-                    <div class="section">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-sm font-medium text-foreground">Global Configuration</h3>
-                        </div>
-                        <div class="border border-border rounded p-4 bg-muted/30">
-                            <div class="mb-3">
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">Active Global .env</label>
-                                <div class="flex items-center space-x-2">
-                                    <select id="envFileSelect" onchange="switchEnv()" class="input-field px-2 py-1.5 text-sm rounded flex-1">
-                                        <option value="">Loading...</option>
-                                    </select>
-                                    <svg id="envSwitchSpinner" class="hidden animate-spin h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24">
-                                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/>
-                                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
-                                    </svg>
-                                    <span class="text-xs font-mono text-muted-foreground break-all" id="resolvedEnvPathDisplay"></span>
-                                </div>
-                            </div>
-                            <div id="envFileList" class="space-y-1 mb-3"></div>
-                            <details class="text-xs">
-                                <summary class="text-muted-foreground cursor-pointer hover:text-foreground">Manage env files</summary>
-                                <div class="mt-2 flex items-center space-x-2">
-                                    <input type="text" id="newEnvName" class="input-field w-1/3 px-2 py-1 text-sm rounded" placeholder="Name (e.g. staging)">
-                                    <input type="text" id="newEnvPath" class="input-field flex-1 px-2 py-1 text-sm rounded" placeholder="Path to .env">
-                                    <button onclick="selectEnvFile()" class="btn btn-secondary px-2 py-1 text-xs" title="Browse">
-                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                                    </button>
-                                    <button onclick="addEnvFile()" class="btn btn-primary px-3 py-1 text-xs font-medium">Add</button>
-                                </div>
-                            </details>
-                        </div>
-                    </div>
                     <!-- Existing Providers -->
                     <div class="section">
                         <div class="flex items-center justify-between mb-3">
@@ -821,7 +790,7 @@
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                                 </svg>
-                                Copy All Agent Context
+                                Agent Context
                             </button>
                         </div>
                         <div id="keyCountsSummary" class="flex items-center gap-4 text-xs text-muted-foreground mb-3 px-2 py-2 bg-muted/50 rounded-md"></div>
@@ -2950,14 +2919,27 @@
             svg.classList.add('animate-spin');
             label.textContent = 'Checking...';
             try {
-                const res = await fetch('/admin/api/test-all-keys', { method: 'POST' });
+                const res = await fetch('/admin/api/test-all-keys', {
+                    method: 'POST',
+                    headers: { ...authHeaders(), 'Content-Type': 'application/json' }
+                });
                 const data = await res.json();
                 if (data.success) {
                     const s = data.summary;
                     label.textContent = `${s.verified}/${s.total} OK`;
                     svg.style.color = '#16a34a';
                     showSuccessToast(`Key check: ${s.verified}/${s.total} verified, ${s.failed} failed`);
-                    await loadEnvVars().catch(() => {});
+                    // Reload key data and re-render UI
+                    try {
+                        const usageRes = await fetch('/admin/api/key-usage');
+                        if (usageRes.ok) keyUsageData = await usageRes.json();
+                    } catch (_) {}
+                    try {
+                        const histRes = await fetch('/admin/api/key-history');
+                        if (histRes.ok) keyHistoryData = await histRes.json();
+                    } catch (_) {}
+                    renderProviders();
+                    if (typeof loadUnifiedStatus === 'function') loadUnifiedStatus();
                 } else {
                     label.textContent = 'Failed';
                     svg.style.color = '#dc2626';
@@ -2973,7 +2955,7 @@
                     svg.classList.remove('animate-spin');
                     svg.style.color = '';
                     label.textContent = origText;
-                }, 3000);
+                }, 10000);
             }
         }
 
@@ -4158,52 +4140,31 @@
                                     <p class="text-xs text-muted-foreground">${provider.apiType.toUpperCase()} Compatible • ${enabledKeyCount}/${totalKeyCount} keys active</p>
                                 </div>
                             </div>
-                            <div class="flex items-center space-x-2" onclick="event.stopPropagation()">
+                            <div class="flex items-center space-x-1.5" onclick="event.stopPropagation()">
                                 <button
                                     onclick="startRenameProvider('${provider.apiType}', '${provider.name}')"
-                                    class="btn btn-secondary px-2 py-1 text-xs font-medium"
+                                    class="transition-colors p-1 text-muted-foreground hover:text-foreground"
                                     title="Rename provider"
                                 >
-                                    <svg class="w-3.5 h-3.5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                                    </svg>
-                                    Rename
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                 </button>
                                 <button
                                     onclick="copyAgentContext('${provider.apiType}', '${provider.name}')"
-                                    class="btn btn-info px-2 py-1 text-xs font-medium"
-                                    title="Copy configuration context for AI agents (MCP servers, API clients, etc.)"
+                                    class="transition-colors p-1 text-muted-foreground hover:text-foreground"
+                                    title="Copy agent context"
                                 >
-                                    <svg class="w-3.5 h-3.5 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                    </svg>
-                                    Agent Context
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                                 </button>
-                                <div class="relative inline-flex" id="curlBtnWrap_${provider.apiType}_${provider.name}">
-                                    <button
-                                        onclick="copyProviderCurl('${provider.apiType}', '${provider.name}', 'completions')"
-                                        class="btn btn-secondary px-2 py-1 text-xs font-medium rounded-r-none border-r-0"
-                                        title="Copy /completions cURL command"
-                                    >Copy cURL</button>
-                                    <button
-                                        onclick="toggleCurlDropdown('${provider.apiType}', '${provider.name}', event)"
-                                        class="btn btn-secondary px-1.5 py-1 text-xs font-medium rounded-l-none"
-                                        title="More cURL options"
-                                    >▾</button>
-                                    <div id="curlDropdown_${provider.apiType}_${provider.name}" class="hidden absolute right-0 top-full mt-1 z-50 bg-popover border border-border rounded-md shadow-lg min-w-max">
-                                        <button onclick="copyProviderCurl('${provider.apiType}', '${provider.name}', 'completions'); closeCurlDropdown('${provider.apiType}', '${provider.name}')" class="block w-full text-left px-3 py-2 text-xs hover:bg-accent text-foreground">
-                                            Copy /completions cURL
-                                        </button>
-                                        <button onclick="copyProviderCurl('${provider.apiType}', '${provider.name}', 'models'); closeCurlDropdown('${provider.apiType}', '${provider.name}')" class="block w-full text-left px-3 py-2 text-xs hover:bg-accent text-foreground">
-                                            Copy /models cURL
-                                        </button>
-                                    </div>
-                                </div>
+                                <button
+                                    onclick="copyProviderCurl('${provider.apiType}', '${provider.name}', 'completions')"
+                                    class="btn btn-secondary px-2 py-1 text-xs font-medium"
+                                    title="Copy cURL command"
+                                >cURL</button>
                                 <button
                                     onclick="copyProviderEnvVar('${provider.apiType}', '${provider.name}')"
                                     class="btn btn-secondary px-2 py-1 text-xs font-medium"
-                                    title="Copy primary key as ENV_VAR=value"
-                                >Copy Env Var</button>
+                                    title="Copy .env variables"
+                                >.env</button>
                                 <button
                                     id="syncBtn_${provider.apiType}_${provider.name}"
                                     onclick="toggleSyncEnv('${provider.apiType}', '${provider.name}')"
@@ -4228,107 +4189,61 @@
                         <div class="provider-keys-container" id="provider-keys-${providerCollapseId}" style="display: none;">
 
 
-                            <!-- Access Key and Default Model Row -->
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                <div>
-                                    <label class="block text-xs text-muted-foreground mb-1.5 font-medium">Access Key (Optional)</label>
-                                    <div class="relative">
-                                        <input
-                                            type="text"
-                                            id="accessKey_${provider.apiType}_${provider.name}"
-                                            value="${provider.accessKey || ''}"
-                                            data-original="${provider.accessKey || ''}"
-                                            class="input-field w-full px-3 py-2 pr-28 text-xs rounded transition-colors font-mono"
-                                            placeholder="Enter access key or leave empty"
-                                            oninput="checkForChanges('accessKey', '${provider.apiType}', '${provider.name}')"
-                                            onkeypress="if(event.key === 'Enter') saveAccessKey('${provider.apiType}', '${provider.name}')"
-                                        >
-                                        <div class="absolute right-1 top-1/2 -translate-y-1/2 flex items-center">
-                                            <button
-                                                onclick="generateAccessKey('${provider.apiType}', '${provider.name}')"
-                                                class="text-muted-foreground hover:text-foreground transition-colors p-1"
-                                                title="Generate new key"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                                </svg>
-                                            </button>
-                                            <button
-                                                onclick="copyAccessKey('${provider.apiType}', '${provider.name}')"
-                                                class="text-muted-foreground hover:text-foreground transition-colors p-1"
-                                                title="Copy access key"
-                                            >
-                                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
-                                                </svg>
-                                            </button>
-                                            <button
-                                                id="saveBtn_accessKey_${provider.apiType}_${provider.name}"
-                                                ${accessKeyAction ? `onclick="${accessKeyAction}"` : ''}
-                                                class="${accessKeyClass}"
-                                                style="${accessKeyStyle}"
-                                                title="${accessKeyTitle}"
-                                            >
-                                                ${accessKeyButtonHtml}
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div>
-                                    <label class="block text-xs text-muted-foreground mb-1.5 font-medium">Default Model (Optional)</label>
-                                    <div class="relative">
-                                        <input
-                                            type="text"
-                                            id="defaultModel_${provider.apiType}_${provider.name}"
-                                            value="${provider.defaultModel || ''}"
-                                            data-original="${provider.defaultModel || ''}"
-                                            class="input-field w-full px-3 py-2 pr-20 text-xs rounded transition-colors"
-                                            placeholder="${provider.apiType === 'openai' ? 'e.g., gpt-4o-mini' : 'e.g., gemini-1.5-flash'}"
-                                            oninput="checkForChanges('defaultModel', '${provider.apiType}', '${provider.name}')"
-                                            onkeypress="if(event.key === 'Enter') saveDefaultModel('${provider.apiType}', '${provider.name}')"
-                                            autocomplete="off"
-                                        >
-                                        <button
-                                            id="historyBtn_defaultModel_${provider.apiType}_${provider.name}"
-                                            onclick="toggleModelHistory('${provider.apiType}', '${provider.name}')"
-                                            class="absolute right-12 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
-                                            title="Model History"
-                                            ${(!provider.modelHistory || provider.modelHistory.length === 0) ? 'disabled style="opacity: 0.3; cursor: not-allowed; pointer-events: none;"' : ''}
-                                        >
-                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                            </svg>
-                                        </button>
-                                        <button
-                                            id="saveBtn_defaultModel_${provider.apiType}_${provider.name}"
-                                            ${defaultModelAction ? `onclick="${defaultModelAction}"` : ''}
-                                            class="${defaultModelClass}"
-                                            style="${defaultModelStyle}"
-                                            title="${defaultModelTitle}"
-                                        >
-                                            ${defaultModelButtonHtml}
-                                        </button>
-                                        <div id="modelHistory_${provider.apiType}_${provider.name}" class="hidden absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg z-10 max-h-48 overflow-y-auto">
-                                            ${(provider.modelHistory && provider.modelHistory.length > 0) ? provider.modelHistory.map(model => `
-                                                <div class="flex items-center justify-between px-3 py-2 text-xs hover:bg-secondary transition-colors group">
-                                                    <button
-                                                        onclick="selectModelFromHistory('${provider.apiType}', '${provider.name}', '${model.replace(/'/g, "&apos;")}')"
-                                                        class="flex-1 text-left"
-                                                    >
-                                                        ${model}
-                                                    </button>
-                                                    <button
-                                                        onclick="showDeleteModelConfirmation(event, '${provider.apiType}', '${provider.name}', '${model.replace(/'/g, "&apos;")}')"
-                                                        class="ml-2 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
-                                                        title="Remove from history"
-                                                    >
-                                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                                        </svg>
-                                                    </button>
-                                                </div>
-                                            `).join('') : ''}
-                                        </div>
+                            <!-- Default Model Row -->
+                            <div class="mb-3">
+                                <label class="block text-xs text-muted-foreground mb-1.5 font-medium">Default Model (Optional)</label>
+                                <div class="relative max-w-md">
+                                    <input
+                                        type="text"
+                                        id="defaultModel_${provider.apiType}_${provider.name}"
+                                        value="${provider.defaultModel || ''}"
+                                        data-original="${provider.defaultModel || ''}"
+                                        class="input-field w-full px-3 py-2 pr-20 text-xs rounded transition-colors"
+                                        placeholder="${provider.apiType === 'openai' ? 'e.g., gpt-4o-mini' : 'e.g., gemini-1.5-flash'}"
+                                        oninput="checkForChanges('defaultModel', '${provider.apiType}', '${provider.name}')"
+                                        onkeypress="if(event.key === 'Enter') saveDefaultModel('${provider.apiType}', '${provider.name}')"
+                                        autocomplete="off"
+                                    >
+                                    <button
+                                        id="historyBtn_defaultModel_${provider.apiType}_${provider.name}"
+                                        onclick="toggleModelHistory('${provider.apiType}', '${provider.name}')"
+                                        class="absolute right-12 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
+                                        title="Model History"
+                                        ${(!provider.modelHistory || provider.modelHistory.length === 0) ? 'disabled style="opacity: 0.3; cursor: not-allowed; pointer-events: none;"' : ''}
+                                    >
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                        </svg>
+                                    </button>
+                                    <button
+                                        id="saveBtn_defaultModel_${provider.apiType}_${provider.name}"
+                                        ${defaultModelAction ? `onclick="${defaultModelAction}"` : ''}
+                                        class="${defaultModelClass}"
+                                        style="${defaultModelStyle}"
+                                        title="${defaultModelTitle}"
+                                    >
+                                        ${defaultModelButtonHtml}
+                                    </button>
+                                    <div id="modelHistory_${provider.apiType}_${provider.name}" class="hidden absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg z-10 max-h-48 overflow-y-auto">
+                                        ${(provider.modelHistory && provider.modelHistory.length > 0) ? provider.modelHistory.map(model => `
+                                            <div class="flex items-center justify-between px-3 py-2 text-xs hover:bg-secondary transition-colors group">
+                                                <button
+                                                    onclick="selectModelFromHistory('${provider.apiType}', '${provider.name}', '${model.replace(/'/g, "&apos;")}')"
+                                                    class="flex-1 text-left"
+                                                >
+                                                    ${model}
+                                                </button>
+                                                <button
+                                                    onclick="showDeleteModelConfirmation(event, '${provider.apiType}', '${provider.name}', '${model.replace(/'/g, "&apos;")}')"
+                                                    class="ml-2 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
+                                                    title="Remove from history"
+                                                >
+                                                    <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        `).join('') : ''}
                                     </div>
                                 </div>
                             </div>
@@ -4554,7 +4469,7 @@
                                             <span class="toggle-slider"></span>
                                         </label>
                                         <!-- Key value -->
-                                        <div class="flex-1 font-mono text-xs text-foreground bg-muted px-2 py-1 rounded${isKeyDisabled ? ' line-through' : ''}">
+                                        <div class="flex-1 font-mono text-xs text-foreground bg-muted px-2 py-1 rounded cursor-pointer hover:bg-muted/70${isKeyDisabled ? ' line-through' : ''}" onclick="copyToClipboard('${keyVal.replace(/'/g, "\\'")}', 'Key copied!')" title="Click to copy key">
                                             ${maskedKey}
                                         </div>
                                         ${envSourceName ? `<span class="text-[10px] text-muted-foreground font-mono" title="Source: ${envSourceName}">${envSourceName.length > 25 ? envSourceName.substring(0, 22) + '...' : envSourceName}</span>` : ''}

@@ -384,7 +384,7 @@ print(response.content)
    */
   getActiveProviders() {
     const providers = [];
-    const envVars = this.config.getAllEnvVars();
+    const envVars = this.config.getEffectiveEnvVars();
 
     const providerMap = {};
 
