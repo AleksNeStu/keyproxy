@@ -794,6 +794,13 @@
                             </button>
                         </div>
                         <div id="keyCountsSummary" class="flex items-center gap-4 text-xs text-muted-foreground mb-3 px-2 py-2 bg-muted/50 rounded-md"></div>
+                        <div class="relative mb-3">
+                            <svg class="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+                            <input id="providerSearchInput" type="text" placeholder="Filter providers..." class="input-field w-full pl-10 pr-8 py-1.5 text-xs rounded" oninput="filterProviders(this.value)">
+                            <button id="providerSearchClear" onclick="clearProviderSearch()" class="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors hidden" title="Clear filter">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
                         <div id="providersContainer" class="space-y-3 mb-4"></div>
                     </div>
 
@@ -4517,6 +4524,39 @@
             if (Object.keys(providers).length === 0) {
                 providersContainer.innerHTML = '<div class="text-muted-foreground text-sm text-center py-4">No providers configured yet. Add one below.</div>';
             }
+            applyProviderFilter();
+        }
+
+        // --- Provider search filter ---
+        let _providerFilterQuery = '';
+
+        function filterProviders(query) {
+            _providerFilterQuery = query.trim().toLowerCase();
+            const clearBtn = document.getElementById('providerSearchClear');
+            if (clearBtn) clearBtn.classList.toggle('hidden', !_providerFilterQuery);
+            applyProviderFilter();
+        }
+
+        function clearProviderSearch() {
+            const input = document.getElementById('providerSearchInput');
+            if (input) input.value = '';
+            _providerFilterQuery = '';
+            const clearBtn = document.getElementById('providerSearchClear');
+            if (clearBtn) clearBtn.classList.add('hidden');
+            applyProviderFilter();
+        }
+
+        function applyProviderFilter() {
+            const container = document.getElementById('providersContainer');
+            if (!container) return;
+            Array.from(container.children).forEach(card => {
+                if (!_providerFilterQuery) {
+                    card.classList.remove('hidden');
+                    return;
+                }
+                const text = card.textContent.toLowerCase();
+                card.classList.toggle('hidden', !text.includes(_providerFilterQuery));
+            });
         }
 
         // --- Collapsible provider sections ---
