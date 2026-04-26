@@ -302,6 +302,27 @@ class ProxyServer {
       return;
     }
 
+    // Serve admin panel
+    if ((req.url === '/admin' || req.url === '/admin.html') && req.method === 'GET') {
+      try {
+        const htmlPath = path.join(process.cwd(), 'public', 'admin.html');
+        console.log(`[ADMIN] Serving admin panel from: ${htmlPath}`);
+
+        const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+        res.writeHead(200, {
+          'Content-Type': 'text/html',
+          'Content-Length': Buffer.byteLength(htmlContent)
+        });
+        res.end(htmlContent);
+        console.log(`[ADMIN] Successfully served admin panel`);
+      } catch (error) {
+        console.log(`[ADMIN] Error serving admin panel: ${error.message}`);
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading admin panel');
+      }
+      return;
+    }
+
     // Serve test login page
     if (req.url === '/test-login' || req.url === '/test-login.html') {
       try {
