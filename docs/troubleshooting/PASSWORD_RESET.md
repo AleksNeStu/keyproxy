@@ -18,7 +18,7 @@ The current admin password is: **`admin123`**
 
 1. Stop KeyProxy service:
    ```powershell
-   .\manage.ps1 stop
+   .\scriptsmanage.ps1 stop
    ```
 
 2. Delete the password hash file:
@@ -33,7 +33,7 @@ The current admin password is: **`admin123`**
 
 4. Start KeyProxy:
    ```powershell
-   .\manage.ps1 start
+   .\scriptsmanage.ps1 start
    ```
 
 5. The password will be automatically migrated to secure hash file and removed from `.env`

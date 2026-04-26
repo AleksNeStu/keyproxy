@@ -5,7 +5,8 @@
 
 PORT=8990
 APP_NAME="KeyProxy"
-LOG_DIR="./logs"
+PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+LOG_DIR="$PROJECT_ROOT/logs"
 STDOUT_LOG="$LOG_DIR/stdout.log"
 STDERR_LOG="$LOG_DIR/stderr.log"
 
@@ -23,7 +24,7 @@ case "$1" in
             echo -e "\e[33m✅ $APP_NAME is already running on port $PORT (PID: $pid)\e[0m"
         else
             echo -e "\e[36m🚀 Starting $APP_NAME in background...\e[0m"
-            nohup node main.js > "$STDOUT_LOG" 2> "$STDERR_LOG" &
+            nohup node "$PROJECT_ROOT/main.js" > "$STDOUT_LOG" 2> "$STDERR_LOG" &
             sleep 2
             new_pid=$(get_pid)
             if [ -n "$new_pid" ]; then
@@ -75,7 +76,7 @@ case "$1" in
         fi
 
         SERVICE_FILE="/etc/systemd/system/keyproxy.service"
-        WORKING_DIR=$(pwd)
+        WORKING_DIR="$PROJECT_ROOT"
         NODE_PATH=$(which node)
 
         echo -e "\e[36m🛠️  Creating systemd service: $SERVICE_FILE\e[0m"
@@ -89,7 +90,7 @@ After=network.target
 Type=simple
 User=$SUDO_USER
 WorkingDirectory=$WORKING_DIR
-ExecStart=$NODE_PATH main.js
+ExecStart=$NODE_PATH $PROJECT_ROOT/main.js
 Restart=always
 
 [Install]

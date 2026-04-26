@@ -1,0 +1,58 @@
+# PRD: MCP Inject Quick Launch
+
+## Goal
+Integrate the MCP intercept module into Claude Code config so that search MCP servers (Brave, Exa, Jina) route through KeyProxy for automatic key rotation. No real API keys in config files — only placeholders.
+
+## Context
+- KeyProxy running at localhost:8990 with 14 providers configured
+- MCP intercept module created at src/inject/mcp-intercept.cjs (Layer 1: fetch, Layer 2: http.request)
+- Per-provider auth headers implemented (Brave=X-Subscription-Token, Exa=x-api-key, Jina=Authorization Bearer)
+- End-to-end tested: intercept → proxy → Brave returns 200 OK
+- Current MCP config in ~/.claude.json has real API keys in env vars
+
+## Tasks
+
+### Task 1: Configure Brave MCP with intercept
+Modify search-brave entry in ~/.claude.json:
+- Set BRAVE_API_KEY to "placeholder"
+- Add NODE_OPTIONS=--require pointing to mcp-intercept.cjs
+- Add KEYPROXY_ROUTES for api.search.brave.com → brave
+- Add KEYPROXY_STATUS_CODES=429,402,403
+Test: run mcp__search-brave__brave_web_search query, verify 200 through proxy.
+
+### Task 2: Configure Exa MCP with intercept
+Modify search-exa entry in ~/.claude.json:
+- Set EXA_API_KEY to "placeholder"
+- Add NODE_OPTIONS, KEYPROXY_ROUTES for api.exa.ai → exa
+Test: run mcp__search-exa__get_code_context_exa query, verify works through proxy.
+
+### Task 3: Configure Jina MCP with intercept
+Modify parse-jina entry in ~/.claude.json:
+- Set JINA_API_KEY to "placeholder"
+- Add NODE_OPTIONS, KEYPROXY_ROUTES for r.jina.ai → jina, s.jina.ai → jina
+Test: run mcp__parse-jina__jina_reader query, verify works through proxy.
+
+### Task 4: Security cleanup — remove real API keys from MCP config
+After all 3 servers confirmed working through proxy:
+- Replace all real API keys in ~/.claude.json with "placeholder"
+- Verify no real keys remain (grep for patterns)
+- Keys now only exist in KeyProxy .env and parent .env
+
+### Task 5: Verify all 3 servers work simultaneously
+Run queries through all 3 MCP servers in sequence:
+- Brave web search
+- Exa code search
+- Jina URL reader
+All should return 200 through proxy with key rotation active.
+
+## Constraints
+- Only modify search-brave, search-exa, parse-jina entries
+- Do NOT touch other MCP servers (doc-ref, doc-rtfm, ui-*, sec-*, git-*, mgmt-taskmaster, vision-gemini, cloud-cloudflare)
+- KeyProxy must be running on localhost:8990 before testing
+- Use absolute path for intercept: E:/nestlab-repo/nest-solo/infra/keyproxy/src/inject/mcp-intercept.cjs
+
+## Acceptance Criteria
+- All 3 MCP servers return valid results through proxy
+- No real API keys in ~/.claude.json for these servers
+- Proxy logs show requests from all 3 providers
+- Key rotation works (verified via proxy admin logs)

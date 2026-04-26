@@ -33,25 +33,25 @@
 ### Windows (PowerShell)
 ```powershell
 # Install as Windows service (starts on boot)
-./manage.ps1 install
+./scripts/manage.ps1 install
 
 # Check status
-./manage.ps1 status
+./scripts/manage.ps1 status
 
 # View logs
-./manage.ps1 logs
+./scripts/manage.ps1 logs
 ```
 
 ### Linux (Systemd)
 ```bash
 # Install as systemd service
-sudo ./manage.sh install
+sudo ./scripts/manage.sh install
 
 # Check status
-sudo ./manage.sh status
+sudo ./scripts/manage.sh status
 
 # View logs
-sudo ./manage.sh logs
+sudo ./scripts/manage.sh logs
 ```
 
 ### Docker
@@ -413,7 +413,7 @@ docker compose logs -f
 
 ```powershell
 # Install
-./manage.ps1 install
+./scripts/manage.ps1 install
 
 # Runs as background service, starts on boot
 # Logs: daemon/keyproxy.out.log
@@ -426,7 +426,7 @@ docker compose logs -f
 
 ```bash
 # Install
-sudo ./manage.sh install
+sudo ./scripts/manage.sh install
 
 # Service: keyproxy.service
 # Logs: journalctl -u keyproxy -f
@@ -580,7 +580,7 @@ MIT License. Copyright (c) 2026 NestLab.
 
 - **Issues**: [GitHub Issues](https://github.com/AleksNeStu/keyproxy/issues)
 - **Documentation**: [./docs](./docs)
-- **Logs**: `./manage.ps1 logs` (Windows) or `./manage.sh logs` (Linux)
+- **Logs**: `./scripts/manage.ps1 logs` (Windows) or `./scripts/manage.sh logs` (Linux)
 
 ---
 

@@ -69,10 +69,10 @@ Nothing happens after entering the password on the admin panel login page.
 1. Make sure you are using: `admin123`
 2. If password does not work, reset it:
    ```powershell
-   .\manage.ps1 stop
+   .\scriptsmanage.ps1 stop
    Remove-Item data\admin.hash -Force
    echo "ADMIN_PASSWORD=admin123" >> .env
-   .\manage.ps1 start
+   .\scriptsmanage.ps1 start
    ```
 
 ### Issue 4: Service Not Updated
@@ -83,7 +83,7 @@ Nothing happens after entering the password on the admin panel login page.
 
 **Fix:**
 ```powershell
-.\manage.ps1 restart
+.\scriptsmanage.ps1 restart
 ```
 
 ## Test via PowerShell
@@ -109,7 +109,7 @@ Content: {"success":true,"passwordUpgradeAvailable":false}
 ## Check Server Logs
 
 ```powershell
-.\manage.ps1 logs
+.\scriptsmanage.ps1 logs
 ```
 
 Look for:

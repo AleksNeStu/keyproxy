@@ -4,12 +4,12 @@ const path = require('path');
 const svc = new Service({
   name: 'KeyProxy',
   description: 'API Key Orchestrator & Proxy — rotation, health checks, environment sync',
-  script: path.join(__dirname, 'main.js'),
+  script: path.join(__dirname, '..', 'main.js'),
   nodeOptions: ['--harmony'],
-  workingDirectory: __dirname,
+  workingDirectory: path.join(__dirname, '..'),
   env: [
     { name: 'NODE_ENV', value: 'production' },
-    { name: 'KEYPROXY_DIR', value: __dirname }
+    { name: 'KEYPROXY_DIR', value: path.join(__dirname, '..') }
   ]
 });
 

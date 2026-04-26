@@ -14,7 +14,7 @@
 ### Reset Password
 ```powershell
 # Stop service
-.\manage.ps1 stop
+.\scriptsmanage.ps1 stop
 
 # Delete old hash
 Remove-Item data\admin.hash -Force
@@ -23,7 +23,7 @@ Remove-Item data\admin.hash -Force
 echo "ADMIN_PASSWORD=new_password" >> .env
 
 # Start service (password will be auto-migrated)
-.\manage.ps1 start
+.\scriptsmanage.ps1 start
 ```
 
 **Full guide:** [Password Reset Guide](../troubleshooting/PASSWORD_RESET.md)
@@ -52,19 +52,19 @@ curl -H "Authorization: Bearer [ACCESS_KEY:secret123]" \
 
 ```powershell
 # Check status
-.\manage.ps1 status
+.\scriptsmanage.ps1 status
 
 # View logs
-.\manage.ps1 logs
+.\scriptsmanage.ps1 logs
 
 # Restart
-.\manage.ps1 restart
+.\scriptsmanage.ps1 restart
 
 # Stop
-.\manage.ps1 stop
+.\scriptsmanage.ps1 stop
 
 # Start
-.\manage.ps1 start
+.\scriptsmanage.ps1 start
 ```
 
 ## 🌐 API Usage
@@ -102,8 +102,8 @@ curl http://localhost:8990/gemini/v1/models \
 
 ### Service Not Running
 ```powershell
-.\manage.ps1 status
-.\manage.ps1 start
+.\scriptsmanage.ps1 status
+.\scriptsmanage.ps1 start
 ```
 
 ### Port Already in Use
@@ -115,5 +115,5 @@ netstat -ano | findstr :8990
 taskkill /PID <PID> /F
 
 # Restart service
-.\manage.ps1 start
+.\scriptsmanage.ps1 start
 ```

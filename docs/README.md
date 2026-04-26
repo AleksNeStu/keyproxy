@@ -37,7 +37,7 @@ KeyProxy is a multi-provider API key orchestrator that:
 
 ### Linux
 ```bash
-sudo ./manage.sh install
+sudo ./scripts/manage.sh install
 ```
 
 ## 🛠️ Service Management
@@ -53,11 +53,11 @@ sudo ./manage.sh install
 
 ### Linux
 ```bash
-sudo ./manage.sh status
-sudo ./manage.sh start
-sudo ./manage.sh stop
-sudo ./manage.sh restart
-sudo ./manage.sh logs
+sudo ./scripts/manage.sh status
+sudo ./scripts/manage.sh start
+sudo ./scripts/manage.sh stop
+sudo ./scripts/manage.sh restart
+sudo ./scripts/manage.sh logs
 ```
 
 ## 🌐 Admin Panel

@@ -30,7 +30,7 @@ if (-not (Test-Administrator)) {
 Write-Host "KeyProxy Manager (Administrator)`n" -ForegroundColor Cyan
 Write-Host "Command: $Command`n" -ForegroundColor Gray
 
-$ManageScript = Join-Path (Split-Path $PSScriptRoot -Parent) "..\manage.ps1"
+$ManageScript = Join-Path (Split-Path $PSScriptRoot -Parent) "manage.ps1"
 if (Test-Path $ManageScript) {
     try {
         & $ManageScript $Command

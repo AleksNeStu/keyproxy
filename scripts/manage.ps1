@@ -4,7 +4,7 @@ param(
     [string]$Command
 )
 
-$KeyProxyDir = $PSScriptRoot
+$KeyProxyDir = Split-Path $PSScriptRoot -Parent
 $Port = 8990
 $ServiceName = 'keyproxy.exe'
 $AdminUrl = "http://localhost:${Port}/admin"
@@ -63,7 +63,7 @@ switch ($Command) {
         }
 
         Push-Location $KeyProxyDir
-        node service.js
+        node "$PSScriptRoot\service.js"
         Pop-Location
 
         $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
@@ -92,7 +92,7 @@ switch ($Command) {
         }
 
         Push-Location $KeyProxyDir
-        node service.js uninstall
+        node "$PSScriptRoot\service.js" uninstall
         Pop-Location
 
         $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
