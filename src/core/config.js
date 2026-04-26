@@ -417,6 +417,20 @@ class Config {
     return !!(envPassword || Auth.loadHashFromFile());
   }
 
+  isGlobalSyncEnabled() {
+    return this.envVars.SYNC_TO_OS_ENV?.toLowerCase() === 'true';
+  }
+
+  isProviderSyncEnabled(providerName) {
+    const provider = this.providers.get(providerName);
+    if (!provider) return false;
+    const syncEnvVar = `${provider.apiType.toUpperCase()}_${providerName.toUpperCase()}_SYNC_ENV`;
+    const perProvider = this.envVars[syncEnvVar]?.toLowerCase();
+    if (perProvider === 'false') return false;
+    if (perProvider === 'true') return true;
+    return this.isGlobalSyncEnabled();
+  }
+
   // New provider methods
   getProviders() {
     return this.providers;

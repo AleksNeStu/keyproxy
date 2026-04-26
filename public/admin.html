@@ -1404,6 +1404,41 @@
                     </div>
                 </div>
 
+                <!-- System Sync: Active Keys to OS Environment -->
+                <div class="section">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-sm font-medium text-foreground flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                                System Sync
+                            </h3>
+                            <p class="text-xs text-muted-foreground mt-1">Sync active API keys to OS environment variables (Windows: setx / Linux: export). MCP servers using direct connections will pick up the current working key.</p>
+                        </div>
+                    </div>
+                    <div class="border border-border rounded p-4 bg-muted/30">
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center gap-3">
+                                <button id="globalSyncToggle" onclick="toggleGlobalSync()" class="relative w-10 h-5 rounded-full transition-colors bg-muted cursor-pointer">
+                                    <span id="globalSyncDot" class="absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-muted-foreground transition-transform"></span>
+                                </button>
+                                <div>
+                                    <span class="text-sm font-medium text-foreground">Sync Active Keys to OS Env</span>
+                                    <span id="globalSyncStatus" class="ml-2 text-xs text-muted-foreground">Disabled</span>
+                                </div>
+                            </div>
+                            <div class="text-xs text-muted-foreground">
+                                Global toggle — per-provider overrides available in Providers tab
+                            </div>
+                        </div>
+                        <div id="globalSyncInfo" class="mt-3 hidden text-xs text-muted-foreground border-t border-border pt-3">
+                            <div class="flex items-start gap-2">
+                                <svg class="w-4 h-4 text-green-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span>When enabled, KeyProxy writes the currently active (rotated) key to <code class="px-1 py-0.5 bg-muted rounded text-foreground">setx PROVIDER_API_KEY "key"</code> on Windows. New processes will see the updated key. Existing processes need restart.</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="space-y-5">
                     <!-- General Section -->
                     <div>
@@ -3731,10 +3766,18 @@
             loadCollapseState();
         }
 
+        function isProviderSyncOn(provider) {
+            const envKey = `${provider.apiType.toUpperCase()}_${provider.name.toUpperCase()}_SYNC_ENV`;
+            const perProvider = envVars[envKey]?.toLowerCase();
+            if (perProvider === 'true') return true;
+            if (perProvider === 'false') return false;
+            return envVars['SYNC_TO_OS_ENV']?.toLowerCase() === 'true';
+        }
+
         function renderProviders() {
             const providersContainer = document.getElementById('providersContainer');
             providersContainer.innerHTML = '';
-            
+
             // Group environment variables by provider
             const providers = {};
             
@@ -4034,9 +4077,10 @@
                                     </div>
                                 </div>
                                 <button
+                                    id="syncBtn_${provider.apiType}_${provider.name}"
                                     onclick="toggleSyncEnv('${provider.apiType}', '${provider.name}')"
-                                    class="transition-colors p-1 ${provider.syncEnv ? 'text-green-500' : 'text-muted-foreground hover:text-foreground'}"
-                                    title="${provider.syncEnv ? 'Windows Env Sync ON — click to disable' : 'Sync active key to Windows Env — click to enable'}"
+                                    class="transition-colors p-1 ${isProviderSyncOn(provider) ? 'text-green-500' : 'text-muted-foreground hover:text-foreground'}"
+                                    title="${isProviderSyncOn(provider) ? 'Sync ON — click to disable' : 'Sync OFF — click to enable'}"
                                 >
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                 </button>
@@ -4534,13 +4578,60 @@
                 });
                 const data = await res.json();
                 if (data.success) {
-                    showSuccessToast(enabled ? `Syncing ${providerName} active key to Windows env` : `Windows env sync disabled for ${providerName}`);
-                    await loadEnvVars();
+                    envVars[envKey] = enabled ? 'true' : 'false';
+                    showSuccessToast(enabled ? `Sync ON: ${providerName} → setx ${providerName.toUpperCase()}_API_KEY` : `Sync OFF for ${providerName}`);
+                    renderProviders();
                 } else {
                     showErrorToast('Failed: ' + (data.error || 'Unknown'));
                 }
             } catch (error) {
                 showErrorToast('Failed to toggle sync: ' + error.message);
+            }
+        }
+
+        async function toggleGlobalSync() {
+            try {
+                const currentState = envVars['SYNC_TO_OS_ENV']?.toLowerCase() === 'true';
+                const enabled = !currentState;
+
+                const res = await fetch('/admin/api/toggle-global-sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ enabled })
+                });
+                const data = await res.json();
+                if (data.success) {
+                    envVars['SYNC_TO_OS_ENV'] = enabled ? 'true' : 'false';
+                    updateGlobalSyncUI();
+                    showSuccessToast(enabled ? 'Global Sync ON — active keys will be written to OS env' : 'Global Sync OFF');
+                    renderProviders();
+                } else {
+                    showErrorToast('Failed: ' + (data.error || 'Unknown'));
+                }
+            } catch (error) {
+                showErrorToast('Failed to toggle global sync: ' + error.message);
+            }
+        }
+
+        function updateGlobalSyncUI() {
+            const enabled = envVars['SYNC_TO_OS_ENV']?.toLowerCase() === 'true';
+            const toggle = document.getElementById('globalSyncToggle');
+            const dot = document.getElementById('globalSyncDot');
+            const status = document.getElementById('globalSyncStatus');
+            const info = document.getElementById('globalSyncInfo');
+
+            if (enabled) {
+                toggle.className = 'relative w-10 h-5 rounded-full transition-colors bg-green-500 cursor-pointer';
+                dot.className = 'absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white transition-transform translate-x-5';
+                status.textContent = 'Enabled';
+                status.className = 'ml-2 text-xs text-green-500 font-medium';
+                info.classList.remove('hidden');
+            } else {
+                toggle.className = 'relative w-10 h-5 rounded-full transition-colors bg-muted cursor-pointer';
+                dot.className = 'absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-muted-foreground transition-transform';
+                status.textContent = 'Disabled';
+                status.className = 'ml-2 text-xs text-muted-foreground';
+                info.classList.add('hidden');
             }
         }
 
@@ -6786,6 +6877,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 loadFallbacks();
                 loadLbSettings();
                 loadGeneralSettings();
+                updateGlobalSyncUI();
                 loadRetryConfig();
                 loadProviderConfig();
             }

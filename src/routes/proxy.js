@@ -152,8 +152,7 @@ async function getProviderClient(server, providerName, provider, legacy = false)
       return null;
     }
     const WindowsEnv = require('../destinations/windowsEnv');
-    const syncEnvVar = `${provider.apiType.toUpperCase()}_${providerName.toUpperCase()}_SYNC_ENV`;
-    const systemEnvName = server.config.envVars[syncEnvVar]?.toLowerCase() === 'true'
+    const systemEnvName = server.config.isProviderSyncEnabled(providerName)
       ? WindowsEnv.deriveEnvName(providerName)
       : null;
     const lbStrategyKey = `${provider.apiType.toUpperCase()}_${providerName.toUpperCase().replace(/-/g, '_')}_LB_STRATEGY`;

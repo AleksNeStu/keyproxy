@@ -24,7 +24,7 @@ const { sendError, sendResponse, readRequestBody, getStatusText } = require('./r
 const { isAdminAuthenticated, handleAdminLogin, handleAdminLogout, handleAuthCheck, handleChangePassword, handleUpgradePassword } = require('./routes/adminAuth');
 const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetGeneralSettings, handleUpdateGeneralSettings, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./routes/adminEnv');
 const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm } = require('./routes/adminKeys');
-const { handleToggleProvider, handleToggleSyncEnv, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey } = require('./routes/adminProviders');
+const { handleToggleProvider, handleToggleSyncEnv, handleToggleGlobalSync, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
 const { handleGetStatus } = require('./routes/adminStatus');
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
@@ -611,6 +611,9 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/toggle-sync-env' && req.method === 'POST') {
       return handleToggleSyncEnv(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/toggle-global-sync' && req.method === 'POST') {
+      return handleToggleGlobalSync(this, req, res, body);
     }
     if (adminPath === '/admin/api/upgrade-password' && req.method === 'POST') {
       return handleUpgradePassword(this, req, res);

@@ -43,8 +43,9 @@ async function handleToggleProvider(server, req, res, body) {
 }
 
 /**
- * POST /admin/api/toggle-sync-env — toggle sync-to-env for a provider.
+ * POST /admin/api/toggle-sync-env — toggle sync-to-os-env for a provider.
  * Body: { apiType, providerName, enabled }
+ * Writes to OS environment variables (setx on Windows), NOT to .env file.
  */
 async function handleToggleSyncEnv(server, req, res, body) {
   try {
@@ -54,26 +55,49 @@ async function handleToggleSyncEnv(server, req, res, body) {
       return;
     }
 
-    const envPath = path.join(process.cwd(), '.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    const envVars = server.config.parseEnvFile(envContent);
-
+    const WindowsEnv = require('../destinations/windowsEnv');
     const envKey = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_SYNC_ENV`;
 
     if (enabled) {
-      envVars[envKey] = 'true';
+      await WindowsEnv.setEnvVar(envKey, 'true');
     } else {
-      delete envVars[envKey];
+      await WindowsEnv.setEnvVar(envKey, 'false');
     }
 
-    server.writeEnvFile(envVars);
-    server.config.loadConfig();
+    // Update in-memory config so the change takes effect immediately
+    server.config.envVars[envKey] = enabled ? 'true' : 'false';
     server.reinitializeClients();
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ success: true }));
+    res.end(JSON.stringify({ success: true, provider: providerName, syncEnabled: enabled }));
   } catch (error) {
     sendError(res, 500, 'Failed to toggle sync env: ' + error.message);
+  }
+}
+
+/**
+ * POST /admin/api/toggle-global-sync — toggle global SYNC_TO_OS_ENV.
+ * Body: { enabled }
+ * Writes to OS environment variables, NOT to .env file.
+ */
+async function handleToggleGlobalSync(server, req, res, body) {
+  try {
+    const { enabled } = JSON.parse(body);
+    const WindowsEnv = require('../destinations/windowsEnv');
+
+    if (enabled) {
+      await WindowsEnv.setEnvVar('SYNC_TO_OS_ENV', 'true');
+    } else {
+      await WindowsEnv.setEnvVar('SYNC_TO_OS_ENV', 'false');
+    }
+
+    server.config.envVars['SYNC_TO_OS_ENV'] = enabled ? 'true' : 'false';
+    server.reinitializeClients();
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, globalSyncEnabled: enabled }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to toggle global sync: ' + error.message);
   }
 }
 
@@ -449,6 +473,7 @@ function validateMcpKey(apiType, apiKey) {
 module.exports = {
   handleToggleProvider,
   handleToggleSyncEnv,
+  handleToggleGlobalSync,
   handleGetHealth,
   handleHealthCheckAll,
   handleHealthReset,
