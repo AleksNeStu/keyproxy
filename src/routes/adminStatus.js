@@ -5,6 +5,7 @@
  */
 
 const { sendError } = require('./httpHelpers');
+const { maskApiKey } = require('../core/utils');
 
 /**
  * GET /admin/api/status — unified status endpoint.
@@ -24,10 +25,9 @@ async function handleGetStatus(server, res, params) {
 
     // Get RPM data
     try {
-      const rpmData = server.rpmTracker.getAll();
-      for (const [key, count] of rpmData.entries()) {
-        response.rpm[key] = count;
-      }
+      const rpmData = server.rpmTracker.getAllRpm();
+      // getAllRpm() returns Object with masked keys: { "sk-abc123": 5, "sk-def456": 2 }
+      Object.assign(response.rpm, rpmData);
     } catch (error) {
       console.error('[STATUS] Failed to get RPM data:', error.message);
     }
@@ -39,7 +39,7 @@ async function handleGetStatus(server, res, params) {
         const keyExpiryList = [];
         for (const key of providerConfig.keys) {
           const keyHash = server.historyManager.hashKey(key);
-          const maskedKey = server.historyManager.maskKey(key);
+          const maskedKey = maskApiKey(key); // Use utils.maskApiKey instead of non-existent maskKey
           const expiryInfo = server.historyManager.getKeyExpiry(providerName, keyHash);
           keyExpiryList.push({
             key: maskedKey,
