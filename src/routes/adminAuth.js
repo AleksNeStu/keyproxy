@@ -65,7 +65,7 @@ async function handleAdminLogin(server, req, res, body) {
       const upgradeAvailable = !Auth.isHash(adminPassword) && !Auth.loadHashFromFile();
       res.writeHead(200, {
         'Content-Type': 'application/json',
-        'Set-Cookie': `adminSession=${server.adminSessionToken}; HttpOnly; Secure; SameSite=Strict; Expires=${expires}; Path=/admin`
+        'Set-Cookie': `adminSession=${server.adminSessionToken}; HttpOnly; SameSite=Strict; Expires=${expires}; Path=/admin`
       });
       res.end(JSON.stringify({
         success: true,
@@ -111,7 +111,7 @@ function handleAdminLogout(server, req, res) {
   server.csrfToken = null; // Clear CSRF token on logout
   res.writeHead(200, {
     'Content-Type': 'application/json',
-    'Set-Cookie': 'adminSession=; HttpOnly; Secure; SameSite=Strict; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/admin'
+    'Set-Cookie': 'adminSession=; HttpOnly; SameSite=Strict; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Path=/admin'
   });
   res.end(JSON.stringify({ success: true }));
 }

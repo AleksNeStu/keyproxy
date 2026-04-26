@@ -471,12 +471,7 @@
 <body class="min-h-screen bg-background" id="mainBody">
     <script>
         (function() {
-            var isAuthenticated = sessionStorage.getItem('adminAuthenticated') === 'true';
-            if (isAuthenticated) {
-                document.body.classList.add('authenticated');
-            } else {
-                document.body.classList.add('not-authenticated');
-            }
+            document.body.classList.add('not-authenticated');
         })();
     </script>
     <!-- Global login function -->
@@ -7132,6 +7127,8 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     // Fetch CSRF token when authenticated
                     await fetchCsrfToken();
 
+                    document.body.classList.remove('not-authenticated');
+                    document.body.classList.add('authenticated');
                     document.getElementById('loginForm').classList.add('hidden');
                     document.getElementById('adminPanel').classList.remove('hidden');
                     loadEnvVars();
