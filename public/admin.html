@@ -15,7 +15,21 @@
         crossorigin="anonymous"
         onerror="console.error('Failed to load Chart.js from local file')">
     </script>
-    
+
+    <script>
+        // Immediately check authentication status to prevent login form flash
+        (function() {
+            const isAuthenticated = sessionStorage.getItem('adminAuthenticated') === 'true';
+            if (isAuthenticated) {
+                document.body.classList.add('authenticated');
+                document.body.classList.remove('not-authenticated');
+            } else {
+                document.body.classList.add('not-authenticated');
+                document.body.classList.remove('authenticated');
+            }
+        })();
+    </script>
+
     <style>
         :root {
           --background: #fafafa;
@@ -149,6 +163,27 @@
             margin: 0;
             padding: 0;
             transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Prevent login form flash on page load */
+        #loginForm {
+            display: none;
+        }
+        #adminPanel {
+            display: none;
+        }
+        /* Show forms via JavaScript */
+        body.authenticated #loginForm {
+            display: none;
+        }
+        body.authenticated #adminPanel {
+            display: block;
+        }
+        body.not-authenticated #loginForm {
+            display: flex;
+        }
+        body.not-authenticated #adminPanel {
+            display: none;
         }
         
         .section {
@@ -471,8 +506,8 @@
                         localStorage.setItem('keyproxy_csrf_token', data.csrfToken);
                     }
 
-                    document.getElementById('loginForm').classList.add('hidden');
-                    document.getElementById('adminPanel').classList.remove('hidden');
+                    document.body.classList.add('authenticated');
+                    document.body.classList.remove('not-authenticated');
                     if (data.passwordUpgradeAvailable) {
                         sessionStorage.setItem('loginResponse', JSON.stringify(data));
                     }
@@ -519,18 +554,19 @@
             </div>
             
             <div class="login-container p-6">
-                <div class="space-y-4">
-                    <div id="loginInputs">
-                        <div>
-                            <label for="password" class="block text-sm font-medium text-foreground mb-2">Password</label>
-                            <input
-                                type="password"
-                                id="password"
-                                class="input-field w-full px-3 py-2 rounded-md transition-colors"
-                                placeholder="Enter admin password"
-                                autofocus
-                            >
-                        </div>
+                <form onsubmit="return false;">
+                    <div class="space-y-4">
+                        <div id="loginInputs">
+                            <div>
+                                <label for="password" class="block text-sm font-medium text-foreground mb-2">Password</label>
+                                <input
+                                    type="password"
+                                    id="password"
+                                    class="input-field w-full px-3 py-2 rounded-md transition-colors"
+                                    placeholder="Enter admin password"
+                                    autofocus
+                                >
+                            </div>
                         <button
                             onclick="login()"
                             id="loginButton"
@@ -554,7 +590,8 @@
                         </div>
                     </div>
                     <div id="loginError" class="hidden bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md text-sm"></div>
-                </div>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -711,35 +748,6 @@
                 </div>
 
                 <div id="reloadSuccess" class="hidden bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md mb-4"></div>
-
-                <!-- Per-Provider Retry Overrides -->
-                <div class="section mt-4">
-                    <div class="flex items-center justify-between mb-3">
-                        <div>
-                            <h3 class="text-sm font-medium text-foreground">Per-Provider Retry Overrides</h3>
-                            <p class="text-xs text-muted-foreground mt-0.5">Leave empty to use global settings (configured in Settings tab)</p>
-                        </div>
-                        <button onclick="saveRetryConfig(this)" class="btn btn-primary px-3 py-1 text-xs">Save Overrides</button>
-                    </div>
-                    <div id="retrySuccess" class="hidden bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md mb-3"></div>
-                    <div class="border border-border rounded p-4 bg-muted/30">
-                        <div class="grid grid-cols-4 gap-2 mb-2 text-xs font-medium text-muted-foreground">
-                            <span>Provider</span>
-                            <span>Max Retries</span>
-                            <span>Delay (ms)</span>
-                            <span>Backoff</span>
-                        </div>
-                        <div id="retryPerProvider" class="space-y-2"></div>
-                        <div class="mt-3 pt-3 border-t border-border">
-                            <p class="text-xs text-muted-foreground flex items-center gap-1.5">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                <span>Providers using global settings show empty fields. Configure global defaults in <button onclick="showTab('settings')" class="text-primary hover:underline font-medium">Settings</button>.</span>
-                            </p>
-                        </div>
-                    </div>
-                </div>
 
 
                 <div class="space-y-4 pt-4">
@@ -1568,7 +1576,7 @@
                             Global Retry & Throttle Settings
                         </h4>
                         <div class="space-y-3">
-                            <p class="text-xs text-muted-foreground">Default retry behavior for all providers. Override per-provider on the API Keys tab.</p>
+                            <p class="text-xs text-muted-foreground">Default retry behavior for all providers. Configure per-provider overrides below.</p>
                             <div class="grid grid-cols-3 gap-3">
                                 <div>
                                     <label class="block text-xs font-medium text-muted-foreground mb-1">Max Retries</label>
@@ -1586,6 +1594,35 @@
                             <div class="flex items-center gap-2">
                                 <button onclick="saveGlobalRetrySettings()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save Global Settings</button>
                                 <span id="globalRetryStatus" class="text-xs"></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Per-Provider Retry Overrides -->
+                    <div class="mt-4">
+                        <div class="flex items-center justify-between mb-3">
+                            <div>
+                                <h4 class="text-sm font-semibold text-foreground">Per-Provider Retry Overrides</h4>
+                                <p class="text-xs text-muted-foreground mt-0.5">Leave empty to use global settings (configured above)</p>
+                            </div>
+                            <button onclick="saveRetryConfig(this)" class="btn btn-primary px-3 py-1 text-xs">Save Overrides</button>
+                        </div>
+                        <div id="retrySuccess" class="hidden bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-md mb-3"></div>
+                        <div class="border border-border rounded p-4 bg-muted/30">
+                            <div class="grid grid-cols-4 gap-2 mb-2 text-xs font-medium text-muted-foreground">
+                                <span>Provider</span>
+                                <span>Max Retries</span>
+                                <span>Delay (ms)</span>
+                                <span>Backoff</span>
+                            </div>
+                            <div id="retryPerProvider" class="space-y-2"></div>
+                            <div class="mt-3 pt-3 border-t border-border">
+                                <p class="text-xs text-muted-foreground flex items-center gap-1.5">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <span>Providers using global settings show empty fields. Configure global defaults above.</span>
+                                </p>
                             </div>
                         </div>
                     </div>
@@ -1621,18 +1658,20 @@
                             <button onclick="upgradePassword()" class="btn btn-primary py-1.5 px-3 text-xs font-medium">Upgrade to Hashed Password</button>
                         </div>
 
-                        <div class="space-y-2">
-                            <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">Current Password</label>
-                                <input type="password" id="currentPassword" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="Enter current password">
+                        <form onsubmit="return false;">
+                            <div class="space-y-2">
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Current Password</label>
+                                    <input type="password" id="currentPassword" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="Enter current password">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">New Password</label>
+                                    <input type="password" id="newPassword" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="Enter new password (min 6 chars)">
+                                </div>
+                                <button onclick="changePassword()" class="btn btn-primary w-full py-2 text-sm font-medium">Change Password</button>
+                                <div id="passwordChangeStatus" class="text-xs"></div>
                             </div>
-                            <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">New Password</label>
-                                <input type="password" id="newPassword" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="Enter new password (min 6 chars)">
-                            </div>
-                            <button onclick="changePassword()" class="btn btn-primary w-full py-2 text-sm font-medium">Change Password</button>
-                            <div id="passwordChangeStatus" class="text-xs"></div>
-                        </div>
+                        </form>
                     </div>
 
                     <hr class="border-border">
@@ -1679,11 +1718,12 @@
                             Telegram Bot
                         </h4>
 
-                        <div class="space-y-3">
-                            <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-1">Bot Token</label>
-                                <input type="password" id="telegramBotToken" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="123456789:ABCdefGhIjKlMnOpQrStUvWxYz">
-                            </div>
+                        <form onsubmit="return false;">
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="block text-xs font-medium text-muted-foreground mb-1">Bot Token</label>
+                                    <input type="password" id="telegramBotToken" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="123456789:ABCdefGhIjKlMnOpQrStUvWxYz">
+                                </div>
                             <div>
                                 <label class="block text-xs font-medium text-muted-foreground mb-1">Allowed User IDs <span class="text-muted-foreground font-normal">(comma-separated, leave empty to allow all)</span></label>
                                 <input type="text" id="telegramAllowedUsers" class="input-field w-full px-3 py-2 rounded-md text-sm" placeholder="123456789, 987654321">
@@ -1711,7 +1751,8 @@
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                            </div>
+                        </form>
                     </div>
 
                     <hr class="border-border">
@@ -1917,9 +1958,7 @@
         <footer class="mt-12 py-6 border-t border-border">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-center text-sm text-muted-foreground">
-                    <a href="https://github.com/KeyProxy/openai-gemini-api-key-KeyProxy" target="_blank" rel="noopener noreferrer" class="hover:text-primary transition-colors">
-                        Star & Fork on GitHub
-                    </a>
+                    <!-- Footer content removed -->
                 </div>
             </div>
         </footer>
@@ -2680,8 +2719,8 @@
                         localStorage.setItem('keyproxy_csrf_token', data.csrfToken);
                     }
 
-                    document.getElementById('loginForm').classList.add('hidden');
-                    document.getElementById('adminPanel').classList.remove('hidden');
+                    document.body.classList.add('authenticated');
+                    document.body.classList.remove('not-authenticated');
                     if (data.passwordUpgradeAvailable) {
                         sessionStorage.setItem('loginResponse', JSON.stringify(data));
                     }
@@ -2762,8 +2801,8 @@
             // Clear CSRF token on logout
             clearCsrfToken();
 
-            document.getElementById('loginForm').classList.remove('hidden');
-            document.getElementById('adminPanel').classList.add('hidden');
+            document.body.classList.add('not-authenticated');
+            document.body.classList.remove('authenticated');
             document.getElementById('password').value = '';
         }
         
