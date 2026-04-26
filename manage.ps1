@@ -104,12 +104,22 @@ switch ($Command) {
     }
 
     'start' {
+        Assert-Admin
         $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
         if ($svc) {
             if ($svc.Status -eq 'Running') {
                 Write-Host "Service already running." -ForegroundColor Yellow
             } else {
-                Assert-Admin
+                # Force-kill any process on port before starting service
+                $conns = netstat -ano 2>$null | findstr ":$Port.*LISTENING"
+                if ($conns) {
+                    $pidStr = ((($conns -split "`n")[0].Trim() -split '\s+')[-1])
+                    if ($pidStr -match '^\d+$' -and [int]$pidStr -ne 0) {
+                        Write-Host "Killing existing process on port $Port (PID: $pidStr)..." -ForegroundColor Yellow
+                        Stop-Process -Id ([int]$pidStr) -Force -ErrorAction SilentlyContinue
+                        Start-Sleep -Seconds 1
+                    }
+                }
                 Start-Service -Name $ServiceName
                 Start-Sleep -Seconds 2
                 $svc = Get-Service -Name $ServiceName
@@ -122,18 +132,31 @@ switch ($Command) {
     }
 
     'stop' {
+        Assert-Admin
         $svc = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
         if ($svc) {
             if ($svc.Status -ne 'Running') {
                 Write-Host "Service is not running (Status: $($svc.Status))." -ForegroundColor Yellow
             } else {
-                Assert-Admin
                 Stop-Service -Name $ServiceName -Force
                 Start-Sleep -Seconds 1
                 Write-Host "Service stopped." -ForegroundColor Green
             }
+        }
+        # Always force-kill any process on port (standalone or service)
+        $conns = netstat -ano 2>$null | findstr ":$Port.*LISTENING"
+        if ($conns) {
+            $pidStr = ((($conns -split "`n")[0].Trim() -split '\s+')[-1])
+            if ($pidStr -match '^\d+$' -and [int]$pidStr -ne 0) {
+                Write-Host "Killing process on port $Port (PID: $pidStr)..." -ForegroundColor Yellow
+                Stop-Process -Id ([int]$pidStr) -Force -ErrorAction SilentlyContinue
+                Start-Sleep -Seconds 1
+                Write-Host "Port $Port is now free." -ForegroundColor Green
+            }
         } else {
-            Write-Host "Service not installed." -ForegroundColor Red
+            if (-not $svc) {
+                Write-Host "Service not installed and no process running on port $Port." -ForegroundColor Gray
+            }
         }
     }
 
