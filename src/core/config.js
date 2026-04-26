@@ -10,6 +10,7 @@ class Config {
     this.openaiApiKeys = [];
     this.baseUrl = null;
     this.envVars = {}; // Stored merged configuration
+    this.keySourceMap = {}; // Maps 'providerName:keyValue' → env var name
     this.loadConfig();
   }
 
@@ -72,6 +73,7 @@ class Config {
 
     // Clear existing providers
     this.providers.clear();
+    this.keySourceMap = {};
 
     // Parse providers from accumulated envVars
     this.parseProviders(envVars);
@@ -121,14 +123,16 @@ class Config {
       if ((match = upperKey.match(/^(OPENAI|GEMINI)_([A-Z0-9_]+)_API_KEY(?:_[A-Z0-9]+)?$/))) {
         const type = match[1].toLowerCase();
         const name = match[2].toLowerCase();
-        
-        if (!discovery[name]) discovery[name] = { type, keys: [], baseUrl: null };
+
+        if (!discovery[name]) discovery[name] = { type, keys: [], baseUrl: null, sources: {} };
         discovery[name].keys.push(value);
-      } 
+        discovery[name].sources[value] = key;
+      }
       // 2. Legacy/Simple pattern: GEMINI_API_KEY_{N} -> maps to 'gemini' provider
       else if ((match = upperKey.match(/^GEMINI_API_KEY(?:_\d+)?$/))) {
-        if (!discovery.gemini) discovery.gemini = { type: 'gemini', keys: [], baseUrl: knownDefaults.gemini.baseUrl };
+        if (!discovery.gemini) discovery.gemini = { type: 'gemini', keys: [], baseUrl: knownDefaults.gemini.baseUrl, sources: {} };
         discovery.gemini.keys.push(value);
+        discovery.gemini.sources[value] = key;
       }
       // 3. Known specific patterns (e.g. FIRECRAWL_API_KEY) - for backward compatibility with existing .env
       // Note: no break — one key can match multiple providers (e.g. TAVILY_API_KEY → both 'tavily' and 'tavily_mcp')
@@ -137,8 +141,9 @@ class Config {
           const patternSource = config.keyPattern || knownName;
           const pattern = new RegExp(`^${patternSource.toUpperCase()}_API_KEY(?:_[A-Z0-9]+)?$`);
           if (pattern.test(upperKey)) {
-            if (!discovery[knownName]) discovery[knownName] = { type: config.type, keys: [], baseUrl: config.baseUrl };
+            if (!discovery[knownName]) discovery[knownName] = { type: config.type, keys: [], baseUrl: config.baseUrl, sources: {} };
             discovery[knownName].keys.push(value);
+            discovery[knownName].sources[value] = key;
           }
         }
       }
@@ -150,7 +155,7 @@ class Config {
         // Find base URL: 1. Explicit override, 2. Pattern default, 3. Known default
         const baseUrlKey = `${data.type.toUpperCase()}_${provider.toUpperCase()}_BASE_URL`;
         let finalBaseUrl = rootVars[baseUrlKey] || data.baseUrl;
-        
+
         // Final fallback to known defaults if name matches
         if (!finalBaseUrl && knownDefaults[provider]) {
           finalBaseUrl = knownDefaults[provider].baseUrl;
@@ -158,12 +163,19 @@ class Config {
 
         const envKey = `${data.type.toUpperCase()}_${provider.toUpperCase()}_API_KEYS`;
         const urlKey = `${data.type.toUpperCase()}_${provider.toUpperCase()}_BASE_URL`;
-        
+
         const existing = (localVars[envKey] || '').split(',').map(k => k.trim()).filter(k => k);
         const merged = [...new Set([...existing, ...data.keys])].join(',');
         // Deduplicate keys within this provider too
         data.keys = [...new Set(data.keys)];
-        
+
+        // Record source env var name for each key
+        if (data.sources) {
+          for (const [keyValue, sourceName] of Object.entries(data.sources)) {
+            this.keySourceMap[`${provider}:${keyValue}`] = sourceName;
+          }
+        }
+
         localVars[envKey] = merged;
         if (finalBaseUrl) {
           localVars[urlKey] = finalBaseUrl;
@@ -260,6 +272,11 @@ class Config {
           providerConfigs.get(provider).keys = enabledKeys;
           providerConfigs.get(provider).allKeys = allKeys;
           providerConfigs.get(provider).apiType = apiType;
+
+          // Record source env var name for each key
+          for (const keyObj of allKeys) {
+            this.keySourceMap[`${provider}:${keyObj.key}`] = key;
+          }
         }
       } else if (key.endsWith('_BASE_URL') && value) {
         const parts = key.replace('_BASE_URL', '').split('_');
@@ -432,6 +449,14 @@ class Config {
   }
 
   // New provider methods
+  getKeySource(providerName, keyValue) {
+    return this.keySourceMap[`${providerName}:${keyValue}`] || null;
+  }
+
+  getKeySourceMap() {
+    return { ...this.keySourceMap };
+  }
+
   getProviders() {
     return this.providers;
   }

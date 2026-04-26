@@ -286,7 +286,7 @@ async function handleRecoveryProbe(server, req, res, adminPath) {
  */
 async function handleTestApiKey(server, req, res, body) {
   try {
-    const { apiType, apiKey, baseUrl } = JSON.parse(body);
+    const { apiType, apiKey, baseUrl, providerName } = JSON.parse(body);
     let testResult = { success: false, error: 'Unknown API type' };
 
     // MCP providers (search/parse services) - validate key format only
@@ -297,6 +297,15 @@ async function handleTestApiKey(server, req, res, body) {
       testResult = await testGeminiKey(server, apiKey, baseUrl);
     } else if (apiType === 'openai') {
       testResult = await testOpenaiKey(server, apiKey, baseUrl);
+    }
+
+    // Record result in keyHistory
+    if (providerName && apiKey && server.historyManager) {
+      if (testResult.success) {
+        server.historyManager.recordKeyVerified(providerName, apiKey);
+      } else {
+        server.historyManager.recordKeyFailed(providerName, apiKey, testResult.error);
+      }
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -470,6 +479,91 @@ function validateMcpKey(apiType, apiKey) {
   };
 }
 
+/**
+ * POST /admin/api/test-all-keys — test all keys for all providers.
+ * Returns results and records verified/failed in keyHistory.
+ */
+async function handleTestAllKeys(server, req, res) {
+  try {
+    const results = {};
+    const providers = server.config.getProviders();
+    let totalVerified = 0;
+    let totalFailed = 0;
+    let totalKeys = 0;
+
+    for (const [providerName, config] of providers.entries()) {
+      results[providerName] = [];
+
+      for (const key of config.keys) {
+        totalKeys++;
+        let testResult;
+
+        // Per-key timeout: 5 seconds
+        const timeoutPromise = new Promise((resolve) => {
+          setTimeout(() => resolve({ success: false, error: 'Test timed out (5s)' }), 5000);
+        });
+
+        try {
+          const mcpProviders = ['brave', 'tavily', 'exa', 'firecrawl', 'context7', 'jina', 'searchapi', 'onref'];
+          let testPromise;
+          if (mcpProviders.includes(config.apiType.toLowerCase())) {
+            testPromise = Promise.resolve(validateMcpKey(config.apiType, key));
+          } else if (config.apiType === 'gemini') {
+            testPromise = testGeminiKey(server, key, config.baseUrl);
+          } else if (config.apiType === 'openai') {
+            testPromise = testOpenaiKey(server, key, config.baseUrl);
+          } else {
+            testPromise = Promise.resolve({ success: false, error: 'Unknown API type' });
+          }
+
+          testResult = await Promise.race([testPromise, timeoutPromise]);
+        } catch (err) {
+          testResult = { success: false, error: err.message };
+        }
+
+        // Record in keyHistory
+        if (server.historyManager) {
+          if (testResult.success) {
+            server.historyManager.recordKeyVerified(providerName, key);
+            totalVerified++;
+          } else {
+            server.historyManager.recordKeyFailed(providerName, key, testResult.error);
+            totalFailed++;
+          }
+        }
+
+        results[providerName].push({
+          success: testResult.success,
+          error: testResult.error || null,
+          lastCheckTime: new Date().toISOString()
+        });
+      }
+    }
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      success: true,
+      summary: { total: totalKeys, verified: totalVerified, failed: totalFailed },
+      results
+    }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to test all keys: ' + error.message);
+  }
+}
+
+/**
+ * GET /admin/api/key-sources — get key source env var mapping.
+ */
+async function handleGetKeySources(server, res) {
+  try {
+    const keySourceMap = server.config.getKeySourceMap();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(keySourceMap));
+  } catch (error) {
+    sendError(res, 500, 'Failed to get key sources: ' + error.message);
+  }
+}
+
 module.exports = {
   handleToggleProvider,
   handleToggleSyncEnv,
@@ -481,6 +575,8 @@ module.exports = {
   handleRecoveryScan,
   handleRecoveryProbe,
   handleTestApiKey,
+  handleTestAllKeys,
+  handleGetKeySources,
   testGeminiKey,
   testOpenaiKey
 };

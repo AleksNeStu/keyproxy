@@ -212,15 +212,22 @@
             transition: opacity 0.2s, border-color 0.2s;
         }
         .key-row.key-active {
-            border-left-color: #ef4444;
-            background: rgba(239, 68, 68, 0.06);
+            border-left-color: #3b82f6;
+            background: rgba(59, 130, 246, 0.06);
         }
         .key-row.key-exhausted {
             border-left-color: #6b7280;
             opacity: 0.5;
         }
-        .key-row.key-fresh {
+        .key-row.key-unverified, .key-row.key-fresh {
+            border-left-color: #f59e0b;
+        }
+        .key-row.key-verified {
             border-left-color: #22c55e;
+        }
+        .key-row.key-failed {
+            border-left-color: #ef4444;
+            background: rgba(239, 68, 68, 0.06);
         }
         .key-status-dot {
             width: 8px;
@@ -230,9 +237,12 @@
             margin-right: 6px;
             flex-shrink: 0;
         }
-        .key-status-dot.dot-active { background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,0.5); }
+        .key-status-dot.dot-active { background: #3b82f6; box-shadow: 0 0 6px rgba(59,130,246,0.5); }
         .key-status-dot.dot-exhausted { background: #6b7280; }
-        .key-status-dot.dot-fresh { background: #22c55e; }
+        .key-status-dot.dot-fresh { background: #f59e0b; }
+        .key-status-dot.dot-unverified { background: #f59e0b; }
+        .key-status-dot.dot-verified { background: #22c55e; }
+        .key-status-dot.dot-failed { background: #ef4444; }
         .key-badge {
             font-size: 0.65rem;
             padding: 1px 6px;
@@ -241,9 +251,12 @@
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        .key-badge.badge-active { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .key-badge.badge-active { background: rgba(59,130,246,0.15); color: #3b82f6; }
         .key-badge.badge-exhausted { background: rgba(107,114,128,0.15); color: #9ca3af; }
-        .key-badge.badge-fresh { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .key-badge.badge-fresh { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .key-badge.badge-unverified { background: rgba(245,158,11,0.15); color: #f59e0b; }
+        .key-badge.badge-verified { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .key-badge.badge-failed { background: rgba(239,68,68,0.15); color: #ef4444; }
 
         .expiry-badge { font-family: monospace; font-size: 0.7rem; padding: 1px 6px; border-radius: 4px; font-weight: 600; white-space: nowrap; }
         .expiry-badge.expiry-green { background: rgba(34,197,94,0.15); color: #22c55e; }
@@ -742,6 +755,10 @@
                             <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                             Reload Config
                         </button>
+                        <button onclick="checkAllKeys(this)" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Test all API keys and update verification status">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            Check All Keys
+                        </button>
                     </div>
                 </div>
 
@@ -807,6 +824,7 @@
                                 Copy All Agent Context
                             </button>
                         </div>
+                        <div id="keyCountsSummary" class="flex items-center gap-4 text-xs text-muted-foreground mb-3 px-2 py-2 bg-muted/50 rounded-md"></div>
                         <div id="providersContainer" class="space-y-3 mb-4"></div>
                     </div>
 
@@ -1532,6 +1550,14 @@
                                     <label class="block text-xs font-medium text-muted-foreground mb-1">Cooldown <span class="font-normal">(sec)</span></label>
                                     <input type="number" id="settingRecoveryCooldown" class="input-field w-full px-3 py-2 rounded-md text-sm" min="30" max="3600" value="300">
                                 </div>
+                            </div>
+
+                            <h5 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mt-3">Key Verification</h5>
+                            <div class="grid grid-cols-1 gap-3">
+                                <label class="flex items-center gap-1.5 text-xs text-muted-foreground" title="Test all API keys when the server starts and mark them as verified/failed">
+                                    <input type="checkbox" id="settingAutoCheckKeys" class="rounded">
+                                    Auto-check keys on startup
+                                </label>
                             </div>
                             <div class="flex items-center gap-2 mt-2">
                                 <button onclick="savePerformanceSettings()" class="btn btn-primary px-4 py-1.5 text-xs font-medium">Save Performance Settings</button>
@@ -2875,6 +2901,42 @@
             }
         }
 
+        // Check All Keys — test every key and update verification status
+        async function checkAllKeys(button) {
+            const svg = button.querySelector('svg');
+            const label = button.childNodes[button.childNodes.length - 1];
+            const origText = label.textContent;
+            button.disabled = true;
+            svg.classList.add('animate-spin');
+            label.textContent = 'Checking...';
+            try {
+                const res = await fetch('/admin/api/test-all-keys', { method: 'POST' });
+                const data = await res.json();
+                if (data.success) {
+                    const s = data.summary;
+                    label.textContent = `${s.verified}/${s.total} OK`;
+                    svg.style.color = '#16a34a';
+                    showSuccessToast(`Key check: ${s.verified}/${s.total} verified, ${s.failed} failed`);
+                    await loadEnvVars().catch(() => {});
+                } else {
+                    label.textContent = 'Failed';
+                    svg.style.color = '#dc2626';
+                    showErrorToast('Key check failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (e) {
+                label.textContent = 'Error';
+                svg.style.color = '#dc2626';
+                showErrorToast('Key check error: ' + e.message);
+            } finally {
+                setTimeout(() => {
+                    button.disabled = false;
+                    svg.classList.remove('animate-spin');
+                    svg.style.color = '';
+                    label.textContent = origText;
+                }, 3000);
+            }
+        }
+
         // Retry config
         async function loadRetryConfig() {
             try {
@@ -2925,6 +2987,7 @@
                 document.getElementById('settingCbTimeout').value = s.cbTimeoutSec || 30;
                 document.getElementById('settingRecoveryEnabled').checked = s.recoveryEnabled !== false;
                 document.getElementById('settingRecoveryCooldown').value = s.recoveryCooldownSec || 300;
+                document.getElementById('settingAutoCheckKeys').checked = s.autoCheckKeys === true;
                 document.getElementById('settingLogLevel').value = s.logLevel || 'info';
                 document.getElementById('settingLogBufferMax').value = s.logBufferMax || 200;
             } catch (e) { console.error('Failed to load general settings:', e); }
@@ -2964,7 +3027,8 @@
                     cbThreshold: parseInt(document.getElementById('settingCbThreshold').value),
                     cbTimeoutSec: parseInt(document.getElementById('settingCbTimeout').value),
                     recoveryEnabled: document.getElementById('settingRecoveryEnabled').checked,
-                    recoveryCooldownSec: parseInt(document.getElementById('settingRecoveryCooldown').value)
+                    recoveryCooldownSec: parseInt(document.getElementById('settingRecoveryCooldown').value),
+                    autoCheckKeys: document.getElementById('settingAutoCheckKeys').checked
                 };
                 const res = await fetch('/admin/api/general-settings', {
                     method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
@@ -3093,6 +3157,8 @@
                 const envData = await envResponse.json();
                 envVars = envData.vars || envData; // Compatibility with both old and new server versions
                 const envPath = envData.envPath || 'Not configured';
+                // Store key source map from env response
+                window._keySourceMap = envData.keySourceMap || {};
                 
                 const pathDisplay = document.getElementById('resolvedEnvPathDisplay');
                 if (pathDisplay) {
@@ -4094,6 +4160,11 @@
                                     </div>
                                 </div>
                                 <button
+                                    onclick="copyProviderEnvVar('${provider.apiType}', '${provider.name}')"
+                                    class="btn btn-secondary px-2 py-1 text-xs font-medium"
+                                    title="Copy primary key as ENV_VAR=value"
+                                >Copy Env Var</button>
+                                <button
                                     id="syncBtn_${provider.apiType}_${provider.name}"
                                     onclick="toggleSyncEnv('${provider.apiType}', '${provider.name}')"
                                     class="transition-colors p-1 ${isProviderSyncOn(provider) ? 'text-green-500' : 'text-muted-foreground hover:text-foreground'}"
@@ -4380,20 +4451,49 @@
                                     const maskedKey = keyVal.length > 16 ? keyVal.substring(0, 8) + '...' + keyVal.slice(-4) : keyVal;
                                     const usageEntry = (keyUsageData[provider.name] || []).find(u => u.fullKey === keyVal);
                                     const usageDisplay = usageEntry ? usageEntry.usageCount : 0;
-                                    // Key history status
-                                    const keyStatus = usageEntry?.status || 'fresh';
+                                    // Key history status (map 'fresh' to 'unverified' for backward compat)
+                                    let keyStatus = usageEntry?.status || 'unverified';
+                                    if (keyStatus === 'fresh') keyStatus = 'unverified';
                                     const rotationReason = usageEntry?.rotationReason || null;
                                     const rotationCount = usageEntry?.rotationCount || 0;
+                                    const lastCheckTime = usageEntry?.lastCheckTime || null;
                                     const statusClass = `key-${keyStatus}`;
                                     const dotClass = `dot-${keyStatus}`;
-                                    const badgeHtml = keyStatus === 'active'
-                                        ? '<span class="key-badge badge-active">ACTIVE</span>'
-                                        : keyStatus === 'exhausted'
-                                            ? `<span class="key-badge badge-exhausted">EXHAUSTED${rotationReason ? ' ' + rotationReason : ''}</span>
-                                               <span class="recovery-countdown text-xs text-amber-400" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Recovery status">...</span>`
-                                            : '<span class="key-badge badge-fresh">FRESH</span>';
+
+                                    // Status color mapping
+                                    const statusColors = { active: '#3b82f6', exhausted: '#6b7280', unverified: '#f59e0b', verified: '#22c55e', failed: '#ef4444' };
+                                    const borderColor = statusColors[keyStatus] || '#6b7280';
+
+                                    // Badge HTML for each status
+                                    let badgeHtml;
+                                    if (keyStatus === 'active') {
+                                        badgeHtml = '<span class="key-badge badge-active">ACTIVE</span>';
+                                    } else if (keyStatus === 'exhausted') {
+                                        badgeHtml = `<span class="key-badge badge-exhausted">EXHAUSTED${rotationReason ? ' ' + rotationReason : ''}</span>
+                                               <span class="recovery-countdown text-xs text-amber-400" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Recovery status">...</span>`;
+                                    } else if (keyStatus === 'verified') {
+                                        badgeHtml = '<span class="key-badge badge-verified">VERIFIED</span>';
+                                    } else if (keyStatus === 'failed') {
+                                        badgeHtml = '<span class="key-badge badge-failed">FAILED</span>';
+                                    } else {
+                                        badgeHtml = '<span class="key-badge badge-unverified">UNVERIFIED</span>';
+                                    }
+
+                                    // Env var source label
+                                    const envSourceMap = window._keySourceMap || {};
+                                    const envSourceName = envSourceMap[provider.name + ':' + keyVal] || '';
+
+                                    // Last check time display
+                                    let lastCheckDisplay = '';
+                                    if (lastCheckTime) {
+                                        const ago = Math.round((Date.now() - new Date(lastCheckTime).getTime()) / 60000);
+                                        lastCheckDisplay = ago < 1 ? 'just now' : ago < 60 ? ago + 'm ago' : ago < 1440 ? Math.round(ago / 60) + 'h ago' : Math.round(ago / 1440) + 'd ago';
+                                    } else {
+                                        lastCheckDisplay = 'Never tested';
+                                    }
+
                                     return `
-                                    <div class="flex items-center space-x-2${isKeyDisabled ? ' opacity-50' : ''} ${statusClass}" style="border-left:3px solid ${keyStatus === 'active' ? '#ef4444' : keyStatus === 'exhausted' ? '#6b7280' : '#22c55e'}; padding-left:8px; border-radius:4px;${keyStatus === 'exhausted' ? ' opacity:0.5;' : ''}">
+                                    <div class="flex items-center space-x-2${isKeyDisabled ? ' opacity-50' : ''} ${statusClass}" style="border-left:3px solid ${borderColor}; padding-left:8px; border-radius:4px;${keyStatus === 'exhausted' ? ' opacity:0.5;' : ''}">
                                         <!-- Status dot -->
                                         <span class="key-status-dot ${dotClass}" title="${keyStatus}"></span>
                                         ${badgeHtml}
@@ -4417,6 +4517,13 @@
                                         <div class="flex-1 font-mono text-xs text-foreground bg-muted px-2 py-1 rounded${isKeyDisabled ? ' line-through' : ''}">
                                             ${maskedKey}
                                         </div>
+                                        ${envSourceName ? `<span class="text-[10px] text-muted-foreground font-mono" title="Source: ${envSourceName}">${envSourceName.length > 25 ? envSourceName.substring(0, 22) + '...' : envSourceName}</span>` : ''}
+                                        <span class="text-[10px] text-muted-foreground whitespace-nowrap" title="Last checked">${lastCheckDisplay}</span>
+                                        <!-- Copy key button -->
+                                        <button onclick="copyToClipboard('${keyVal.replace(/'/g, "\\'")}', 'Key copied')" class="text-muted-foreground hover:text-foreground p-1" title="Copy key">
+                                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                                        </button>
+                                        ${envSourceName ? `<button onclick="copyToClipboard('${envSourceName}=${keyVal.replace(/'/g, "\\'")}', 'Env var copied')" class="text-muted-foreground hover:text-foreground p-1" title="Copy as ENV_VAR=value"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7v8a2 2 0 002 2h6M8 7V5a2 2 0 012-2h4.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V15a2 2 0 01-2 2h-2M8 7H6a2 2 0 00-2 2v10a2 2 0 002 2h8a2 2 0 002-2v-2"/></svg></button>` : ''}
                                         <!-- Usage count + rotation count + RPM + Expiry -->
                                         <span class="text-xs text-muted-foreground whitespace-nowrap" title="Times used${rotationCount > 0 ? ' / Rotations: ' + rotationCount : ''}">${usageDisplay} uses${rotationCount > 0 ? ' / ' + rotationCount + ' rot' : ''}</span>
                                         <span class="rpm-badge text-xs px-1.5 py-0.5 rounded" data-key="${maskedKey}" data-provider="${provider.apiType}" title="Requests per minute">--rpm</span>
@@ -4468,7 +4575,38 @@
                 `;
                 providersContainer.appendChild(providerDiv);
             });
-            
+
+            // Key counts summary
+            const summaryEl = document.getElementById('keyCountsSummary');
+            if (summaryEl) {
+                let total = 0, verified = 0, active = 0, failed = 0, unverified = 0, exhausted = 0;
+                for (const provider of Object.values(providers)) {
+                    for (const keyObj of provider.keys) {
+                        total++;
+                        const usageEntry = (keyUsageData[provider.name] || []).find(u => u.fullKey === keyObj.key);
+                        let status = usageEntry?.status || 'unverified';
+                        if (status === 'fresh') status = 'unverified';
+                        if (status === 'verified') verified++;
+                        else if (status === 'active') active++;
+                        else if (status === 'failed') failed++;
+                        else if (status === 'exhausted') exhausted++;
+                        else unverified++;
+                    }
+                }
+                if (total > 0) {
+                    summaryEl.innerHTML = `
+                        <span>Total: <strong>${total}</strong></span>
+                        <span class="text-green-500">Verified: <strong>${verified}</strong></span>
+                        <span class="text-blue-500">Active: <strong>${active}</strong></span>
+                        <span class="text-amber-500">Unverified: <strong>${unverified}</strong></span>
+                        <span class="text-red-500">Failed: <strong>${failed}</strong></span>
+                        ${exhausted > 0 ? `<span class="text-gray-400">Exhausted: <strong>${exhausted}</strong></span>` : ''}
+                    `;
+                } else {
+                    summaryEl.innerHTML = '';
+                }
+            }
+
             if (Object.keys(providers).length === 0) {
                 providersContainer.innerHTML = '<div class="text-muted-foreground text-sm text-center py-4">No providers configured yet. Add one below.</div>';
             }
@@ -5091,8 +5229,8 @@
         function showDeleteProviderConfirmation(apiType, providerName) {
             const dialog = document.getElementById('confirmDialog');
             const message = document.getElementById('confirmMessage');
-            
-            message.textContent = `Delete provider '${providerName}'? This will remove all its API keys and configuration. This action cannot be undone.`;
+
+            message.innerHTML = `Delete provider '${providerName}'?<br><br><span class="text-amber-500 text-xs">This removes the provider from the running configuration. Keys will still exist in your .env file and will reappear on next Reload Config. To permanently remove them, edit your .env file manually.</span>`;
             
             // Set up the confirm button to call the actual delete function
             const confirmBtn = dialog.querySelector('button[onclick="confirmDelete()"]');
@@ -5139,6 +5277,19 @@
         document.addEventListener('click', () => {
             document.querySelectorAll('[id^="curlDropdown_"]').forEach(el => el.classList.add('hidden'));
         });
+
+        // Copy provider's primary key as ENV_VAR=value format
+        async function copyProviderEnvVar(apiType, providerName) {
+            const envKey = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_API_KEYS`;
+            const keysStr = envVars[envKey] || '';
+            const firstKey = keysStr.split(',').map(k => k.trim()).filter(k => k && !k.startsWith('~'))[0];
+            if (!firstKey) { showErrorToast('No enabled key found for this provider'); return; }
+
+            // Find the source env var name
+            const sourceMap = window._keySourceMap || {};
+            const sourceName = sourceMap[providerName + ':' + firstKey] || envKey;
+            await copyToClipboard(`${sourceName}=${firstKey}`, 'Env var copied');
+        }
 
         // Generate and copy cURL command for testing a provider
         // endpointType: 'completions' (default) or 'models'
@@ -5930,7 +6081,8 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     body: JSON.stringify({
                         apiType: apiType,
                         apiKey: apiKey,
-                        baseUrl: baseUrl
+                        baseUrl: baseUrl,
+                        providerName: providerName
                     })
                 });
 
@@ -5941,6 +6093,12 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 } else {
                     showErrorToast(`API key ${maskedKey} test failed: ${result.error || 'Invalid key'}`);
                 }
+                // Reload key usage data to reflect updated status
+                try {
+                    const usageRes = await fetch('/admin/api/key-usage');
+                    if (usageRes.ok) keyUsageData = await usageRes.json();
+                    renderProviders();
+                } catch {}
             } catch (error) {
                 showErrorToast(`API key test failed: ${error.message}`);
             }
@@ -6121,8 +6279,8 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         function showDeleteKeyConfirmation(apiType, providerName, keyIndex) {
             const dialog = document.getElementById('confirmDialog');
             const message = document.getElementById('confirmMessage');
-            
-            message.textContent = `Are you sure you want to delete this API key from provider '${providerName}'? This action cannot be undone.`;
+
+            message.innerHTML = `Remove this API key from provider '${providerName}'?<br><br><span class="text-amber-500 text-xs">This removes the key from the running configuration. The key will still exist in your .env file and will reappear on next Reload Config. To permanently remove it, edit your .env file manually.</span>`;
             
             // Set up the confirm button to call the actual delete function
             const confirmBtn = dialog.querySelector('button[onclick="confirmDelete()"]');

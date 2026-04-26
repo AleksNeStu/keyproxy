@@ -24,7 +24,7 @@ const { sendError, sendResponse, readRequestBody, getStatusText } = require('./r
 const { isAdminAuthenticated, handleAdminLogin, handleAdminLogout, handleAuthCheck, handleChangePassword, handleUpgradePassword } = require('./routes/adminAuth');
 const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetGeneralSettings, handleUpdateGeneralSettings, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./routes/adminEnv');
 const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm } = require('./routes/adminKeys');
-const { handleToggleProvider, handleToggleSyncEnv, handleToggleGlobalSync, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey } = require('./routes/adminProviders');
+const { handleToggleProvider, handleToggleSyncEnv, handleToggleGlobalSync, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey, handleTestAllKeys, handleGetKeySources } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
 const { handleGetStatus } = require('./routes/adminStatus');
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
@@ -154,6 +154,11 @@ class ProxyServer {
 
       // Initialize fallback router
       this.fallbackRouter = new FallbackRouter(this.config);
+
+      // Startup auto-check keys if enabled
+      if (this.config.envVars.KEYPROXY_AUTO_CHECK_KEYS === 'true') {
+        this.runStartupKeyCheck().catch(err => console.log('[STARTUP] Key check failed:', err.message));
+      }
     });
 
     this.server.on('error', (error) => {
@@ -578,6 +583,12 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/test' && req.method === 'POST') {
       return handleTestApiKey(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/test-all-keys' && req.method === 'POST') {
+      return handleTestAllKeys(this, req, res);
+    }
+    if (adminPath === '/admin/api/key-sources' && req.method === 'GET') {
+      return handleGetKeySources(this, res);
     }
     if (adminPath === '/admin/api/logs' && req.method === 'GET') {
       return this.handleGetLogs(res);
@@ -1164,6 +1175,60 @@ class ProxyServer {
     }
 
     console.log(`[SERVER] ${this.config.getProviders().size} providers available for dynamic initialization`);
+  }
+
+  /**
+   * Test all keys on startup and record verified/failed in keyHistory.
+   * Fire-and-forget (non-blocking).
+   */
+  async runStartupKeyCheck() {
+    const providers = this.config.getProviders();
+    let verified = 0;
+    let failed = 0;
+    let total = 0;
+
+    console.log('[STARTUP] Auto-checking all API keys...');
+
+    for (const [providerName, config] of providers.entries()) {
+      for (const key of config.keys) {
+        total++;
+        try {
+          const { testGeminiKey, testOpenaiKey } = require('./routes/adminProviders');
+          const mcpProviders = ['brave', 'tavily', 'exa', 'firecrawl', 'context7', 'jina', 'searchapi', 'onref'];
+          let result;
+
+          const timeoutPromise = new Promise((resolve) => {
+            setTimeout(() => resolve({ success: false, error: 'Timeout' }), 5000);
+          });
+
+          let testPromise;
+          if (mcpProviders.includes(config.apiType.toLowerCase())) {
+            testPromise = Promise.resolve({ success: true });
+          } else if (config.apiType === 'gemini') {
+            testPromise = testGeminiKey(this, key, config.baseUrl);
+          } else if (config.apiType === 'openai') {
+            testPromise = testOpenaiKey(this, key, config.baseUrl);
+          } else {
+            testPromise = Promise.resolve({ success: false, error: 'Unknown type' });
+          }
+
+          result = await Promise.race([testPromise, timeoutPromise]);
+
+          if (result.success) {
+            this.historyManager.recordKeyVerified(providerName, key);
+            verified++;
+          } else {
+            this.historyManager.recordKeyFailed(providerName, key, result.error);
+            failed++;
+          }
+        } catch (err) {
+          this.historyManager.recordKeyFailed(providerName, key, err.message);
+          failed++;
+        }
+      }
+    }
+
+    console.log(`[STARTUP] Key check complete: ${verified}/${total} verified, ${failed} failed`);
   }
 
   async initTelegramBot() {

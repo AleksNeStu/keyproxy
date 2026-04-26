@@ -84,19 +84,62 @@ class KeyHistoryManager {
     const provider = this._ensureProvider(providerName);
     if (!provider.keys[hash]) {
       provider.keys[hash] = {
-        status: 'fresh',
+        status: 'unverified',
         lastUsed: null,
         rotatedOutAt: null,
         rotationReason: null,
         rotationCount: 0,
         recoveryAttempts: 0,
-        lastRecoveryAttempt: null
+        lastRecoveryAttempt: null,
+        lastCheckTime: null
       };
     }
     return provider.keys[hash];
   }
 
   // --- Public API ---
+
+  /**
+   * Mark a key as verified (tested successfully).
+   */
+  recordKeyVerified(providerName, fullKey) {
+    const hash = this.hashKey(fullKey);
+    const entry = this._ensureKeyEntry(providerName, hash);
+    entry.status = 'verified';
+    entry.lastCheckTime = new Date().toISOString();
+    this._scheduleSave();
+  }
+
+  /**
+   * Mark a key as failed (tested and not working).
+   */
+  recordKeyFailed(providerName, fullKey, reason) {
+    const hash = this.hashKey(fullKey);
+    const entry = this._ensureKeyEntry(providerName, hash);
+    entry.status = 'failed';
+    entry.lastCheckTime = new Date().toISOString();
+    if (reason) entry.lastFailReason = reason;
+    this._scheduleSave();
+  }
+
+  /**
+   * Get key counts by status for a provider.
+   * Returns { total, active, verified, unverified, failed, exhausted, fresh }
+   */
+  getKeyCounts(providerName) {
+    const provider = this.data.providers[providerName];
+    const counts = { total: 0, active: 0, verified: 0, unverified: 0, failed: 0, exhausted: 0, fresh: 0 };
+    if (!provider) return counts;
+
+    for (const entry of Object.values(provider.keys)) {
+      counts.total++;
+      const status = entry.status || 'unverified';
+      // Map 'fresh' to 'unverified' for backward compat
+      const normalized = status === 'fresh' ? 'unverified' : status;
+      if (counts[normalized] !== undefined) counts[normalized]++;
+    }
+    return counts;
+  }
 
   /**
    * Mark a key as currently active (in-use / live)
@@ -133,7 +176,7 @@ class KeyHistoryManager {
   getKeyStatus(providerName, fullKey) {
     const hash = this.hashKey(fullKey);
     const provider = this.data.providers[providerName];
-    if (!provider || !provider.keys[hash]) return { status: 'fresh' };
+    if (!provider || !provider.keys[hash]) return { status: 'unverified' };
     return { ...provider.keys[hash] };
   }
 

@@ -22,7 +22,8 @@ async function handleGetEnvVars(server, res) {
     // Don't send sensitive config to UI
     const safeEnv = {
       vars: { ...envVars },
-      envPath: envPath
+      envPath: envPath,
+      keySourceMap: server.config.getKeySourceMap()
     };
 
     delete safeEnv.vars.ADMIN_PASSWORD;
@@ -366,7 +367,8 @@ async function handleGetGeneralSettings(server, res) {
       logLevel: ev.KEYPROXY_LOG_LEVEL || 'info',
       logBufferMax: parseInt(ev.KEYPROXY_LOG_BUFFER_MAX) || 200,
       rateLimitWindowMs: parseInt(ev.KEYPROXY_RATE_LIMIT_WINDOW_MS) || 60000,
-      rateLimitMax: parseInt(ev.KEYPROXY_RATE_LIMIT_MAX) || 100
+      rateLimitMax: parseInt(ev.KEYPROXY_RATE_LIMIT_MAX) || 100,
+      autoCheckKeys: ev.KEYPROXY_AUTO_CHECK_KEYS === 'true'
     };
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(settings));
@@ -410,6 +412,9 @@ async function handleUpdateGeneralSettings(server, req, res, body) {
     }
     if (data.recoveryEnabled !== undefined) {
       envVars.KEYPROXY_RECOVERY_ENABLED = data.recoveryEnabled ? 'true' : 'false';
+    }
+    if (data.autoCheckKeys !== undefined) {
+      envVars.KEYPROXY_AUTO_CHECK_KEYS = data.autoCheckKeys ? 'true' : 'false';
     }
 
     server.writeEnvFile(envVars);
