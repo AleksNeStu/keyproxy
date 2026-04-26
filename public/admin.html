@@ -171,6 +171,13 @@
         body.not-authenticated #adminPanel {
             display: none;
         }
+        body.checking-auth #loginForm {
+            display: none;
+        }
+        body.checking-auth #adminPanel {
+            display: none;
+        }
+        }
         
         .section {
             background-color: var(--card);
@@ -471,7 +478,7 @@
 <body class="min-h-screen bg-background" id="mainBody">
     <script>
         (function() {
-            document.body.classList.add('not-authenticated');
+            document.body.classList.add('checking-auth');
         })();
     </script>
     <!-- Global login function -->
@@ -6828,8 +6835,30 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             document.getElementById('responseDialog').classList.add('hidden');
         }
         
+        // Hash-based tab routing
+        const TAB_HASHES = {
+            environment: 'keys',
+            logs: 'logs',
+            management: 'health',
+            analytics: 'analytics',
+            virtualkeys: 'virtual-keys',
+            budgets: 'budgets',
+            settings: 'settings'
+        };
+        const HASH_TO_TAB = Object.fromEntries(Object.entries(TAB_HASHES).map(([k, v]) => [v, k]));
+
+        function getTabFromHash() {
+            const hash = location.hash.slice(1);
+            return HASH_TO_TAB[hash] || null;
+        }
+
         // Load logs when logs tab is shown
         function showTab(tabName) {
+            // Update URL hash
+            if (TAB_HASHES[tabName] && location.hash.slice(1) !== TAB_HASHES[tabName]) {
+                history.replaceState(null, '', '#' + TAB_HASHES[tabName]);
+            }
+
             // Hide all tabs
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.add('hidden');
@@ -7127,21 +7156,32 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     // Fetch CSRF token when authenticated
                     await fetchCsrfToken();
 
-                    document.body.classList.remove('not-authenticated');
+                    document.body.classList.remove('checking-auth');
                     document.body.classList.add('authenticated');
                     document.getElementById('loginForm').classList.add('hidden');
                     document.getElementById('adminPanel').classList.remove('hidden');
+
+                    // Always load base data
                     loadEnvVars();
                     loadRetryConfig();
 
-                    // Start recovery poller (API Keys tab is default)
-                    startRecoveryPoller();
+                    // Restore tab from URL hash or show default
+                    const tabFromUrl = getTabFromHash();
+                    if (tabFromUrl) {
+                        showTab(tabFromUrl);
+                    } else {
+                        startRecoveryPoller();
+                    }
 
-                    // Fix header positioning after panel is shown
                     setTimeout(adjustStickyHeaderPositioning, 100);
+                } else {
+                    document.body.classList.remove('checking-auth');
+                    document.body.classList.add('not-authenticated');
                 }
             } catch (error) {
                 console.log('Auth check failed, showing login form');
+                document.body.classList.remove('checking-auth');
+                document.body.classList.add('not-authenticated');
             }
         }
 
@@ -7257,6 +7297,14 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             
             // Check if user is already authenticated
             checkAuth();
+
+            // Handle browser back/forward (hash changes)
+            window.addEventListener('hashchange', () => {
+                if (document.body.classList.contains('authenticated')) {
+                    const tab = getTabFromHash();
+                    if (tab) showTab(tab);
+                }
+            });
         });
     </script>
 <script>
