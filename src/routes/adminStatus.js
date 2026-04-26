@@ -34,27 +34,28 @@ async function handleGetStatus(server, res, params) {
       console.error('[STATUS] Failed to get RPM data:', error.message);
     }
 
-    // Get key expiry data + provider sync status
+    // Get key status data + provider sync status
     try {
       const providers = server.config.getProviders();
       for (const [providerName, providerConfig] of providers.entries()) {
-        const keyExpiryList = [];
+        const keyStatusList = [];
         for (const key of providerConfig.keys) {
-          const keyHash = server.historyManager.hashKey(key);
           const maskedKey = maskApiKey(key);
-          const expiryInfo = server.historyManager.getKeyExpiry(providerName, keyHash);
-          keyExpiryList.push({
+          const status = server.historyManager.getKeyStatus(providerName, key);
+          keyStatusList.push({
             key: maskedKey,
-            expiry: expiryInfo
+            status: status.status || 'fresh',
+            lastUsed: status.lastUsed || null,
+            failCount: status.failCount || 0
           });
         }
-        response.keyExpiry[providerName] = keyExpiryList;
+        response.keyExpiry[providerName] = keyStatusList;
         response.providers[providerName] = {
           syncEnabled: server.config.isProviderSyncEnabled(providerName)
         };
       }
     } catch (error) {
-      console.error('[STATUS] Failed to get key expiry data:', error.message);
+      console.error('[STATUS] Failed to get key status data:', error.message);
     }
 
     // Get health summary (optional, only if requested)
