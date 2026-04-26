@@ -173,10 +173,20 @@ function validateQuery(schema) {
 function limitBodySize(maxSize = 1024 * 1024) {
   return (req, res, next) => {
     let contentLength = 0;
+    let settled = false;
+
+    const done = () => {
+      if (settled) return;
+      settled = true;
+      if (contentLength <= maxSize && !res.writableEnded) {
+        next();
+      }
+    };
 
     req.on('data', (chunk) => {
       contentLength += chunk.length;
       if (contentLength > maxSize) {
+        settled = true;
         console.log(`[SECURITY] Request body too large: ${contentLength} bytes`);
         res.writeHead(413, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ error: 'Request entity too large' }));
@@ -184,11 +194,9 @@ function limitBodySize(maxSize = 1024 * 1024) {
       }
     });
 
-    req.on('end', () => {
-      if (contentLength <= maxSize) {
-        next();
-      }
-    });
+    req.on('end', done);
+    req.on('error', done);
+    setTimeout(done, 3000);
   };
 }
 

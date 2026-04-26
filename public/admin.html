@@ -2839,22 +2839,37 @@
         
         // Reload configuration
         async function reloadConfig(button) {
+            const svg = button.querySelector('svg');
+            const label = button.childNodes[button.childNodes.length - 1];
+            const origText = label.textContent;
             button.disabled = true;
-            button.querySelector('svg').classList.add('animate-spin');
+            svg.classList.add('animate-spin');
+            label.textContent = 'Reloading...';
             try {
                 const res = await fetch('/admin/api/reload', { method: 'POST' });
                 const data = await res.json();
                 if (data.success) {
+                    label.textContent = `Done (${data.providers.length} providers)`;
+                    svg.classList.remove('animate-spin');
+                    svg.style.color = '#16a34a';
                     showSuccess('reloadSuccess', `Config reloaded: ${data.providers.length} providers active`);
-                    await loadEnvVars();
+                    await loadEnvVars().catch(() => {});
                 } else {
-                    alert('Failed to reload: ' + (data.error || 'Unknown error'));
+                    label.textContent = 'Failed';
+                    svg.style.color = '#dc2626';
+                    showSuccess('reloadSuccess', 'Failed to reload: ' + (data.error || 'Unknown error'));
                 }
             } catch (e) {
-                alert('Reload failed: ' + e.message);
+                label.textContent = 'Error';
+                svg.style.color = '#dc2626';
+                showSuccess('reloadSuccess', 'Reload failed: ' + e.message);
             } finally {
-                button.disabled = false;
-                button.querySelector('svg').classList.remove('animate-spin');
+                setTimeout(() => {
+                    button.disabled = false;
+                    svg.classList.remove('animate-spin');
+                    svg.style.color = '';
+                    label.textContent = origText;
+                }, 2000);
             }
         }
 
@@ -7301,15 +7316,18 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
     }
 
     /**
-     * Intercept fetch calls to add CSRF token and credentials
+     * Intercept fetch calls to add CSRF token and credentials.
+     * Server rotates CSRF token after every POST — we refresh it after each state-changing request.
      */
     const originalFetch = window.fetch;
     window.fetch = function(url, options = {}) {
         // Always include credentials to send cookies
         options.credentials = options.credentials || 'include';
-        
+
+        const isStateChanging = options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase());
+
         // Add CSRF token to state-changing requests
-        if (options.method && ['POST', 'PUT', 'DELETE', 'PATCH'].includes(options.method.toUpperCase())) {
+        if (isStateChanging) {
             const token = getCsrfToken();
             if (token) {
                 options.headers = options.headers || {};
@@ -7317,25 +7335,23 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             }
         }
 
-        // Handle CSRF errors (403)
-        return originalFetch(url, options).then(response => {
+        return originalFetch(url, options).then(async response => {
             if (response.status === 403) {
-                return response.clone().json().then(data => {
-                    if (data.error === 'Invalid CSRF token') {
-                        console.error('CSRF validation failed. Refreshing page...');
-                        // Try to fetch new token
-                        fetchCsrfToken().then(() => {
-                            // If successful, retry the request
-                            if (getCsrfToken()) {
-                                return window.fetch(url, options);
-                            } else {
-                                // If still no token, reload page
-                                location.reload();
-                            }
-                        });
+                const data = await response.clone().json().catch(() => ({}));
+                if (data.error === 'Invalid CSRF token') {
+                    console.warn('[CSRF] Token invalid, refreshing...');
+                    const newToken = await fetchCsrfToken().catch(() => null);
+                    if (newToken) {
+                        options.headers = options.headers || {};
+                        options.headers['X-CSRF-Token'] = newToken;
+                        return originalFetch(url, options);
                     }
-                    throw new Error(data.error || 'Request failed');
-                });
+                }
+                throw new Error(data.error || 'Request failed');
+            }
+            // Server rotates token after every state-changing request — pre-fetch new one
+            if (isStateChanging && response.ok) {
+                fetchCsrfToken().catch(() => {});
             }
             return response;
         });

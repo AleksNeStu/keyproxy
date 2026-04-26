@@ -67,12 +67,25 @@ function sendResponse(res, response) {
 function readRequestBody(req) {
   return new Promise((resolve) => {
     let body = '';
+    let settled = false;
+    const done = (value) => {
+      if (settled) return;
+      settled = true;
+      resolve(value);
+    };
+
     req.on('data', (chunk) => {
       body += chunk;
     });
     req.on('end', () => {
-      resolve(body || null);
+      done(body || null);
     });
+    req.on('error', () => {
+      done(null);
+    });
+
+    // Safety timeout — resolve even if 'end' never fires (e.g. empty POST with no Content-Length)
+    setTimeout(() => done(body || null), 3000);
   });
 }
 
