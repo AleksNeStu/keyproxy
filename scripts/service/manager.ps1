@@ -1,9 +1,10 @@
-/**
- * KeyProxy Manager - Run as Administrator
- *
- * This script serves as a launcher for KeyProxy management commands.
- * It will automatically request Administrator privileges via UAC prompt.
- */
+<#
+.SYNOPSIS
+    KeyProxy Manager — run management commands with Administrator privileges.
+.DESCRIPTION
+    Launches with UAC prompt if not already elevated.
+    Usage: .\manager.ps1 [start|stop|restart|status|logs|install|uninstall]
+#>
 
 param(
     [Parameter(Position = 0)]
@@ -13,26 +14,23 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-# Check if running as Administrator
 function Test-Administrator {
     $currentUser = [Security.Principal.WindowsIdentity]::GetCurrent()
     $principal = New-Object Security.Principal.WindowsPrincipal($currentUser)
     return $principal.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
-# If not admin, relaunch with elevated privileges
 if (-not (Test-Administrator)) {
     Write-Host "Requesting Administrator privileges..." -ForegroundColor Yellow
-    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"" + $PSCommandPath + """ " + $MyInvocation.BoundParameters.Keys + " " + $MyInvocation.BoundParameters.Values
+    $arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$PSCommandPath`" $Command"
     Start-Process powershell -Verb RunAs -ArgumentList $arguments
     exit
 }
 
-# Running as admin - execute command
 Write-Host "KeyProxy Manager (Administrator)`n" -ForegroundColor Cyan
 Write-Host "Command: $Command`n" -ForegroundColor Gray
 
-$ManageScript = Join-Path $PSScriptRoot "manage.ps1"
+$ManageScript = Join-Path (Split-Path $PSScriptRoot -Parent) "..\manage.ps1"
 if (Test-Path $ManageScript) {
     try {
         & $ManageScript $Command

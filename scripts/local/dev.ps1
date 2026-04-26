@@ -10,7 +10,6 @@ param([int]$Port = 8990)
 
 $ErrorActionPreference = 'Continue'
 
-# --- Force-kill anything on the port ---
 Write-Host "`n--- KeyProxy Dev ---" -ForegroundColor Cyan
 Write-Host "Checking port $Port..." -NoNewline
 
@@ -31,8 +30,7 @@ if ($occupant) {
     Write-Host " free." -ForegroundColor Green
 }
 
-# --- Start with auto-reload ---
 Write-Host "Starting node --watch main.js  (edit any .js file to auto-restart)`n" -ForegroundColor Cyan
 
-Set-Location (Split-Path $PSScriptRoot -Parent)
+Set-Location (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent)
 node --watch main.js
