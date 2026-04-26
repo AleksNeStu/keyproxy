@@ -30,6 +30,7 @@ const { handleGetStatus } = require('./routes/adminStatus');
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
 const { handleFetchModels, handleSaveModels } = require('./routes/adminModels');
 const { handleGetExclusions, handleAddExclusion, handleRemoveExclusion, handleToggleExclusion, handleTestExclusion } = require('./routes/adminExclusions');
+const { handleGetEnvSources, handleAddEnvSource, handleRemoveEnvSource, handlePreviewEnvSource, handlePullEnvSource } = require('./routes/adminEnvSources');
 const { handleGetAgentContext } = require('./routes/adminMcp');
 const KeyExclusionManager = require('./core/exclusions');
 const AgentContextGenerator = require('./core/mcpInstructions');
@@ -673,6 +674,22 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/toggle-env-file-disabled' && req.method === 'POST') {
       return handleToggleEnvFileDisabled(this, req, res, body);
+    }
+    // Environment Sources (manual import)
+    if (adminPath === '/admin/api/env-sources/preview' && req.method === 'POST') {
+      return handlePreviewEnvSource(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/env-sources/pull' && req.method === 'POST') {
+      return handlePullEnvSource(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/env-sources' && req.method === 'GET') {
+      return handleGetEnvSources(this, res);
+    }
+    if (adminPath === '/admin/api/env-sources' && req.method === 'POST') {
+      return handleAddEnvSource(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/env-sources' && req.method === 'DELETE') {
+      return handleRemoveEnvSource(this, req, res, body);
     }
     if (adminPath === '/admin/api/recovery-status' && req.method === 'GET') {
       return handleGetRecoveryStatus(this, res);

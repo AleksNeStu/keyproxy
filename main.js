@@ -29,6 +29,10 @@ function main() {
     // Initialize Key Exclusion Manager
     const KeyExclusionManager = require('./src/core/exclusions');
     const exclusionManager = new KeyExclusionManager();
+
+    // Initialize Environment Source Manager
+    const EnvSourceManager = require('./src/core/envSources');
+    const envSourceManager = new EnvSourceManager();
     destMgr.setExclusionManager(exclusionManager);
 
     // Initialize legacy clients for backward compatibility
@@ -53,6 +57,7 @@ function main() {
 
     const server = new ProxyServer(config, geminiClient, openaiClient);
     server.exclusionManager = exclusionManager;
+    server.envSourceManager = envSourceManager;
     server.start();
 
     process.on('SIGINT', () => {

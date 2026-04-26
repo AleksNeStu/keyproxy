@@ -1380,6 +1380,46 @@
                     </div>
                 </div>
 
+                <!-- Environment Sources (Manual Import) -->
+                <div class="section mt-6">
+                    <div class="flex items-center justify-between mb-3">
+                        <div>
+                            <h3 class="text-sm font-medium text-foreground flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                                Environment Sources
+                            </h3>
+                            <p class="text-[11px] text-muted-foreground mt-0.5">Register env files as secondary sources. Pull new keys on demand — these are NOT auto-loaded.</p>
+                        </div>
+                    </div>
+                    <div class="border border-border rounded p-4 bg-muted/30">
+                        <div id="envSourcesList" class="space-y-2">
+                            <div class="text-center text-muted-foreground text-sm py-4">Loading environment sources...</div>
+                        </div>
+
+                        <details class="mt-4">
+                            <summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">+ Add environment source</summary>
+                            <div class="mt-2 flex items-center gap-2">
+                                <input type="text" id="newEnvSourceName" class="input-field w-1/3 px-2 py-1.5 text-sm rounded" placeholder="Name (e.g. team-shared)">
+                                <input type="text" id="newEnvSourcePath" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Full path to .env file">
+                                <button onclick="browseEnvSourceFile()" class="btn btn-secondary px-2 py-1.5 text-sm" title="Browse...">...</button>
+                                <button onclick="addEnvSource()" class="btn btn-primary px-3 py-1.5 text-sm">Add</button>
+                            </div>
+                        </details>
+
+                        <div id="envSourcePreviewPanel" class="hidden mt-4 border border-border rounded p-3 bg-card">
+                            <h4 class="text-xs font-semibold text-foreground mb-2">New keys found:</h4>
+                            <div id="envSourcePreviewKeys" class="text-xs space-y-1 max-h-48 overflow-y-auto"></div>
+                            <div class="flex items-center gap-2 mt-3">
+                                <button onclick="confirmPullEnvSource()" class="btn btn-primary px-3 py-1.5 text-sm">Import Keys</button>
+                                <button onclick="cancelPullEnvSource()" class="btn btn-secondary px-3 py-1.5 text-sm">Cancel</button>
+                                <span id="envSourcePullStatus" class="text-xs"></span>
+                            </div>
+                        </div>
+
+                        <p class="text-[11px] text-muted-foreground mt-3">Environment sources are secondary — they are never loaded automatically. Click "Pull" to scan for new API keys that are not already in your active configuration.</p>
+                    </div>
+                </div>
+
                 <!-- Key Sync Exclusions -->
                 <div class="section mt-6">
                     <div class="flex items-center justify-between mb-3">
@@ -7067,6 +7107,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             // Load settings if settings tab is selected
             if (tabName === 'settings') {
                 loadConfiguration();
+                loadEnvSources();
                 loadExclusions();
                 loadTelegramSettings();
                 checkPasswordUpgrade();
@@ -8129,6 +8170,199 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             closeCreateVirtualKeyDialog();
         }
     });
+
+    // ─── Environment Sources (Manual Import) ────────────────────
+    let envSourcesData = [];
+    let pendingPullSourceId = null;
+
+    async function loadEnvSources() {
+        try {
+            const res = await fetch('/admin/api/env-sources', { headers: authHeaders() });
+            if (!res.ok) return;
+            const data = await res.json();
+            envSourcesData = data.sources || [];
+            renderEnvSources();
+        } catch (err) {
+            console.error('Failed to load env sources:', err);
+        }
+    }
+
+    function renderEnvSources() {
+        const list = document.getElementById('envSourcesList');
+        if (!envSourcesData || envSourcesData.length === 0) {
+            list.innerHTML = '<div class="text-center text-muted-foreground text-sm py-4">No environment sources registered</div>';
+            return;
+        }
+        list.innerHTML = envSourcesData.map(source => {
+            const statusColor = source.lastPullStatus === 'success' ? 'text-green-400' :
+                               source.lastPullStatus === 'never' ? 'text-muted-foreground' :
+                               source.lastPullStatus === 'no-new-keys' ? 'text-blue-400' : 'text-red-400';
+            const statusText = source.lastPullStatus === 'never' ? 'Never pulled' :
+                              source.lastPulledAt ? `Pulled ${new Date(source.lastPulledAt).toLocaleString()}` :
+                              source.lastPullStatus;
+            return `
+            <div class="flex items-center gap-3 p-2 rounded bg-card border border-border hover:border-primary/30 transition-colors">
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-sm font-medium text-foreground">${source.name}</span>
+                        <span class="text-xs ${statusColor}">${statusText}</span>
+                    </div>
+                    <div class="text-xs text-muted-foreground truncate" title="${source.filePath}">${source.filePath}</div>
+                </div>
+                <button onclick="previewPullEnvSource('${source.id}')" class="btn btn-primary px-3 py-1 text-xs">Pull</button>
+                <button onclick="removeEnvSource('${source.id}')" class="p-1.5 hover:bg-red-500/10 text-red-500 rounded transition-colors" title="Remove source">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                </button>
+            </div>`;
+        }).join('');
+    }
+
+    async function addEnvSource() {
+        const name = document.getElementById('newEnvSourceName').value.trim();
+        const filePath = document.getElementById('newEnvSourcePath').value.trim();
+        if (!name || !filePath) {
+            showToast('Name and file path are required', 'error');
+            return;
+        }
+        try {
+            const res = await fetch('/admin/api/env-sources', {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({ name, filePath })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                showToast(data.error || 'Failed to add source', 'error');
+                return;
+            }
+            document.getElementById('newEnvSourceName').value = '';
+            document.getElementById('newEnvSourcePath').value = '';
+            showSuccessToast(`Source "${name}" added`);
+            loadEnvSources();
+        } catch (err) {
+            showToast('Failed to add source', 'error');
+        }
+    }
+
+    async function removeEnvSource(id) {
+        if (!confirm('Remove this environment source? Imported keys will remain in config.')) return;
+        try {
+            const res = await fetch('/admin/api/env-sources', {
+                method: 'DELETE',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({ id })
+            });
+            if (res.ok) {
+                showSuccessToast('Source removed');
+                loadEnvSources();
+            }
+        } catch (err) {
+            showToast('Failed to remove source', 'error');
+        }
+    }
+
+    async function previewPullEnvSource(id) {
+        cancelPullEnvSource();
+        try {
+            const res = await fetch('/admin/api/env-sources/preview', {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({ id })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                showToast(data.error || 'Preview failed', 'error');
+                return;
+            }
+
+            if (Object.keys(data.newKeys || {}).length === 0) {
+                showSuccessToast('No new keys found in this source');
+                loadEnvSources();
+                return;
+            }
+
+            pendingPullSourceId = id;
+
+            // Build preview list
+            const keysDiv = document.getElementById('envSourcePreviewKeys');
+            const keyEntries = Object.entries(data.newKeys);
+            keysDiv.innerHTML = keyEntries.map(([key, value]) => {
+                const isKeyList = key.endsWith('_API_KEYS');
+                const count = isKeyList ? value.split(',').filter(Boolean).length : 1;
+                const display = isKeyList
+                    ? value.split(',').map(k => k.trim()).map(k => k.length > 20 ? k.substring(0, 8) + '...' + k.substring(k.length - 4) : k).join(', ')
+                    : value;
+                return `<div class="flex items-center gap-2 p-1.5 rounded bg-muted/50">
+                    <span class="font-mono text-foreground">${key}</span>
+                    <span class="text-muted-foreground">${isKeyList ? '(' + count + ' key' + (count > 1 ? 's' : '') + ')' : ''}</span>
+                    <span class="ml-auto font-mono text-muted-foreground truncate max-w-[50%]">${display}</span>
+                </div>`;
+            }).join('');
+
+            document.getElementById('envSourcePreviewPanel').classList.remove('hidden');
+            document.getElementById('envSourcePullStatus').textContent = `${data.totalNewKeys} new key(s) from ${data.totalNewProviders} provider(s)`;
+        } catch (err) {
+            showToast('Preview failed', 'error');
+        }
+    }
+
+    async function confirmPullEnvSource() {
+        if (!pendingPullSourceId) return;
+        const statusEl = document.getElementById('envSourcePullStatus');
+        statusEl.textContent = 'Importing...';
+        try {
+            const res = await fetch('/admin/api/env-sources/pull', {
+                method: 'POST',
+                headers: { ...authHeaders(), 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                body: JSON.stringify({ id: pendingPullSourceId })
+            });
+            const data = await res.json();
+            if (!res.ok) {
+                statusEl.innerHTML = '<span class="text-red-400">' + (data.error || 'Pull failed') + '</span>';
+                return;
+            }
+            cancelPullEnvSource();
+            if (data.message) {
+                showSuccessToast(data.message);
+            } else {
+                showSuccessToast(`Imported ${data.imported.keys} key(s) from ${data.imported.providers} provider(s)`);
+            }
+            loadEnvSources();
+            loadConfiguration();
+        } catch (err) {
+            statusEl.innerHTML = '<span class="text-red-400">Network error</span>';
+        }
+    }
+
+    function cancelPullEnvSource() {
+        document.getElementById('envSourcePreviewPanel').classList.add('hidden');
+        document.getElementById('envSourcePullStatus').textContent = '';
+        pendingPullSourceId = null;
+    }
+
+    async function browseEnvSourceFile() {
+        try {
+            const res = await fetch('/admin/api/fs-list?path=', { headers: authHeaders() });
+            if (!res.ok) return;
+            const data = await res.json();
+            // Simple prompt-based file selection (reuse existing pattern)
+            const input = document.getElementById('newEnvSourcePath');
+            if (input.value) {
+                const browseRes = await fetch('/admin/api/fs-list?path=' + encodeURIComponent(input.value), { headers: authHeaders() });
+                if (browseRes.ok) {
+                    const items = await browseRes.json();
+                    const envFiles = (items.entries || []).filter(e => e.name.endsWith('.env'));
+                    if (envFiles.length > 0) {
+                        input.value = envFiles[0].path;
+                        return;
+                    }
+                }
+            }
+            showToast('Enter the full path to an .env file', 'error');
+        } catch (err) {
+            // Silently fail — user can type path manually
+        }
+    }
 
     async function loadTelegramSettings() {
         try {
