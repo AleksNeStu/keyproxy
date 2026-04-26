@@ -16,9 +16,9 @@ $occupant = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Sil
     Select-Object -ExpandProperty OwningProcess -Unique
 
 if ($occupant) {
-    $pid = $occupant[0]
-    $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
-    Write-Host "Process: RUNNING (PID $pid, $($proc.ProcessName)) | Port $Port" -ForegroundColor Green
+    $procId = $occupant[0]
+    $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
+    Write-Host "Process: RUNNING (PID $procId, $($proc.ProcessName)) | Port $Port" -ForegroundColor Green
 } else {
     Write-Host "Process: STOPPED | Port $Port free" -ForegroundColor Red
 }

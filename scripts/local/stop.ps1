@@ -10,11 +10,11 @@ $occupant = Get-NetTCPConnection -LocalPort $Port -State Listen -ErrorAction Sil
     Select-Object -ExpandProperty OwningProcess -Unique
 
 if ($occupant) {
-    foreach ($pid in $occupant) {
-        $proc = Get-Process -Id $pid -ErrorAction SilentlyContinue
+    foreach ($procId in $occupant) {
+        $proc = Get-Process -Id $procId -ErrorAction SilentlyContinue
         if ($proc) {
-            Write-Host "Stopping KeyProxy (PID $pid, Port $Port)" -ForegroundColor Yellow
-            Stop-Process -Id $pid -Force -ErrorAction SilentlyContinue
+            Write-Host "Stopping KeyProxy (PID $procId, Port $Port)" -ForegroundColor Yellow
+            Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue
         }
     }
     Start-Sleep -Milliseconds 500
