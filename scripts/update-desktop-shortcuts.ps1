@@ -26,6 +26,7 @@ Set-Shortcut "KeyProxy Start" "scripts\start-keyproxy.bat" ""
 Set-Shortcut "KeyProxy Stop" "scripts\stop-keyproxy.bat" ""
 Set-Shortcut "KeyProxy Restart" "scripts\restart-keyproxy.bat" ""
 Set-Shortcut "KeyProxy Status" "scripts\status-keyproxy.bat" ""
+Set-Shortcut "KeyProxy Dev" "scripts\dev.bat" ""
 
 Write-Host "`nAll shortcuts updated!" -ForegroundColor Green
 Write-Host "Just double-click the shortcuts - they work!" -ForegroundColor Yellow
