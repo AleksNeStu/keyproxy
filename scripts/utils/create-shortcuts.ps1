@@ -55,7 +55,7 @@ if ($Mode -eq 'admin') {
 }
 
 # Dev shortcut (always available)
-$devBat = Join-Path $ScriptsDir "local\dev.bat"
-New-KeyProxyShortcut -Name "KeyProxy Dev" -Target "cmd.exe" -Arguments "/c `"$devBat`""
+$startBat = Join-Path $ScriptsDir "local\start.bat"
+New-KeyProxyShortcut -Name "KeyProxy Start" -Target "cmd.exe" -Arguments "/c `"$startBat`""
 
 Write-Host "`nDone! Shortcuts created on desktop." -ForegroundColor Green

@@ -15,11 +15,10 @@ scripts/
 ## Quick Start
 
 ```powershell
-# Development (auto-reload on .js changes)
-.\scripts\local\dev.ps1
-
-# Start in background
+# Start KeyProxy (auto-reload on .js changes)
 .\scripts\local\start.ps1
+
+# Or double-click start.bat
 
 # Check status
 .\scripts\local\status.ps1
@@ -42,12 +41,11 @@ No Administrator privileges needed. Manages KeyProxy as a regular process.
 
 | Script | Description |
 |--------|-------------|
-| `local/start.ps1` | Start KeyProxy in background |
+| `local/start.ps1` | Start with `node --watch` (auto-reload on .js changes) |
+| `local/start.bat` | Double-click wrapper for start.ps1 |
 | `local/stop.ps1` | Kill process on port 8990 |
 | `local/restart.ps1` | Stop + start |
 | `local/status.ps1` | Show process/port status |
-| `local/dev.ps1` | Start with `node --watch` (auto-reload) |
-| `local/dev.bat` | Double-click wrapper for dev.ps1 |
 
 ## Service — Windows Service Management
 
