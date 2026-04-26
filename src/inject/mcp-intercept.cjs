@@ -30,6 +30,21 @@ const DEFAULT_ROUTES = {
   'api.context7.com': 'context7',
 };
 
+// Auto-fill missing API key env vars so MCP servers start without real keys
+const KNOWN_KEYS = {
+  'BRAVE_API_KEY': 'brave',
+  'EXA_API_KEY': 'exa',
+  'JINA_API_KEY': 'jina',
+  'FIRECRAWL_API_KEY': 'firecrawl',
+  'CONTEXT7_API_KEY': 'context7',
+  'TAVILY_API_KEY': 'tavily',
+};
+for (const [envVar] of Object.entries(KNOWN_KEYS)) {
+  if (!process.env[envVar]) {
+    process.env[envVar] = 'placeholder';
+  }
+}
+
 let routes;
 try {
   routes = process.env.KEYPROXY_ROUTES ? JSON.parse(process.env.KEYPROXY_ROUTES) : DEFAULT_ROUTES;
