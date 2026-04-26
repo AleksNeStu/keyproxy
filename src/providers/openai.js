@@ -2,8 +2,10 @@ const { URL } = require('url');
 const BaseProvider = require('./BaseProvider');
 
 class OpenAIClient extends BaseProvider {
-  constructor(keyRotator, baseUrl = 'https://api.openai.com', providerName = 'openai', retryConfig = null, timeoutMs = 60000) {
-    super(keyRotator, baseUrl, providerName, retryConfig, timeoutMs);
+  constructor(keyRotator, baseUrl = 'https://api.openai.com', providerName = 'openai', retryConfig = null, timeoutMs = 60000, budgetTracker = null, providerConfig = null) {
+    super(keyRotator, baseUrl, providerName, retryConfig, timeoutMs, budgetTracker);
+    this.authHeader = providerConfig?.authHeader || 'Authorization';
+    this.authPrefix = providerConfig?.authPrefix !== undefined && providerConfig?.authPrefix !== null ? providerConfig.authPrefix : 'Bearer';
   }
 
   _buildRequestOptions(method, requestPath, body, headers, apiKey) {
@@ -28,9 +30,10 @@ class OpenAIClient extends BaseProvider {
       ...headers
     };
 
-    // Only add Bearer auth if not using query-param auth (KeyProxy placeholder)
+    // Only add auth if not using query-param auth (KeyProxy placeholder)
     if (!fullUrl.includes(apiKey) || !url.searchParams.has('tavilyApiKey')) {
-      finalHeaders['Authorization'] = `Bearer ${apiKey}`;
+      const authValue = this.authPrefix ? `${this.authPrefix} ${apiKey}` : apiKey;
+      finalHeaders[this.authHeader] = authValue;
     }
 
     const options = {

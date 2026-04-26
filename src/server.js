@@ -24,7 +24,7 @@ const { sendError, sendResponse, readRequestBody, getStatusText } = require('./r
 const { isAdminAuthenticated, handleAdminLogin, handleAdminLogout, handleAuthCheck, handleChangePassword, handleUpgradePassword } = require('./routes/adminAuth');
 const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetGeneralSettings, handleUpdateGeneralSettings, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./routes/adminEnv');
 const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm } = require('./routes/adminKeys');
-const { handleToggleProvider, handleToggleSyncEnv, handleToggleGlobalSync, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey, handleTestAllKeys, handleGetKeySources } = require('./routes/adminProviders');
+const { handleToggleProvider, handleToggleSyncEnv, handleToggleGlobalSync, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey, handleTestAllKeys, handleGetKeySources, handleGetSyncExclusive, handleToggleSyncExclusive } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
 const { handleGetStatus } = require('./routes/adminStatus');
 const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
@@ -305,6 +305,30 @@ class ProxyServer {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('File not found');
       }
+      return;
+    }
+
+    // Serve MCP intercept module
+    if (req.url.startsWith('/inject/') && req.method === 'GET') {
+      try {
+        const fileName = req.url.replace('/inject/', '').replace(/\.\./g, '');
+        const filePath = path.join(process.cwd(), 'src', 'inject', fileName);
+        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
+          const content = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, {
+            'Content-Type': 'application/javascript; charset=utf-8',
+            'Content-Length': Buffer.byteLength(content),
+            'Cache-Control': 'no-cache',
+            'X-Content-Type-Options': 'nosniff'
+          });
+          res.end(content);
+          return;
+        }
+      } catch (e) {
+        console.log(`[INJECT] Error serving file: ${e.message}`);
+      }
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not found');
       return;
     }
 
@@ -626,6 +650,12 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/toggle-global-sync' && req.method === 'POST') {
       return handleToggleGlobalSync(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/sync-exclusive' && req.method === 'GET') {
+      return handleGetSyncExclusive(this, res);
+    }
+    if (adminPath === '/admin/api/sync-exclusive' && req.method === 'POST') {
+      return handleToggleSyncExclusive(this, req, res, body);
     }
     if (adminPath === '/admin/api/upgrade-password' && req.method === 'POST') {
       return handleUpgradePassword(this, req, res);

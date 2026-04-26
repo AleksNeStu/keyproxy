@@ -21,31 +21,16 @@ class Config {
   loadConfig() {
     const localEnvPath = path.join(process.cwd(), '.env');
     console.log(`[CONFIG] Loading local configuration from ${localEnvPath}`);
-    
-    // 1. Load local env first
+
+    // 1. Load local env first (app settings: PORT, ADMIN_PASSWORD, etc.)
     let envVars = {};
     if (fs.existsSync(localEnvPath)) {
       const localEnvContent = fs.readFileSync(localEnvPath, 'utf8');
       envVars = { ...this.parseEnvFile(localEnvContent) };
     }
 
-    // Determine rootEnvPath from local env or default
-    const rootEnvPath = this.resolveGlobalEnvPath(envVars);
-
-    // 2. Load global env and merge (local takes priority for settings, but keys accumulate)
-    if (rootEnvPath && fs.existsSync(rootEnvPath)) {
-      console.log(`[CONFIG] Loading global configuration from ${rootEnvPath}`);
-      const rootEnvContent = fs.readFileSync(rootEnvPath, 'utf8');
-      const rootEnvVars = this.parseEnvFile(rootEnvContent);
-
-      // Auto-discover keys from root and merge into envVars
-      this.autoDiscoverGlobalKeys(rootEnvVars, envVars);
-
-      // Merge other root vars if not defined locally
-      for (const [key, value] of Object.entries(rootEnvVars)) {
-        if (!envVars[key]) envVars[key] = value;
-      }
-    }
+    // 2. Load rotation key files (all enabled files, later overrides earlier)
+    this.loadRotationKeyFiles(envVars);
 
     if (Object.keys(envVars).length === 0) {
       console.error('\n❌ ERROR: No .env configuration found!');
@@ -95,16 +80,16 @@ class Config {
     // Known service defaults
     const knownDefaults = {
       gemini: { type: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
-      firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev' },
-      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com' },
-      tavily_mcp: { type: 'openai', baseUrl: 'https://mcp.tavily.com/mcp', keyPattern: 'TAVILY' },
-      context7: { type: 'openai', baseUrl: 'https://context7.com/api' },
-      onref: { type: 'openai', baseUrl: 'https://ref.tools/api', keyPattern: 'REF' },
-      brave: { type: 'openai', baseUrl: 'https://api.search.brave.com' },
-      exa: { type: 'openai', baseUrl: 'https://api.exa.ai' },
-      jina: { type: 'openai', baseUrl: 'https://api.jina.ai' },
-      groq: { type: 'openai', baseUrl: 'https://api.groq.com/openai/v1' },
-      mistral: { type: 'openai', baseUrl: 'https://api.mistral.ai/v1' },
+      firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer' },
+      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', authHeader: 'Authorization', authPrefix: 'Bearer' },
+      tavily_mcp: { type: 'openai', baseUrl: 'https://mcp.tavily.com/mcp', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer' },
+      context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer' },
+      onref: { type: 'openai', baseUrl: 'https://ref.tools/api', keyPattern: 'REF', authHeader: 'Authorization', authPrefix: 'Bearer' },
+      brave: { type: 'openai', baseUrl: 'https://api.search.brave.com', authHeader: 'X-Subscription-Token', authPrefix: '' },
+      exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '' },
+      jina: { type: 'openai', baseUrl: 'https://api.jina.ai', authHeader: 'Authorization', authPrefix: 'Bearer' },
+      groq: { type: 'openai', baseUrl: 'https://api.groq.com/openai/v1', authHeader: 'Authorization', authPrefix: 'Bearer' },
+      mistral: { type: 'openai', baseUrl: 'https://api.mistral.ai/v1', authHeader: 'Authorization', authPrefix: 'Bearer' },
       zhipuai: { type: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', keyPattern: '(ZHIPUAI|GLM)' },
       siliconflow: { type: 'openai', baseUrl: 'https://api.siliconflow.cn/v1' },
       searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1' },
@@ -141,7 +126,7 @@ class Config {
           const patternSource = config.keyPattern || knownName;
           const pattern = new RegExp(`^${patternSource.toUpperCase()}_API_KEY(?:_[A-Z0-9]+)?$`);
           if (pattern.test(upperKey)) {
-            if (!discovery[knownName]) discovery[knownName] = { type: config.type, keys: [], baseUrl: config.baseUrl, sources: {} };
+            if (!discovery[knownName]) discovery[knownName] = { type: config.type, keys: [], baseUrl: config.baseUrl, sources: {}, authHeader: config.authHeader, authPrefix: config.authPrefix };
             discovery[knownName].keys.push(value);
             discovery[knownName].sources[value] = key;
           }
@@ -254,7 +239,7 @@ class Config {
     // Parse {API_TYPE}_{PROVIDER}_API_KEYS, {API_TYPE}_{PROVIDER}_BASE_URL, and {API_TYPE}_{PROVIDER}_ACCESS_KEY format
     const providerConfigs = new Map();
 
-    const defaultConfig = () => ({ apiType: null, keys: [], allKeys: [], baseUrl: null, accessKey: null, defaultModel: null, allowedModels: [], disabled: false });
+    const defaultConfig = () => ({ apiType: null, keys: [], allKeys: [], baseUrl: null, accessKey: null, defaultModel: null, allowedModels: [], disabled: false, authHeader: null, authPrefix: null });
 
     for (const [key, value] of Object.entries(envVars)) {
       if (key.endsWith('_API_KEYS') && value) {
@@ -350,6 +335,22 @@ class Config {
 
           providerConfigs.get(provider).allowedModels = value.split(',').map(s => s.trim()).filter(Boolean);
         }
+      } else if (key.endsWith('_AUTH_HEADER') && value) {
+        const parts = key.replace('_AUTH_HEADER', '').split('_');
+        if (parts.length >= 1) {
+          const apiType = parts[0].toLowerCase();
+          const provider = parts.length === 1 ? apiType : parts.slice(1).join('_').toLowerCase();
+          if (!providerConfigs.has(provider)) providerConfigs.set(provider, defaultConfig());
+          providerConfigs.get(provider).authHeader = value.trim();
+        }
+      } else if (key.endsWith('_AUTH_PREFIX') && value !== undefined) {
+        const parts = key.replace('_AUTH_PREFIX', '').split('_');
+        if (parts.length >= 1) {
+          const apiType = parts[0].toLowerCase();
+          const provider = parts.length === 1 ? apiType : parts.slice(1).join('_').toLowerCase();
+          if (!providerConfigs.has(provider)) providerConfigs.set(provider, defaultConfig());
+          providerConfigs.get(provider).authPrefix = value.trim();
+        }
       }
     }
 
@@ -439,6 +440,7 @@ class Config {
   }
 
   isProviderSyncEnabled(providerName) {
+    if (this.isProviderSyncExcluded(providerName)) return false;
     const provider = this.providers.get(providerName);
     if (!provider) return false;
     const syncEnvVar = `${provider.apiType.toUpperCase()}_${providerName.toUpperCase()}_SYNC_ENV`;
@@ -446,6 +448,83 @@ class Config {
     if (perProvider === 'false') return false;
     if (perProvider === 'true') return true;
     return this.isGlobalSyncEnabled();
+  }
+
+  isProviderSyncExcluded(providerName) {
+    const exclusive = this.getSyncExclusiveProviders();
+    return exclusive.includes(providerName.toLowerCase());
+  }
+
+  getSyncExclusiveProviders() {
+    const raw = this.envVars.SYNC_EXCLUSIVE_PROVIDERS || '';
+    return raw.split(',').map(s => s.trim().toLowerCase()).filter(Boolean);
+  }
+
+  setSyncExclusiveProviders(names) {
+    const localEnvPath = path.join(process.cwd(), '.env');
+    const content = fs.readFileSync(localEnvPath, 'utf8');
+    const vars = this.parseEnvFile(content);
+    vars.SYNC_EXCLUSIVE_PROVIDERS = names.join(',');
+    this.writeLocalEnv(vars);
+    this.loadConfig();
+  }
+
+  /**
+   * Load ALL enabled rotation key files (ENV_FILES) and merge into envVars.
+   * Files later in the list override earlier ones.
+   * Local .env is NOT overwritten — it stays the authority for app settings.
+   */
+  loadRotationKeyFiles(envVars) {
+    if (!envVars.ENV_FILES) {
+      // Legacy fallback: single EXTERNAL_ENV_PATH or ../../.env
+      const legacyPath = envVars.EXTERNAL_ENV_PATH
+        ? path.resolve(process.cwd(), envVars.EXTERNAL_ENV_PATH)
+        : path.resolve(process.cwd(), '../../.env');
+
+      if (legacyPath && fs.existsSync(legacyPath)) {
+        console.log(`[CONFIG] Loading legacy key file: ${legacyPath}`);
+        const content = fs.readFileSync(legacyPath, 'utf8');
+        const fileVars = this.parseEnvFile(content);
+        this.autoDiscoverGlobalKeys(fileVars, envVars);
+        for (const [key, value] of Object.entries(fileVars)) {
+          if (!envVars[key]) envVars[key] = value;
+        }
+      }
+      return;
+    }
+
+    const disabledList = this.parseEnvFilesDisabled(envVars.ENV_FILES_DISABLED);
+    const envFiles = this.parseEnvFiles(envVars.ENV_FILES);
+    const enabledEntries = Object.entries(envFiles).filter(([name]) => !disabledList.includes(name));
+
+    if (enabledEntries.length === 0) {
+      console.log('[CONFIG] No rotation key files enabled');
+      return;
+    }
+
+    console.log(`[CONFIG] Loading ${enabledEntries.length} rotation key file(s)...`);
+
+    for (const [name, filePath] of enabledEntries) {
+      const resolvedPath = path.resolve(process.cwd(), filePath);
+      if (!fs.existsSync(resolvedPath)) {
+        console.warn(`[CONFIG] Key file "${name}" not found: ${resolvedPath}`);
+        continue;
+      }
+
+      console.log(`[CONFIG] Loading key file "${name}": ${resolvedPath}`);
+      const content = fs.readFileSync(resolvedPath, 'utf8');
+      const fileVars = this.parseEnvFile(content);
+
+      // Auto-discover keys from file and merge (later files override)
+      this.autoDiscoverGlobalKeys(fileVars, envVars);
+
+      // Merge non-key settings if not already defined
+      for (const [key, value] of Object.entries(fileVars)) {
+        envVars[key] = value;
+      }
+    }
+
+    console.log(`[CONFIG] Loaded ${enabledEntries.length} rotation key file(s)`);
   }
 
   // New provider methods
@@ -571,24 +650,22 @@ class Config {
 
   getEnvFiles() {
     const localEnvPath = path.join(process.cwd(), '.env');
-    if (!fs.existsSync(localEnvPath)) return { files: {}, active: 'default', disabled: [] };
+    if (!fs.existsSync(localEnvPath)) return { files: [], disabled: [] };
     const content = fs.readFileSync(localEnvPath, 'utf8');
     const vars = this.parseEnvFile(content);
     const files = this.parseEnvFiles(vars.ENV_FILES);
     const disabledList = this.parseEnvFilesDisabled(vars.ENV_FILES_DISABLED);
 
-    // Convert to array with priority and disabled state
-    const fileArray = Object.entries(files).map(([name, path], index) => ({
+    const fileArray = Object.entries(files).map(([name, filePath], index) => ({
       name,
-      path,
+      path: filePath,
       priority: index + 1,
       disabled: disabledList.includes(name)
     }));
 
     return {
       files: fileArray,
-      active: vars.ACTIVE_ENV || 'default',
-      legacyPath: vars.EXTERNAL_ENV_PATH || null,
+      enabledCount: fileArray.filter(f => !f.disabled).length,
       disabled: disabledList
     };
   }

@@ -564,6 +564,54 @@ async function handleGetKeySources(server, res) {
   }
 }
 
+/**
+ * GET /admin/api/sync-exclusive — get providers excluded from OS env sync.
+ */
+function handleGetSyncExclusive(server, res) {
+  try {
+    const exclusiveProviders = server.config.getSyncExclusiveProviders();
+    const allProviders = [];
+    for (const [name, config] of server.config.getProviders().entries()) {
+      allProviders.push({ name, apiType: config.apiType });
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ exclusiveProviders, allProviders }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to get sync exclusive: ' + error.message);
+  }
+}
+
+/**
+ * POST /admin/api/sync-exclusive — toggle a provider's sync exclusive state.
+ * Body: { providerName, exclusive: true/false }
+ */
+function handleToggleSyncExclusive(server, req, res, body) {
+  try {
+    const { providerName, exclusive } = JSON.parse(body);
+    if (!providerName) {
+      sendError(res, 400, 'Missing providerName');
+      return;
+    }
+
+    const current = server.config.getSyncExclusiveProviders();
+    const normalized = providerName.toLowerCase();
+    let updated;
+    if (exclusive) {
+      updated = [...new Set([...current, normalized])];
+    } else {
+      updated = current.filter(p => p !== normalized);
+    }
+
+    server.config.setSyncExclusiveProviders(updated);
+    server.reinitializeClients();
+
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, exclusiveProviders: updated }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to toggle sync exclusive: ' + error.message);
+  }
+}
+
 module.exports = {
   handleToggleProvider,
   handleToggleSyncEnv,
@@ -577,6 +625,8 @@ module.exports = {
   handleTestApiKey,
   handleTestAllKeys,
   handleGetKeySources,
+  handleGetSyncExclusive,
+  handleToggleSyncExclusive,
   testGeminiKey,
   testOpenaiKey
 };

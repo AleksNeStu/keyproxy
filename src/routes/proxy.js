@@ -172,7 +172,7 @@ async function getProviderClient(server, providerName, provider, legacy = false)
     let client;
 
     if (provider.apiType === 'openai') {
-      client = new server.OpenAIClient(keyRotator, provider.baseUrl, providerName, retryConfig, timeoutMs, server.budgetTracker);
+      client = new server.OpenAIClient(keyRotator, provider.baseUrl, providerName, retryConfig, timeoutMs, server.budgetTracker, provider);
     } else if (provider.apiType === 'gemini') {
       client = new server.GeminiClient(keyRotator, provider.baseUrl, providerName, retryConfig, timeoutMs, server.budgetTracker);
     } else {
