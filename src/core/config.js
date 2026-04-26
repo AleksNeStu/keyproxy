@@ -79,20 +79,22 @@ class Config {
   autoDiscoverGlobalKeys(rootVars, localVars) {
     // Known service defaults (also accessible via this.knownDefaults)
     const knownDefaults = this.knownDefaults = {
-      gemini: { type: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta' },
-      firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer' },
-      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', authHeader: 'Authorization', authPrefix: 'Bearer' },
-      tavily_mcp: { type: 'openai', baseUrl: 'https://mcp.tavily.com/mcp', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer' },
-      context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer' },
-      onref: { type: 'openai', baseUrl: 'https://ref.tools/api', keyPattern: 'REF', authHeader: 'Authorization', authPrefix: 'Bearer' },
-      brave: { type: 'openai', baseUrl: 'https://api.search.brave.com', authHeader: 'X-Subscription-Token', authPrefix: '' },
-      exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '' },
-      jina: { type: 'openai', baseUrl: 'https://api.jina.ai', authHeader: 'Authorization', authPrefix: 'Bearer' },
-      groq: { type: 'openai', baseUrl: 'https://api.groq.com/openai/v1', authHeader: 'Authorization', authPrefix: 'Bearer' },
-      mistral: { type: 'openai', baseUrl: 'https://api.mistral.ai/v1', authHeader: 'Authorization', authPrefix: 'Bearer' },
-      zhipuai: { type: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', keyPattern: '(ZHIPUAI|GLM)' },
-      siliconflow: { type: 'openai', baseUrl: 'https://api.siliconflow.cn/v1' },
-      searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1' },
+      // AI Model Providers
+      gemini: { type: 'gemini', baseUrl: 'https://generativelanguage.googleapis.com/v1beta', category: 'ai' },
+      groq: { type: 'openai', baseUrl: 'https://api.groq.com/openai/v1', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'ai' },
+      mistral: { type: 'openai', baseUrl: 'https://api.mistral.ai/v1', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'ai' },
+      zhipuai: { type: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', keyPattern: '(ZHIPUAI|GLM)', category: 'ai' },
+      siliconflow: { type: 'openai', baseUrl: 'https://api.siliconflow.cn/v1', category: 'ai' },
+      // MCP / Search / Content Providers
+      brave: { type: 'openai', baseUrl: 'https://api.search.brave.com', authHeader: 'X-Subscription-Token', authPrefix: '', category: 'mcp' },
+      exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '', category: 'mcp' },
+      jina: { type: 'openai', baseUrl: 'https://api.jina.ai', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      onref: { type: 'openai', baseUrl: 'https://ref.tools/api', keyPattern: 'REF', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      tavily_mcp: { type: 'openai', baseUrl: 'https://mcp.tavily.com/mcp', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1', category: 'search' },
     };
 
     // Discovery container: { name: { type, keys: [], baseUrl } }
