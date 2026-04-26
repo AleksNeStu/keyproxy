@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KeyProxy Admin - Minimal</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+            background: #0a0a0a;
+            color: #fafafa;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        h1 { color: #fafafa; }
+        .success { color: #22c55e; font-size: 18px; margin: 20px 0; }
+        .container { max-width: 600px; margin: 0 auto; }
+        .card { background: #18181b; padding: 20px; border-radius: 8px; margin: 20px 0; }
+        button { background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 4px; cursor: pointer; margin: 5px; }
+        button:hover { background: #2563eb; }
+    </style>
+</head>
+    <body>
+        <div class="container">
+            <h1>✅ KeyProxy Admin Panel</h1>
+            <div class="card">
+                <p><strong>Server Status:</strong> Running on port 8990</p>
+                <p><strong>Providers:</strong> 14 configured</p>
+                <div class="success">✅ JavaScript is working!</div>
+                <p style="font-size: 14px; color: #a1a1aa;">If you see this, your browser is compatible with KeyProxy.</p>
+            </div>
+            <div class="card">
+                <p><strong>Quick Test:</strong></p>
+                <button onclick="testAPI()">Test API Connection</button>
+                <div id="result" style="margin-top: 10px;"></div>
+            </div>
+        </div>
+        <script>
+            console.log('✅ KeyProxy admin panel loaded successfully');
+
+            async function testAPI() {
+                const resultDiv = document.getElementById('result');
+                resultDiv.innerHTML = 'Testing...';
+                try {
+                    const response = await fetch('/admin/api/status');
+                    const data = await response.json();
+                    resultDiv.innerHTML = '<span style="color: #22c55e;">✅ API Working!</span>';
+                    console.log('API Response:', data);
+                } catch (error) {
+                    resultDiv.innerHTML = '<span style="color: #ef4444;">❌ API Error: ' + error.message + '</span>';
+                    console.error('API Error:', error);
+                }
+            }
+        </script>
+    </body>
+</html>

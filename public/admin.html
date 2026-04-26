@@ -16,20 +16,6 @@
         onerror="console.error('Failed to load Chart.js from local file')">
     </script>
 
-    <script>
-        // Immediately check authentication status to prevent login form flash
-        (function() {
-            const isAuthenticated = sessionStorage.getItem('adminAuthenticated') === 'true';
-            if (isAuthenticated) {
-                document.body.classList.add('authenticated');
-                document.body.classList.remove('not-authenticated');
-            } else {
-                document.body.classList.add('not-authenticated');
-                document.body.classList.remove('authenticated');
-            }
-        })();
-    </script>
-
     <style>
         :root {
           --background: #fafafa;
@@ -483,6 +469,16 @@
     </script>
 </head>
 <body class="min-h-screen bg-background" id="mainBody">
+    <script>
+        (function() {
+            var isAuthenticated = sessionStorage.getItem('adminAuthenticated') === 'true';
+            if (isAuthenticated) {
+                document.body.classList.add('authenticated');
+            } else {
+                document.body.classList.add('not-authenticated');
+            }
+        })();
+    </script>
     <!-- Global login function -->
     <script>
         async function login() {

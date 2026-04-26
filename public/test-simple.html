@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>KeyProxy Test Page</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; background: #1a1a1a; color: #fff; }
+        .success { color: #22c55e; font-size: 24px; }
+        h1 { margin-bottom: 20px; }
+    </style>
+</head>
+<body>
+    <h1>✅ KeyProxy Server Working!</h1>
+    <div class="success">If you see this page, your server is running correctly.</div>
+    <p>Open browser console (F12) to check for JavaScript errors.</p>
+    <script>
+        console.log('✅ JavaScript is working!');
+        document.body.style.background = '#1a1a1a';
+        setTimeout(() => {
+            document.querySelector('.success').textContent = '✅ All systems operational!';
+        }, 1000);
+    </script>
+</body>
+</html>

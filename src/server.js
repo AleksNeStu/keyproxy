@@ -302,16 +302,18 @@ class ProxyServer {
       return;
     }
 
-    // Serve admin panel
+    // Serve admin panel (BEFORE handleAdminRequest)
     if ((req.url === '/admin' || req.url === '/admin.html') && req.method === 'GET') {
       try {
         const htmlPath = path.join(process.cwd(), 'public', 'admin.html');
-        console.log(`[ADMIN] Serving admin panel from: ${htmlPath}`);
 
         const htmlContent = fs.readFileSync(htmlPath, 'utf8');
         res.writeHead(200, {
-          'Content-Type': 'text/html',
-          'Content-Length': Buffer.byteLength(htmlContent)
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Length': Buffer.byteLength(htmlContent),
+          'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
+          'X-Content-Type-Options': 'nosniff',
+          'X-Frame-Options': 'SAMEORIGIN'
         });
         res.end(htmlContent);
         console.log(`[ADMIN] Successfully served admin panel`);
@@ -319,6 +321,42 @@ class ProxyServer {
         console.log(`[ADMIN] Error serving admin panel: ${error.message}`);
         res.writeHead(500, { 'Content-Type': 'text/plain' });
         res.end('Error loading admin panel');
+      }
+      return;
+    }
+
+    // Serve test page for debugging
+    if (req.url === '/test' || req.url === '/test-simple.html') {
+      try {
+        const htmlPath = path.join(process.cwd(), 'public', 'test-simple.html');
+        const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Length': Buffer.byteLength(htmlContent)
+        });
+        res.end(htmlContent);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading test page');
+      }
+      return;
+    }
+
+    // Serve minimal admin page (no Tailwind/Chart.js - for debugging)
+    if (req.url === '/admin-minimal.html') {
+      try {
+        const htmlPath = path.join(process.cwd(), 'public', 'admin-minimal.html');
+        const htmlContent = fs.readFileSync(htmlPath, 'utf8');
+        res.writeHead(200, {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Content-Length': Buffer.byteLength(htmlContent),
+          'Content-Security-Policy': "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';",
+          'X-Content-Type-Options': 'nosniff'
+        });
+        res.end(htmlContent);
+      } catch (error) {
+        res.writeHead(500, { 'Content-Type': 'text/plain' });
+        res.end('Error loading minimal admin page');
       }
       return;
     }
