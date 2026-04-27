@@ -27,7 +27,7 @@ const DEFAULT_ROUTES = {
   'r.jina.ai': 'jina',
   's.jina.ai': 'jina',
   'api.firecrawl.dev': 'firecrawl',
-  'api.context7.com': 'context7',
+  'context7.com': 'context7',
   'api.tavily.com': 'tavily',
   'api.ref.tools': 'onref',
 };
