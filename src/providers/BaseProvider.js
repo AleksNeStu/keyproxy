@@ -105,11 +105,21 @@ class BaseProvider {
         // Check for permanent freeze conditions (e.g., Exa 402 balance exhaustion)
         const freezeStatusCodes = this.providerConfig?.freezeOnStatusCodes;
         if (freezeStatusCodes && freezeStatusCodes.has(response.statusCode) && this.keyRotator.historyManager) {
-          const reason = `${response.statusCode}_balance_exhausted`;
+          let freezeDetail = 'balance_exhausted';
+          if (!streaming && response.data) {
+            try {
+              const errBody = JSON.parse(response.data);
+              const msg = (errBody.error?.message || '').toLowerCase();
+              if (msg.includes('insufficient credit') || msg.includes('no credits remaining')) freezeDetail = 'credits_depleted';
+              else if (msg.includes('balance exhausted') || msg.includes('balance depleted')) freezeDetail = 'balance_depleted';
+              else if (msg.includes('quota exceeded') || msg.includes('usage limit')) freezeDetail = 'quota_exceeded';
+            } catch (_) { /* non-JSON response, use default */ }
+          }
+          const reason = `${response.statusCode}_${freezeDetail}`;
           this.keyRotator.historyManager.recordKeyFrozen(this.providerName, apiKey, reason);
           console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] KEY FROZEN (${reason}) — permanent disable`);
           requestContext.markKeyAsRateLimited(apiKey);
-          failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'frozen_balance_exhausted' });
+          failedKeys.push({ key: maskedKey, status: response.statusCode, reason: `frozen_${freezeDetail}` });
           lastResponse = response.stream ? { statusCode: response.statusCode, headers: response.headers, data: '' } : response;
           continue;
         }
