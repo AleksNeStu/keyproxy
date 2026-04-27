@@ -49,11 +49,12 @@ class KeyHistoryManager {
   _flush() {
     if (!this.dirty) return;
     this.dirty = false;
-    try {
-      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
-    } catch (err) {
-      console.log(`[HISTORY] Write failed: ${err.message}`);
-    }
+    this._writing = true;
+    fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2), (err) => {
+      this._writing = false;
+      if (err) console.log(`[HISTORY] Write failed: ${err.message}`);
+      if (this.dirty) this._scheduleSave();
+    });
   }
 
   flushSync() {
@@ -62,7 +63,12 @@ class KeyHistoryManager {
       this.saveTimer = null;
     }
     this.dirty = true;
-    this._flush();
+    try {
+      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
+      this.dirty = false;
+    } catch (err) {
+      console.log(`[HISTORY] Sync write failed: ${err.message}`);
+    }
   }
 
   // --- Hashing ---

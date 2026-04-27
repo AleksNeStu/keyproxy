@@ -37,13 +37,14 @@ class AnalyticsTracker {
   _flush() {
     if (!this.dirty) return;
     this.dirty = false;
-    try {
-      const dir = path.dirname(this.filePath);
-      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
-    } catch (err) {
-      console.log(`[ANALYTICS] Write failed: ${err.message}`);
-    }
+    this._writing = true;
+    const dir = path.dirname(this.filePath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2), (err) => {
+      this._writing = false;
+      if (err) console.log(`[ANALYTICS] Write failed: ${err.message}`);
+      if (this.dirty) this._scheduleSave();
+    });
   }
 
   flushSync() {
@@ -52,7 +53,14 @@ class AnalyticsTracker {
       this.saveTimer = null;
     }
     this.dirty = true;
-    this._flush();
+    try {
+      const dir = path.dirname(this.filePath);
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(this.filePath, JSON.stringify(this.data, null, 2));
+      this.dirty = false;
+    } catch (err) {
+      console.log(`[ANALYTICS] Sync write failed: ${err.message}`);
+    }
   }
 
   _dayKey(ts) {
