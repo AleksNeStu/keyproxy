@@ -235,38 +235,10 @@ try {
       newOpts.headers['X-KeyProxy-Original-Host'] = host;
 
       // Use http.request (not https) since KeyProxy listens on plain HTTP
+      // NOTE: No body buffering in Layer 2 — follow-redirects (axios) creates a
+      // Writable stream that calls _currentRequest.write() but may not call .end()
+      // in all code paths, causing deadlocks. Body stripping is handled in Layer 1.
       const req = http.request(newOpts, cb);
-
-      // Intercept .write() and .end() to strip body keys (e.g., Tavily api_key in JSON)
-      const origWrite = req.write.bind(req);
-      const origEnd = req.end.bind(req);
-      let bodyChunks = [];
-      let bodyFlushed = false;
-
-      req.write = function(data, ...rest) {
-        if (!bodyFlushed) {
-          bodyChunks.push(typeof data === 'string' ? data : data.toString());
-          // Return fake "not flushed" to buffer until end()
-          return false;
-        }
-        return origWrite(data, ...rest);
-      };
-
-      req.end = function(data, ...rest) {
-        if (bodyFlushed) {
-          return origEnd(data, ...rest);
-        }
-        if (data) {
-          bodyChunks.push(typeof data === 'string' ? data : data.toString());
-        }
-        bodyFlushed = true;
-        const fullBody = bodyChunks.join('');
-        const cleaned = stripBodyKeys(fullBody);
-        if (cleaned.length > 0) {
-          origWrite(cleaned);
-        }
-        return origEnd(...rest);
-      };
 
       return req;
     };
