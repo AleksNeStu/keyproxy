@@ -28,6 +28,7 @@ const DEFAULT_ROUTES = {
   's.jina.ai': 'jina',
   'api.firecrawl.dev': 'firecrawl',
   'api.context7.com': 'context7',
+  'api.tavily.com': 'tavily',
 };
 
 // Auto-fill missing API key env vars so MCP servers start without real keys
