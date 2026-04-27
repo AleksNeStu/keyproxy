@@ -9,13 +9,14 @@ class OpenAIClient extends BaseProvider {
   }
 
   _buildRequestOptions(method, requestPath, body, headers, apiKey) {
+    const baseUrl = this._baseUrlOverride || this.baseUrl;
     let fullUrl;
     if (!requestPath || requestPath === '/') {
-      fullUrl = this.baseUrl;
+      fullUrl = baseUrl;
     } else if (requestPath.startsWith('/')) {
-      fullUrl = this.baseUrl.endsWith('/') ? this.baseUrl + requestPath.substring(1) : this.baseUrl + requestPath;
+      fullUrl = baseUrl.endsWith('/') ? baseUrl + requestPath.substring(1) : baseUrl + requestPath;
     } else {
-      fullUrl = this.baseUrl.endsWith('/') ? this.baseUrl + requestPath : this.baseUrl + '/' + requestPath;
+      fullUrl = baseUrl.endsWith('/') ? baseUrl + requestPath : baseUrl + '/' + requestPath;
     }
 
     // Support for query-parameter authentication (e.g. for Tavily MCP or other custom proxies)

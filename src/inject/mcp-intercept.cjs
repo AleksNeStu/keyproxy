@@ -110,9 +110,10 @@ if (typeof globalThis.fetch === 'function') {
         h.delete(ah);
       }
       h.set('Authorization', proxyAuthHeader());
+      h.set('X-KeyProxy-Original-Host', route.host);
       newInit.headers = h;
     } else {
-      newInit.headers = new Headers({ 'Authorization': proxyAuthHeader() });
+      newInit.headers = new Headers({ 'Authorization': proxyAuthHeader(), 'X-KeyProxy-Original-Host': route.host });
     }
 
     // Handle Request objects
@@ -135,15 +136,29 @@ try {
   function patchModule(mod, modName) {
     const origRequest = mod.request;
 
-    mod.request = function(opts, cb) {
-      let host;
+    mod.request = function(urlOrOpts, optionsOrCb, maybeCb) {
+      // Normalize: http.request(url, options, cb) | http.request(url, cb) | http.request(options, cb)
+      let url, options, cb;
+      if (typeof urlOrOpts === 'string' || urlOrOpts instanceof URL) {
+        url = urlOrOpts;
+        if (typeof optionsOrCb === 'function') {
+          cb = optionsOrCb;
+          options = {};
+        } else {
+          options = optionsOrCb || {};
+          cb = maybeCb;
+        }
+      } else {
+        options = urlOrOpts || {};
+        cb = optionsOrCb;
+      }
 
-      if (typeof opts === 'string') {
-        try { host = new URL(opts).hostname; } catch {}
-      } else if (opts instanceof URL) {
-        host = opts.hostname;
-      } else if (opts && typeof opts === 'object') {
-        host = opts.hostname || opts.host;
+      // Extract host from url or options
+      let host;
+      if (url) {
+        try { host = new URL(typeof url === 'string' ? url : url.href).hostname; } catch {}
+      } else if (options) {
+        host = options.hostname || options.host;
       }
 
       const route = host ? matchRoute(`https://${host}`) : null;
@@ -154,22 +169,23 @@ try {
 
       // Build new options
       let newOpts;
-      if (typeof opts === 'string' || opts instanceof URL) {
-        const oldUrl = typeof opts === 'string' ? opts : opts.href;
-        const parsed = new URL(oldUrl);
+      if (url) {
+        const urlStr = typeof url === 'string' ? url : url.href;
+        const parsed = new URL(urlStr);
         newOpts = {
+          ...options,
           hostname: proxyHost,
           port: proxyPort,
           path: `/${route.provider}${parsed.pathname}${parsed.search}`,
-          method: 'GET',
-          headers: {},
+          method: options.method || 'GET',
+          headers: { ...options.headers },
         };
       } else {
-        newOpts = { ...opts };
+        newOpts = { ...options };
         newOpts.hostname = proxyHost;
         newOpts.port = proxyPort;
-        newOpts.path = `/${route.provider}${opts.path || '/'}`;
-        newOpts.headers = { ...opts.headers };
+        newOpts.path = `/${route.provider}${options.path || '/'}`;
+        newOpts.headers = { ...options.headers };
       }
 
       // Strip auth headers
@@ -180,8 +196,10 @@ try {
       }
       newOpts.headers = newOpts.headers || {};
       newOpts.headers['Authorization'] = proxyAuthHeader();
+      newOpts.headers['X-KeyProxy-Original-Host'] = host;
 
-      return origRequest.call(this, newOpts, cb);
+      // Use http.request (not https) since KeyProxy listens on plain HTTP
+      return http.request(newOpts, cb);
     };
   }
 

@@ -90,9 +90,9 @@ class Config {
       exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([402]) },
       jina: { type: 'openai', baseUrl: 'https://api.jina.ai', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
       firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
-      context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      context7: { type: 'openai', baseUrl: 'https://api.context7.com', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
       onref: { type: 'openai', baseUrl: 'https://ref.tools/api', keyPattern: 'REF', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
-      tavily: { type: 'openai', baseUrl: 'https://mcp.tavily.com/mcp', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
       searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1', category: 'mcp' },
     };
 

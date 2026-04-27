@@ -537,6 +537,12 @@ async function handleProxyRequest(server, req, res, body) {
     console.log(`[REQ-${requestId}] Cache MISS for ${providerName}`);
   }
 
+  // Apply X-KeyProxy-Original-Host override for injection routing
+  const originalHost = req.headers['x-keyproxy-original-host'];
+  if (originalHost) {
+    client._baseUrlOverride = `https://${originalHost}`;
+  }
+
   try {
     response = await client.makeRequest(req.method, apiPath, body, headers, customStatusCodes, streaming);
   } catch (error) {
@@ -585,6 +591,8 @@ async function handleProxyRequest(server, req, res, body) {
 
     sendError(res, statusCode, `${statusText}: ${error.message}`);
     return;
+  } finally {
+    delete client._baseUrlOverride;
   }
 
   // Extract key info from response

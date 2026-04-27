@@ -15,29 +15,30 @@ class GeminiClient extends BaseProvider {
   }
 
   _buildRequestOptions(method, requestPath, body, headers, apiKey) {
+    const baseUrl = this._baseUrlOverride || this.baseUrl;
     let fullUrl;
     if (!requestPath || requestPath === '/') {
-      fullUrl = this.baseUrl;
+      fullUrl = baseUrl;
     } else if (requestPath.startsWith('/')) {
-      let effectiveBaseUrl = this.baseUrl;
+      let effectiveBaseUrl = baseUrl;
 
       // Resolve version conflicts between path and base URL
       const pathVersionMatch = requestPath.match(/^\/v[^\/]+\//);
-      const baseVersionMatch = this.baseUrl.match(/\/v[^\/]+$/);
+      const baseVersionMatch = baseUrl.match(/\/v[^\/]+$/);
 
       if (pathVersionMatch && baseVersionMatch) {
         const pathVersion = pathVersionMatch[0].slice(0, -1);
         const baseVersion = baseVersionMatch[0];
 
         if (pathVersion !== baseVersion) {
-          effectiveBaseUrl = this.baseUrl.replace(baseVersion, pathVersion);
+          effectiveBaseUrl = baseUrl.replace(baseVersion, pathVersion);
           requestPath = requestPath.substring(pathVersion.length);
         }
       }
 
       fullUrl = effectiveBaseUrl.endsWith('/') ? effectiveBaseUrl + requestPath.substring(1) : effectiveBaseUrl + requestPath;
     } else {
-      fullUrl = this.baseUrl.endsWith('/') ? this.baseUrl + requestPath : this.baseUrl + '/' + requestPath;
+      fullUrl = baseUrl.endsWith('/') ? baseUrl + requestPath : baseUrl + '/' + requestPath;
     }
 
     const url = new URL(fullUrl);
