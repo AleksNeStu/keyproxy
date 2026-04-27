@@ -2,6 +2,7 @@ const https = require('https');
 const crypto = require('crypto');
 const { URL } = require('url');
 const { maskApiKey, sleep } = require('../core/utils');
+const { handleError } = require('../core/errorHandler');
 
 class BaseProvider {
   constructor(keyRotator, baseUrl, providerName, retryConfig = null, timeoutMs = 60000, budgetTracker = null, providerConfig = null) {
@@ -130,6 +131,7 @@ class BaseProvider {
         response._keyInfo = { keyUsed: maskedKey, actualKey: apiKey, failedKeys };
         return response;
       } catch (error) {
+        handleError(error, { location: this.providerName, category: 'high' });
         console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] ✗ Request failed: ${error.message}`);
         failedKeys.push({ key: maskedKey, status: null, reason: error.message.substring(0, 100) });
         lastError = error;
