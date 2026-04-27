@@ -71,7 +71,12 @@ const AUTH_HEADERS = [
   'authorization',
   'x-api-key',
   'x-subscription-token',
+  'x-ref-api-key',
+  'x-goog-api-key',
 ];
+
+// Body fields to strip from intercepted requests (some APIs send key in body AND header)
+const BODY_KEY_FIELDS = ['api_key', 'apikey', 'api-key'];
 
 function matchRoute(urlStr) {
   if (!urlStr) return null;
@@ -86,6 +91,24 @@ function matchRoute(urlStr) {
 
 function proxyAuthHeader() {
   return `Bearer [STATUS_CODES:${STATUS_CODES}]`;
+}
+
+function stripBodyKeys(body) {
+  if (typeof body !== 'string') return body;
+  try {
+    const obj = JSON.parse(body);
+    if (typeof obj !== 'object' || obj === null) return body;
+    let changed = false;
+    for (const field of BODY_KEY_FIELDS) {
+      if (field in obj) {
+        delete obj[field];
+        changed = true;
+      }
+    }
+    return changed ? JSON.stringify(obj) : body;
+  } catch {
+    return body;
+  }
 }
 
 // ── Layer 1: globalThis.fetch ────────────────────────────────────────────────
@@ -103,6 +126,11 @@ if (typeof globalThis.fetch === 'function') {
 
     const newUrl = url.replace(`https://${route.host}`, `${PROXY_URL}/${route.provider}`);
     const newInit = { ...init };
+
+    // Strip body keys (e.g., Tavily sends api_key in JSON body)
+    if (newInit?.body && typeof newInit.body === 'string') {
+      newInit.body = stripBodyKeys(newInit.body);
+    }
 
     if (newInit?.headers) {
       const h = newInit.headers instanceof Headers
@@ -207,7 +235,40 @@ try {
       newOpts.headers['X-KeyProxy-Original-Host'] = host;
 
       // Use http.request (not https) since KeyProxy listens on plain HTTP
-      return http.request(newOpts, cb);
+      const req = http.request(newOpts, cb);
+
+      // Intercept .write() and .end() to strip body keys (e.g., Tavily api_key in JSON)
+      const origWrite = req.write.bind(req);
+      const origEnd = req.end.bind(req);
+      let bodyChunks = [];
+      let bodyFlushed = false;
+
+      req.write = function(data, ...rest) {
+        if (!bodyFlushed) {
+          bodyChunks.push(typeof data === 'string' ? data : data.toString());
+          // Return fake "not flushed" to buffer until end()
+          return false;
+        }
+        return origWrite(data, ...rest);
+      };
+
+      req.end = function(data, ...rest) {
+        if (bodyFlushed) {
+          return origEnd(data, ...rest);
+        }
+        if (data) {
+          bodyChunks.push(typeof data === 'string' ? data : data.toString());
+        }
+        bodyFlushed = true;
+        const fullBody = bodyChunks.join('');
+        const cleaned = stripBodyKeys(fullBody);
+        if (cleaned.length > 0) {
+          origWrite(cleaned);
+        }
+        return origEnd(...rest);
+      };
+
+      return req;
     };
   }
 
