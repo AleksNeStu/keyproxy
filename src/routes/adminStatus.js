@@ -78,6 +78,17 @@ async function handleGetStatus(server, res, params) {
   }
 }
 
+/**
+ * GET /admin/api/audit-log — query audit log entries.
+ */
+function handleGetAuditLog(server, res, params) {
+  const limit = parseInt(params.limit) || 100;
+  const offset = parseInt(params.offset) || 0;
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify(server.auditLog.query(limit, offset)));
+}
+
 module.exports = {
-  handleGetStatus
+  handleGetStatus,
+  handleGetAuditLog
 };

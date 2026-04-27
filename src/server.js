@@ -14,24 +14,15 @@ const ResponseCache = require('./core/cache');
 const VirtualKeyManager = require('./core/virtualKeys');
 const BudgetTracker = require('./core/budgetTracker');
 const TelegramBot = require('./core/telegramBot');
-const { refreshCsrfToken, getCsrfToken } = require('./middleware/csrf');
+const { refreshCsrfToken } = require('./middleware/csrf');
 const { validateBody, limitBodySize } = require('./middleware/validation');
 const { addSecurityHeaders, sanitizeInput, adminApiLimiter, adminReadLimiter, adminWriteLimiter, adminFileOpsLimiter, adminHighRiskLimiter } = require('./middleware/securityHeaders');
 const globalMiddleware = require('./middleware/globalMiddleware');
 
-// Route modules
+// Route infrastructure
 const { sendError, sendResponse, readRequestBody, getStatusText } = require('./routes/httpHelpers');
-const { isAdminAuthenticated, handleAdminLogin, handleAdminLogout, handleAuthCheck, handleChangePassword, handleUpgradePassword } = require('./routes/adminAuth');
-const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetGeneralSettings, handleUpdateGeneralSettings, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./routes/adminEnv');
-const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm, handleUnfreezeKey } = require('./routes/adminKeys');
-const { handleToggleProvider, handleToggleSyncEnv, handleToggleGlobalSync, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey, handleTestAllKeys, handleGetKeySources, handleGetSyncExclusive, handleToggleSyncExclusive } = require('./routes/adminProviders');
-const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
-const { handleGetStatus } = require('./routes/adminStatus');
-const { handleGetAnalytics, handleResetAnalytics, handleGetFallbacks, handleSetFallback, handleGetCircuitBreaker, handleCircuitBreakerAction, handleGetCacheStats, handleClearCache, handleCacheConfig, handleListVirtualKeys, handleCreateVirtualKey, handleRevokeVirtualKey, handleToggleVirtualKey, handleGetBudgets, handleGetAvailableKeys, handleSetBudget, handleRemoveBudget, handleGetKeyExpiry, handleExtendKey, handleExportConfig, handleImportConfig, handleFsList, handleFsDrives, handleGetLbStrategy, handleSetLbStrategy, handleSetLbWeight } = require('./routes/adminAdvanced');
-const { handleFetchModels, handleSaveModels } = require('./routes/adminModels');
-const { handleGetExclusions, handleAddExclusion, handleRemoveExclusion, handleToggleExclusion, handleTestExclusion } = require('./routes/adminExclusions');
-const { handleGetEnvSources, handleAddEnvSource, handleRemoveEnvSource, handlePreviewEnvSource, handlePullEnvSource } = require('./routes/adminEnvSources');
-const { handleGetAgentContext } = require('./routes/adminMcp');
+const { isAdminAuthenticated } = require('./routes/adminAuth');
+const { createPreAuthRouter, createAuthenticatedRouter } = require('./routes/adminRoutes');
 const KeyExclusionManager = require('./core/exclusions');
 const AgentContextGenerator = require('./core/mcpInstructions');
 const destinationManager = require('./destinations/manager');
@@ -122,6 +113,10 @@ class ProxyServer {
     // Key exclusion manager (destination sync filtering)
     this.exclusionManager = new KeyExclusionManager();
     destinationManager.setExclusionManager(this.exclusionManager);
+
+    // Route dispatchers (pre-auth and authenticated)
+    this.preAuthRouter = createPreAuthRouter();
+    this.authenticatedRouter = createAuthenticatedRouter();
   }
 
   serveStaticFile(res, cacheKey, filePath, contentType, cacheControl = 'public, max-age=3600') {
@@ -396,69 +391,18 @@ class ProxyServer {
       if (res.writableEnded) return; // Size limit rejected the request
     }
 
-    // Serve main admin page
-    if (adminPath === '/admin' || adminPath === '/admin/') {
-      this.serveAdminPanel(res);
-      return;
-    }
+    // ─── Pre-auth routes (no auth/CSRF required) ─────────────────
+    const ctx = { server: this, req, res, body, path: adminPath, params };
+    if (await this.preAuthRouter.dispatch(ctx)) return;
 
-    // Check authentication status
-    if (adminPath === '/admin/api/auth' && req.method === 'GET') {
-      return handleAuthCheck(this, req, res);
-    }
-
-    // CSRF token endpoint (authenticated)
-    if (adminPath === '/admin/api/csrf-token' && req.method === 'GET') {
-      if (!isAdminAuthenticated(this, req)) {
-        res.writeHead(401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ error: 'Unauthorized' }));
-        return;
-      }
-      const currentToken = getCsrfToken(this);
-      if (!currentToken) {
-        // Generate new token if none exists
-        const newToken = refreshCsrfToken(this);
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ csrfToken: newToken }));
-      } else {
-        res.writeHead(200, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify({ csrfToken: currentToken }));
-      }
-      return;
-    }
-
-    // Check login rate limit status
-    if (adminPath === '/admin/api/login-status' && req.method === 'GET') {
-      const now = Date.now();
-      const isBlocked = this.loginBlockedUntil && now < this.loginBlockedUntil;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        blocked: isBlocked,
-        blockedUntil: this.loginBlockedUntil,
-        remainingSeconds: isBlocked ? Math.ceil((this.loginBlockedUntil - now) / 1000) : 0,
-        failedAttempts: this.failedLoginAttempts
-      }));
-      return;
-    }
-
-    // Handle login
-    if (adminPath === '/admin/login' && req.method === 'POST') {
-      return handleAdminLogin(this, req, res, body);
-    }
-
-    // Handle logout
-    if (adminPath === '/admin/logout' && req.method === 'POST') {
-      return handleAdminLogout(this, req, res);
-    }
-
-    // All other admin routes require authentication
+    // ─── Auth gate ───────────────────────────────────────────────
     if (!isAdminAuthenticated(this, req)) {
       res.writeHead(401, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Unauthorized' }));
       return;
     }
 
-    // CSRF validation for state-changing operations (POST/PUT/DELETE/PATCH)
+    // ─── CSRF validation for state-changing operations ───────────
     const stateChangingMethods = ['POST', 'PUT', 'DELETE', 'PATCH'];
     if (stateChangingMethods.includes(req.method)) {
       const headerToken = req.headers['x-csrf-token'] || req.headers['X-CSRF-Token'];
@@ -471,7 +415,6 @@ class ProxyServer {
         return;
       }
 
-      // Validate token using timing-safe comparison
       try {
         const sessionBuffer = Buffer.from(sessionToken, 'hex');
         const headerBuffer = Buffer.from(headerToken, 'hex');
@@ -490,288 +433,11 @@ class ProxyServer {
         return;
       }
 
-      // Token is valid - rotate it after successful validation
       this.csrfToken = refreshCsrfToken(this);
     }
 
-    // ─── Admin API routes ───────────────────────────────────────
-
-    if (adminPath === '/admin/api/env' && req.method === 'GET') {
-      return handleGetEnvVars(this, res);
-    }
-    if (adminPath === '/admin/api/env-file' && req.method === 'GET') {
-      return handleGetEnvFile(this, res);
-    }
-    if (adminPath === '/admin/api/env' && req.method === 'POST') {
-      return handleUpdateEnvVars(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/test' && req.method === 'POST') {
-      return handleTestApiKey(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/test-all-keys' && req.method === 'POST') {
-      return handleTestAllKeys(this, req, res);
-    }
-    if (adminPath === '/admin/api/key-sources' && req.method === 'GET') {
-      return handleGetKeySources(this, res);
-    }
-    if (adminPath === '/admin/api/logs' && req.method === 'GET') {
-      return this.handleGetLogs(res);
-    }
-    if (adminPath.startsWith('/admin/api/response/') && req.method === 'GET') {
-      return this.handleGetResponse(res, adminPath);
-    }
-    if (adminPath === '/admin/api/reorder-keys' && req.method === 'POST') {
-      return handleReorderKeys(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/key-usage' && req.method === 'GET') {
-      return handleGetKeyUsage(this, res);
-    }
-    if (adminPath === '/admin/api/key-history' && req.method === 'GET') {
-      return handleGetKeyHistory(this, res);
-    }
-    if (adminPath.startsWith('/admin/api/key-history/') && req.method === 'GET') {
-      return handleGetKeyHistory(this, res, adminPath.split('/').pop());
-    }
-    if (adminPath.startsWith('/admin/api/key-history/reset/') && req.method === 'POST') {
-      return handleResetKeyHistory(this, req, res, adminPath.split('/').pop());
-    }
-    if (adminPath === '/admin/api/key-test' && req.method === 'POST') {
-      return handleTestKeyRecovery(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/unfreeze-key' && req.method === 'POST') {
-      return handleUnfreezeKey(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/toggle-key' && req.method === 'POST') {
-      return handleToggleKey(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/toggle-provider' && req.method === 'POST') {
-      return handleToggleProvider(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/toggle-sync-env' && req.method === 'POST') {
-      return handleToggleSyncEnv(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/toggle-global-sync' && req.method === 'POST') {
-      return handleToggleGlobalSync(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/sync-exclusive' && req.method === 'GET') {
-      return handleGetSyncExclusive(this, res);
-    }
-    if (adminPath === '/admin/api/sync-exclusive' && req.method === 'POST') {
-      return handleToggleSyncExclusive(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/upgrade-password' && req.method === 'POST') {
-      return handleUpgradePassword(this, req, res);
-    }
-    if (adminPath === '/admin/api/change-password' && req.method === 'POST') {
-      return handleChangePassword(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/telegram' && req.method === 'GET') {
-      return handleGetTelegramSettings(this, res);
-    }
-    if (adminPath === '/admin/api/telegram' && req.method === 'POST') {
-      return handleUpdateTelegramSettings(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/reload' && req.method === 'POST') {
-      return handleReloadConfig(this, req, res);
-    }
-    if (adminPath === '/admin/api/retry-config' && req.method === 'GET') {
-      return handleGetRetryConfig(this, res);
-    }
-    if (adminPath === '/admin/api/retry-config' && req.method === 'POST') {
-      return handleUpdateRetryConfig(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/settings' && req.method === 'POST') {
-      return handleUpdateSettings(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/general-settings' && req.method === 'GET') {
-      return handleGetGeneralSettings(this, res);
-    }
-    if (adminPath === '/admin/api/general-settings' && req.method === 'POST') {
-      return handleUpdateGeneralSettings(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/env-files' && req.method === 'GET') {
-      return handleGetEnvFiles(this, res);
-    }
-    if (adminPath === '/admin/api/env-files' && req.method === 'POST') {
-      return handleAddEnvFile(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/env-files' && req.method === 'DELETE') {
-      return handleRemoveEnvFile(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/switch-env' && req.method === 'POST') {
-      return handleSwitchEnv(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/reorder-env-files' && req.method === 'POST') {
-      return handleReorderEnvFiles(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/toggle-env-file-disabled' && req.method === 'POST') {
-      return handleToggleEnvFileDisabled(this, req, res, body);
-    }
-    // Environment Sources (manual import)
-    if (adminPath === '/admin/api/env-sources/preview' && req.method === 'POST') {
-      return handlePreviewEnvSource(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/env-sources/pull' && req.method === 'POST') {
-      return handlePullEnvSource(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/env-sources' && req.method === 'GET') {
-      return handleGetEnvSources(this, res);
-    }
-    if (adminPath === '/admin/api/env-sources' && req.method === 'POST') {
-      return handleAddEnvSource(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/env-sources' && req.method === 'DELETE') {
-      return handleRemoveEnvSource(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/recovery-status' && req.method === 'GET') {
-      return handleGetRecoveryStatus(this, res);
-    }
-    if (adminPath === '/admin/api/recovery/scan' && req.method === 'POST') {
-      return handleRecoveryScan(this, req, res);
-    }
-    if (adminPath.startsWith('/admin/api/recovery/probe/') && req.method === 'POST') {
-      return handleRecoveryProbe(this, req, res, adminPath);
-    }
-    if (adminPath === '/admin/api/health' && req.method === 'GET') {
-      return handleGetHealth(this, res);
-    }
-    if (adminPath === '/admin/api/health/check-all' && req.method === 'POST') {
-      return handleHealthCheckAll(this, req, res);
-    }
-    if (adminPath === '/admin/api/health/reset' && req.method === 'POST') {
-      return handleHealthReset(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/notifications' && req.method === 'GET') {
-      return handleGetNotifications(this, res);
-    }
-    if (adminPath === '/admin/api/notifications' && req.method === 'POST') {
-      return handleUpdateNotifications(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/notifications/test' && req.method === 'POST') {
-      return handleTestNotification(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/analytics' && req.method === 'GET') {
-      return handleGetAnalytics(this, res, params);
-    }
-    if (adminPath === '/admin/api/analytics/reset' && req.method === 'POST') {
-      return handleResetAnalytics(this, req, res);
-    }
-    if (adminPath === '/admin/api/audit-log' && req.method === 'GET') {
-      const limit = parseInt(params.get('limit')) || 100;
-      const offset = parseInt(params.get('offset')) || 0;
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      return res.end(JSON.stringify(this.auditLog.query(limit, offset)));
-    }
-    if (adminPath === '/admin/api/fallbacks' && req.method === 'GET') {
-      return handleGetFallbacks(this, res);
-    }
-    if (adminPath === '/admin/api/fallbacks' && req.method === 'POST') {
-      return handleSetFallback(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/circuit-breaker' && req.method === 'GET') {
-      return handleGetCircuitBreaker(this, res);
-    }
-    if (adminPath.startsWith('/admin/api/circuit-breaker/') && req.method === 'POST') {
-      return handleCircuitBreakerAction(this, req, res, adminPath, body);
-    }
-    if (adminPath === '/admin/api/export-config' && req.method === 'POST') {
-      return handleExportConfig(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/import-config' && req.method === 'POST') {
-      return handleImportConfig(this, req, res, body);
-    }
-    // Unified status endpoint (combines RPM, key expiry, health)
-    if (adminPath === '/admin/api/status' && req.method === 'GET') {
-      return handleGetStatus(this, res, params);
-    }
-    if (adminPath === '/admin/api/rpm' && req.method === 'GET') {
-      return handleGetRpm(this, res);
-    }
-    if (adminPath === '/admin/api/cache' && req.method === 'GET') {
-      return handleGetCacheStats(this, res);
-    }
-    if (adminPath === '/admin/api/cache' && req.method === 'DELETE') {
-      return handleClearCache(this, req, res);
-    }
-    if (adminPath === '/admin/api/cache/config' && req.method === 'POST') {
-      return handleCacheConfig(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/virtual-keys' && req.method === 'GET') {
-      return handleListVirtualKeys(this, res);
-    }
-    if (adminPath === '/admin/api/virtual-keys' && req.method === 'POST') {
-      return handleCreateVirtualKey(this, req, res, body);
-    }
-    if (adminPath.startsWith('/admin/api/virtual-keys/') && req.method === 'DELETE') {
-      return handleRevokeVirtualKey(this, req, res, adminPath);
-    }
-    if (adminPath.startsWith('/admin/api/virtual-keys/') && req.method === 'POST') {
-      return handleToggleVirtualKey(this, req, res, adminPath);
-    }
-    if (adminPath === '/admin/api/budgets' && req.method === 'GET') {
-      return handleGetBudgets(this, res);
-    }
-    if (adminPath === '/admin/api/budgets/available-keys' && req.method === 'GET') {
-      return handleGetAvailableKeys(this, res);
-    }
-    if (adminPath.startsWith('/admin/api/budgets/') && req.method === 'DELETE') {
-      return handleRemoveBudget(this, req, res, adminPath);
-    }
-    if (adminPath === '/admin/api/budgets' && req.method === 'POST') {
-      return handleSetBudget(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/key-expiry' && req.method === 'GET') {
-      return handleGetKeyExpiry(this, res, params);
-    }
-    if (adminPath === '/admin/api/key-extend' && req.method === 'POST') {
-      return handleExtendKey(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/select-env' && (req.method === 'GET' || req.method === 'POST')) {
-      return handleSelectEnv(this, req, res);
-    }
-    if (adminPath === '/admin/api/fs-list' && req.method === 'GET') {
-      return handleFsList(this, res, params.path);
-    }
-    if (adminPath === '/admin/api/fs-drives' && req.method === 'GET') {
-      return handleFsDrives(this, res);
-    }
-    if (adminPath === '/admin/api/lb-strategy' && req.method === 'GET') {
-      return handleGetLbStrategy(this, res);
-    }
-    if (adminPath === '/admin/api/lb-strategy' && req.method === 'POST') {
-      return handleSetLbStrategy(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/lb-weight' && req.method === 'POST') {
-      return handleSetLbWeight(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/models' && req.method === 'GET') {
-      return handleFetchModels(this, req, res);
-    }
-    if (adminPath === '/admin/api/models' && req.method === 'POST') {
-      return handleSaveModels(this, req, res, body);
-    }
-
-    // Exclusion pattern management
-    if (adminPath === '/admin/api/exclusions' && req.method === 'GET') {
-      return handleGetExclusions(this, res);
-    }
-    if (adminPath === '/admin/api/exclusions' && req.method === 'POST') {
-      return handleAddExclusion(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/exclusions' && req.method === 'DELETE') {
-      return handleRemoveExclusion(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/exclusions/toggle' && req.method === 'POST') {
-      return handleToggleExclusion(this, req, res, body);
-    }
-    if (adminPath === '/admin/api/exclusions/test' && req.method === 'POST') {
-      return handleTestExclusion(this, req, res, body);
-    }
-
-    // Agent Configuration Context
-    if (adminPath === '/admin/api/agent-context' && req.method === 'GET') {
-      return handleGetAgentContext(this, res, params);
-    }
+    // ─── Authenticated routes ────────────────────────────────────
+    if (await this.authenticatedRouter.dispatch(ctx)) return;
 
     sendError(res, 404, 'Not found');
   }

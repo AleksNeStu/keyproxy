@@ -193,6 +193,43 @@ async function handleUpgradePassword(server, req, res) {
   }
 }
 
+/**
+ * GET /admin/api/csrf-token — get or generate CSRF token.
+ * Has its own auth check (runs before the main auth gate).
+ */
+function handleGetCsrfToken(server, req, res) {
+  if (!isAdminAuthenticated(server, req)) {
+    res.writeHead(401, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Unauthorized' }));
+    return;
+  }
+  const { getCsrfToken } = require('../middleware/csrf');
+  const currentToken = getCsrfToken(server);
+  if (!currentToken) {
+    const newToken = refreshCsrfToken(server);
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ csrfToken: newToken }));
+  } else {
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ csrfToken: currentToken }));
+  }
+}
+
+/**
+ * GET /admin/api/login-status — check if login is rate-limited.
+ */
+function handleGetLoginStatus(server, res) {
+  const now = Date.now();
+  const isBlocked = server.loginBlockedUntil && now < server.loginBlockedUntil;
+  res.writeHead(200, { 'Content-Type': 'application/json' });
+  res.end(JSON.stringify({
+    blocked: isBlocked,
+    blockedUntil: server.loginBlockedUntil,
+    remainingSeconds: isBlocked ? Math.ceil((server.loginBlockedUntil - now) / 1000) : 0,
+    failedAttempts: server.failedLoginAttempts
+  }));
+}
+
 module.exports = {
   isAdminAuthenticated,
   generateSessionToken,
@@ -200,5 +237,7 @@ module.exports = {
   handleAdminLogout,
   handleAuthCheck,
   handleChangePassword,
-  handleUpgradePassword
+  handleUpgradePassword,
+  handleGetCsrfToken,
+  handleGetLoginStatus
 };
