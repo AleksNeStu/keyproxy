@@ -257,6 +257,8 @@
         .key-badge.badge-unverified { background: rgba(245,158,11,0.15); color: #f59e0b; }
         .key-badge.badge-verified { background: rgba(34,197,94,0.15); color: #22c55e; }
         .key-badge.badge-failed { background: rgba(239,68,68,0.15); color: #ef4444; }
+        .key-badge.badge-frozen { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+        .key-status-dot.dot-frozen { background: #8b5cf6; box-shadow: 0 0 6px rgba(139,92,246,0.5); }
 
         .category-badge-ai { background: rgba(168,85,247,0.15); color: #a855f7; }
         .category-badge-mcp { background: rgba(59,130,246,0.15); color: #3b82f6; }
@@ -4368,7 +4370,7 @@
                                     const dotClass = `dot-${keyStatus}`;
 
                                     // Status color mapping
-                                    const statusColors = { active: '#3b82f6', exhausted: '#6b7280', unverified: '#f59e0b', verified: '#22c55e', failed: '#ef4444' };
+                                    const statusColors = { active: '#3b82f6', exhausted: '#6b7280', unverified: '#f59e0b', verified: '#22c55e', failed: '#ef4444', frozen: '#8b5cf6' };
                                     const borderColor = statusColors[keyStatus] || '#6b7280';
 
                                     // Badge HTML for each status
@@ -4382,6 +4384,10 @@
                                         badgeHtml = '<span class="key-badge badge-verified">VERIFIED</span>';
                                     } else if (keyStatus === 'failed') {
                                         badgeHtml = '<span class="key-badge badge-failed">FAILED</span>';
+                                    } else if (keyStatus === 'frozen') {
+                                        const freezeReason = usageEntry?.freezeReason || rotationReason || 'balance_exhausted';
+                                        badgeHtml = `<span class="key-badge badge-frozen" title="Frozen permanently: ${freezeReason}">FROZEN</span>
+                                               <span class="text-xs text-purple-400">${freezeReason}</span>`;
                                     } else {
                                         badgeHtml = '<span class="key-badge badge-unverified">UNVERIFIED</span>';
                                     }
@@ -4400,7 +4406,7 @@
                                     }
 
                                     return `
-                                    <div class="flex items-center space-x-2${isKeyDisabled ? ' opacity-50' : ''} ${statusClass}" style="border-left:3px solid ${borderColor}; padding-left:8px; border-radius:4px;${keyStatus === 'exhausted' ? ' opacity:0.5;' : ''}">
+                                    <div class="flex items-center space-x-2${isKeyDisabled ? ' opacity-50' : ''} ${statusClass}" style="border-left:3px solid ${borderColor}; padding-left:8px; border-radius:4px;${keyStatus === 'exhausted' ? ' opacity:0.5;' : ''}${keyStatus === 'frozen' ? ' opacity:0.4;' : ''}">
                                         <!-- Status dot -->
                                         <span class="key-status-dot ${dotClass}" title="${keyStatus}"></span>
                                         ${badgeHtml}
@@ -4435,7 +4441,10 @@
                                         <span class="rpm-badge text-xs px-1.5 py-0.5 rounded" data-key="${maskedKey}" data-provider="${provider.apiType}" title="Requests per minute">--rpm</span>
                                         <span class="expiry-badge expiry-none expiry-slot" data-key="${maskedKey}" data-maskedkey="${keyVal.length >= 8 ? keyVal.substring(0, 4) + '...' + keyVal.slice(-4) : keyVal}" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Key TTL">${usageEntry?.expiry ? formatExpiry(usageEntry.expiry) : '—'}</span>
                                         ${usageEntry?.expiry ? `<button onclick="extendKeyTtl('${provider.name}', this)" class="btn btn-extend px-2 py-1 text-xs font-medium" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Reset key TTL timer">Extend</button>` : ''}
-                                        ${keyStatus === 'exhausted'
+                                        ${keyStatus === 'frozen'
+                                            ? `<button onclick="unfreezeKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid rgba(139,92,246,0.3)" title="Manually unfreeze this key">Unfreeze</button>
+                                               <button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
+                                            : keyStatus === 'exhausted'
                                             ? `<button onclick="testAndRecoverKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">Test & Reset</button>
                                                <button onclick="forceProbeKey('${provider.name}', '${keyVal}', this)" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3)" title="Force immediate recovery probe">Force Probe</button>`
                                             : `<button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
@@ -4486,7 +4495,7 @@
             // Key counts summary
             const summaryEl = document.getElementById('keyCountsSummary');
             if (summaryEl) {
-                let total = 0, verified = 0, active = 0, failed = 0, unverified = 0, exhausted = 0;
+                let total = 0, verified = 0, active = 0, failed = 0, unverified = 0, exhausted = 0, frozenCount = 0;
                 for (const provider of Object.values(providers)) {
                     for (const keyObj of provider.keys) {
                         total++;
@@ -4497,6 +4506,7 @@
                         else if (status === 'active') active++;
                         else if (status === 'failed') failed++;
                         else if (status === 'exhausted') exhausted++;
+                        else if (status === 'frozen') frozenCount++;
                         else unverified++;
                     }
                 }
@@ -4508,6 +4518,7 @@
                         <span class="text-amber-500">Unverified: <strong>${unverified}</strong></span>
                         <span class="text-red-500">Failed: <strong>${failed}</strong></span>
                         ${exhausted > 0 ? `<span class="text-gray-400">Exhausted: <strong>${exhausted}</strong></span>` : ''}
+                        ${frozenCount > 0 ? `<span class="text-purple-400">Frozen: <strong>${frozenCount}</strong></span>` : ''}
                     `;
                 } else {
                     summaryEl.innerHTML = '';
@@ -6133,6 +6144,29 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 } catch {}
             } catch (error) {
                 showErrorToast(`API key test failed: ${error.message}`);
+            }
+        }
+
+        async function unfreezeKey(providerName, fullKey) {
+            const maskedKey = fullKey.length > 16 ? fullKey.substring(0, 8) + '...' + fullKey.slice(-4) : fullKey;
+            if (!confirm(`Unfreeze key ${maskedKey} for '${providerName}'? This will re-enable the key for rotation.`)) return;
+            showInfoToast(`Unfreezing key ${maskedKey}...`);
+            try {
+                const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
+                const response = await fetch('/admin/api/unfreeze-key', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                    body: JSON.stringify({ providerName, fullKey })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showSuccessToast(`Key ${maskedKey} unfrozen successfully!`);
+                    loadProviders();
+                } else {
+                    showErrorToast(`Failed to unfreeze: ${result.error}`);
+                }
+            } catch (error) {
+                showErrorToast(`Unfreeze failed: ${error.message}`);
             }
         }
 

@@ -4,13 +4,14 @@ const { URL } = require('url');
 const { maskApiKey, sleep } = require('../core/utils');
 
 class BaseProvider {
-  constructor(keyRotator, baseUrl, providerName, retryConfig = null, timeoutMs = 60000, budgetTracker = null) {
+  constructor(keyRotator, baseUrl, providerName, retryConfig = null, timeoutMs = 60000, budgetTracker = null, providerConfig = null) {
     this.keyRotator = keyRotator;
     this.baseUrl = baseUrl;
     this.providerName = providerName;
     this.retryConfig = retryConfig || { maxRetries: 3, retryDelayMs: 1000, retryBackoff: 2 };
     this.timeoutMs = timeoutMs;
     this.budgetTracker = budgetTracker;
+    this.providerConfig = providerConfig;
   }
 
   /**
@@ -79,7 +80,7 @@ class BaseProvider {
           if (response.stream) response.stream.resume();
           requestContext.markKeyAsRateLimited(apiKey);
           this.keyRotator.recordRotationEvent(this.providerName, apiKey, response.statusCode);
-          
+
           // Extract error message if available
           let errorReason = 'rate_limited';
           if (!streaming && response.data) {
@@ -92,12 +93,24 @@ class BaseProvider {
               // Ignore parse errors
             }
           }
-          
+
           failedKeys.push({ key: maskedKey, status: response.statusCode, reason: errorReason });
           lastResponse = response.stream ? { statusCode: response.statusCode, headers: response.headers, data: '' } : response;
           const delay = retryDelayMs * Math.pow(retryBackoff, attempt - 1);
           console.log(`[${this.providerName.toUpperCase()}] ⏳ Waiting ${delay}ms before retry (attempt ${attempt}/${maxRetries})`);
           await sleep(delay);
+          continue;
+        }
+
+        // Check for permanent freeze conditions (e.g., Exa 402 balance exhaustion)
+        const freezeStatusCodes = this.providerConfig?.freezeOnStatusCodes;
+        if (freezeStatusCodes && freezeStatusCodes.has(response.statusCode) && this.keyRotator.historyManager) {
+          const reason = `${response.statusCode}_balance_exhausted`;
+          this.keyRotator.historyManager.recordKeyFrozen(this.providerName, apiKey, reason);
+          console.log(`[${this.providerName.toUpperCase()}::${maskedKey}] KEY FROZEN (${reason}) — permanent disable`);
+          requestContext.markKeyAsRateLimited(apiKey);
+          failedKeys.push({ key: maskedKey, status: response.statusCode, reason: 'frozen_balance_exhausted' });
+          lastResponse = response.stream ? { statusCode: response.statusCode, headers: response.headers, data: '' } : response;
           continue;
         }
 

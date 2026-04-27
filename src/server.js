@@ -23,7 +23,7 @@ const globalMiddleware = require('./middleware/globalMiddleware');
 const { sendError, sendResponse, readRequestBody, getStatusText } = require('./routes/httpHelpers');
 const { isAdminAuthenticated, handleAdminLogin, handleAdminLogout, handleAuthCheck, handleChangePassword, handleUpgradePassword } = require('./routes/adminAuth');
 const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetGeneralSettings, handleUpdateGeneralSettings, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./routes/adminEnv');
-const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm } = require('./routes/adminKeys');
+const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm, handleUnfreezeKey } = require('./routes/adminKeys');
 const { handleToggleProvider, handleToggleSyncEnv, handleToggleGlobalSync, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey, handleTestAllKeys, handleGetKeySources, handleGetSyncExclusive, handleToggleSyncExclusive } = require('./routes/adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./routes/adminNotifications');
 const { handleGetStatus } = require('./routes/adminStatus');
@@ -638,6 +638,9 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/key-test' && req.method === 'POST') {
       return handleTestKeyRecovery(this, req, res, body);
+    }
+    if (adminPath === '/admin/api/unfreeze-key' && req.method === 'POST') {
+      return handleUnfreezeKey(this, req, res, body);
     }
     if (adminPath === '/admin/api/toggle-key' && req.method === 'POST') {
       return handleToggleKey(this, req, res, body);

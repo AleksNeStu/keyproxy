@@ -3,7 +3,7 @@ const BaseProvider = require('./BaseProvider');
 
 class OpenAIClient extends BaseProvider {
   constructor(keyRotator, baseUrl = 'https://api.openai.com', providerName = 'openai', retryConfig = null, timeoutMs = 60000, budgetTracker = null, providerConfig = null) {
-    super(keyRotator, baseUrl, providerName, retryConfig, timeoutMs, budgetTracker);
+    super(keyRotator, baseUrl, providerName, retryConfig, timeoutMs, budgetTracker, providerConfig);
     this.authHeader = providerConfig?.authHeader || 'Authorization';
     this.authPrefix = providerConfig?.authPrefix !== undefined && providerConfig?.authPrefix !== null ? providerConfig.authPrefix : 'Bearer';
   }

@@ -87,7 +87,7 @@ class Config {
       siliconflow: { type: 'openai', baseUrl: 'https://api.siliconflow.cn/v1', category: 'ai' },
       // MCP / Search / Content Providers
       brave: { type: 'openai', baseUrl: 'https://api.search.brave.com', authHeader: 'X-Subscription-Token', authPrefix: '', category: 'mcp' },
-      exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '', category: 'mcp' },
+      exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([402]) },
       jina: { type: 'openai', baseUrl: 'https://api.jina.ai', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
       firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
       context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
@@ -374,6 +374,9 @@ class Config {
         }
         if (config.authPrefix === null && known?.authPrefix !== undefined) {
           config.authPrefix = known.authPrefix;
+        }
+        if (known?.freezeOnStatusCodes && !config.freezeOnStatusCodes) {
+          config.freezeOnStatusCodes = known.freezeOnStatusCodes;
         }
 
         this.providers.set(provider, config);

@@ -49,7 +49,14 @@ class KeyRotator {
    * @returns {RequestKeyContext} A new context for managing keys for a single request
    */
   createRequestContext() {
-    const activeKeys = this.getActiveKeys();
+    let activeKeys = this.getActiveKeys();
+    // Exclude frozen keys from rotation
+    if (this.historyManager) {
+      activeKeys = activeKeys.filter(key => {
+        const status = this.historyManager.getKeyStatus(this.apiType, key);
+        return status.status !== 'frozen';
+      });
+    }
     return new RequestKeyContext(activeKeys, this.apiType, this.lastFailedKey, this.strategy, this.keyUsageCount, this.keyWeights);
   }
 

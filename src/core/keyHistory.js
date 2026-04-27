@@ -124,11 +124,11 @@ class KeyHistoryManager {
 
   /**
    * Get key counts by status for a provider.
-   * Returns { total, active, verified, unverified, failed, exhausted, fresh }
+   * Returns { total, active, verified, unverified, failed, exhausted, fresh, frozen }
    */
   getKeyCounts(providerName) {
     const provider = this.data.providers[providerName];
-    const counts = { total: 0, active: 0, verified: 0, unverified: 0, failed: 0, exhausted: 0, fresh: 0 };
+    const counts = { total: 0, active: 0, verified: 0, unverified: 0, failed: 0, exhausted: 0, fresh: 0, frozen: 0 };
     if (!provider) return counts;
 
     for (const entry of Object.values(provider.keys)) {
@@ -150,6 +150,64 @@ class KeyHistoryManager {
     entry.status = 'active';
     entry.lastUsed = new Date().toISOString();
     this._scheduleSave();
+  }
+
+  /**
+   * Mark a key as permanently frozen (e.g. Exa balance exhaustion).
+   */
+  recordKeyFrozen(providerName, fullKey, reason) {
+    const hash = this.hashKey(fullKey);
+    const entry = this._ensureKeyEntry(providerName, hash);
+    entry.status = 'frozen';
+    entry.frozenAt = new Date().toISOString();
+    entry.freezeReason = reason || 'unknown';
+    entry.recoveryAttempts = 0;
+    this._scheduleSave();
+  }
+
+  /**
+   * Manually unfreeze a key (admin action). Returns true if unfrozen.
+   */
+  unfreezeKey(providerName, fullKey) {
+    const hash = this.hashKey(fullKey);
+    const provider = this.data.providers[providerName];
+    if (!provider || !provider.keys[hash]) return false;
+    const entry = provider.keys[hash];
+    if (entry.status !== 'frozen') return false;
+
+    entry.status = 'active';
+    delete entry.frozenAt;
+    delete entry.freezeReason;
+    entry.lastUsed = new Date().toISOString();
+    entry.recoveryAttempts = 0;
+    entry.lastRecoveryAttempt = null;
+    this._scheduleSave();
+    return true;
+  }
+
+  /**
+   * Get all frozen keys for a provider.
+   */
+  getFrozenKeys(providerName, allFullKeys = []) {
+    const provider = this.data.providers[providerName];
+    if (!provider) return [];
+
+    const hashToKey = new Map();
+    for (const key of allFullKeys) {
+      hashToKey.set(this.hashKey(key), key);
+    }
+
+    const result = [];
+    for (const [hash, entry] of Object.entries(provider.keys)) {
+      if (entry.status !== 'frozen') continue;
+      result.push({
+        hash,
+        fullKey: hashToKey.get(hash) || null,
+        frozenAt: entry.frozenAt,
+        freezeReason: entry.freezeReason
+      });
+    }
+    return result;
   }
 
   /**

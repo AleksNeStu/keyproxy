@@ -202,6 +202,47 @@ async function handleGetRpm(server, res) {
   }
 }
 
+/**
+ * POST /admin/api/unfreeze-key — manually unfreeze a frozen key.
+ * Body: { providerName, fullKey }
+ */
+async function handleUnfreezeKey(server, req, res, body) {
+  try {
+    const { providerName, fullKey } = JSON.parse(body);
+    if (!providerName || !fullKey) {
+      sendError(res, 400, 'Missing providerName or fullKey');
+      return;
+    }
+
+    const providerConfig = server.config.getProvider(providerName);
+    if (!providerConfig) {
+      sendError(res, 404, 'Provider not found');
+      return;
+    }
+
+    const status = server.historyManager.getKeyStatus(providerName, fullKey);
+    if (status.status !== 'frozen') {
+      sendError(res, 400, 'Key is not frozen');
+      return;
+    }
+
+    const success = server.historyManager.unfreezeKey(providerName, fullKey);
+    if (success) {
+      const masked = maskApiKey(fullKey);
+      console.log(`[FREEZE] Key ${masked} manually unfrozen for '${providerName}'`);
+      if (server.notifier) {
+        server.notifier.send(`Key ${masked} manually unfrozen for '${providerName}'`, 'recovery');
+      }
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ success: true }));
+    } else {
+      sendError(res, 500, 'Failed to unfreeze key');
+    }
+  } catch (error) {
+    sendError(res, 500, 'Failed to unfreeze key: ' + error.message);
+  }
+}
+
 module.exports = {
   handleToggleKey,
   handleReorderKeys,
@@ -209,5 +250,6 @@ module.exports = {
   handleGetKeyHistory,
   handleResetKeyHistory,
   handleTestKeyRecovery,
-  handleGetRpm
+  handleGetRpm,
+  handleUnfreezeKey
 };

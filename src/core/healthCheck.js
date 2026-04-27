@@ -92,17 +92,20 @@ class HealthMonitor {
       let exhaustedCount = 0;
       let freshCount = 0;
       let activeCount = 0;
+      let frozenCount = 0;
 
       for (const stat of usageStats) {
         status.totalRequests += stat.usageCount;
         if (stat.status === 'exhausted') exhaustedCount++;
         else if (stat.status === 'active') activeCount++;
+        else if (stat.status === 'frozen') frozenCount++;
         else if (stat.status === 'fresh') freshCount++;
       }
 
       status.exhaustedKeys = exhaustedCount;
       status.freshKeys = freshCount;
       status.activeKeys = activeCount;
+      status.frozenKeys = frozenCount;
 
       if (status.status !== 'disabled' && status.enabledKeys > 0) {
         if (exhaustedCount >= status.enabledKeys) {
@@ -160,6 +163,11 @@ class HealthMonitor {
       for (const entry of allExhausted) {
         if (!entry.fullKey) continue;
         const masked = maskApiKey(entry.fullKey);
+        const attempts = entry.recoveryAttempts || 0;
+
+        // Skip frozen keys — permanent disable, requires manual unfreeze
+        const keyStatus = historyManager.getKeyStatus(providerName, entry.fullKey);
+        if (keyStatus.status === 'frozen') continue;
         const attempts = entry.recoveryAttempts || 0;
 
         // Skip keys that exceeded max recovery attempts
