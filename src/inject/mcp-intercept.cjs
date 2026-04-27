@@ -252,6 +252,42 @@ try {
   console.log('[keyproxy-intercept] Layer 2 skipped:', e.message);
 }
 
+// ── Zombie cleanup ─────────────────────────────────────────────────────────
+
+// On Windows, MCP server processes (especially via npx) may not be properly
+// terminated on reconnect, leaving orphan processes that accumulate over time.
+// Kill stale siblings of the SAME package only (not other MCP servers).
+try {
+  const { execSync } = require('child_process');
+
+  const entryPoint = process.argv[1] || '';
+  if (entryPoint && process.platform === 'win32') {
+    // Extract the package name from the entry point path (e.g. "exa-mcp-server")
+    const pathParts = entryPoint.replace(/\\/g, '/').split('/');
+    const pkgIdx = pathParts.findIndex(p => p === 'node_modules');
+    const pkgName = pkgIdx >= 0 ? pathParts[pkgIdx + 1] : null;
+
+    if (pkgName) {
+      const cmd = `wmic process where "name='node.exe' and processid!=${process.pid}" get processid,commandline /format:csv 2>nul`;
+      const output = execSync(cmd, { timeout: 3000, encoding: 'utf8' }).trim();
+      const lines = output.split('\n').filter(l => l.includes(pkgName));
+
+      for (const line of lines) {
+        const match = line.match(/"(\d+)"/);
+        if (match) {
+          const pid = parseInt(match[1]);
+          if (pid && pid !== process.pid) {
+            try {
+              process.kill(pid);
+              console.log(`[keyproxy-intercept] Killed zombie ${pkgName} PID ${pid}`);
+            } catch {}
+          }
+        }
+      }
+    }
+  }
+} catch {} // Silent — cleanup is best-effort
+
 // ── Summary ──────────────────────────────────────────────────────────────────
 
 const routeList = Object.entries(routes).map(([h, p]) => `${h} → ${p}`).join(', ');

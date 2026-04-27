@@ -86,14 +86,14 @@ class Config {
       zhipuai: { type: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', keyPattern: '(ZHIPUAI|GLM)', category: 'ai' },
       siliconflow: { type: 'openai', baseUrl: 'https://api.siliconflow.cn/v1', category: 'ai' },
       // MCP / Search / Content Providers
-      brave: { type: 'openai', baseUrl: 'https://api.search.brave.com', authHeader: 'X-Subscription-Token', authPrefix: '', category: 'mcp' },
-      exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([402]) },
-      jina: { type: 'openai', baseUrl: 'https://api.jina.ai', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
-      firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
-      context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
-      onref: { type: 'openai', baseUrl: 'https://api.ref.tools', keyPattern: 'REF', authHeader: 'x-ref-api-key', authPrefix: '', category: 'mcp' },
-      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
-      searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1', category: 'mcp' },
+      brave: { type: 'openai', baseUrl: 'https://api.search.brave.com', authHeader: 'X-Subscription-Token', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
+      exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([401, 402]) },
+      jina: { type: 'openai', baseUrl: 'https://api.jina.ai', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
+      firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
+      context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
+      onref: { type: 'openai', baseUrl: 'https://api.ref.tools', keyPattern: 'REF', authHeader: 'x-ref-api-key', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
+      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
+      searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
     };
 
     // Discovery container: { name: { type, keys: [], baseUrl } }
