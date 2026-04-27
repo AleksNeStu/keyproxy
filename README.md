@@ -1,587 +1,214 @@
-# 🛰️ KeyProxy
+# KeyProxy
 
-> **Professional API Key Orchestrator & Proxy** — Intelligent rotation, health monitoring, and seamless synchronization for AI development tools.
+> **Stop putting real API keys in MCP config files.** KeyProxy is a local API key vault + proxy that intercepts MCP server traffic and injects rotated keys — your config files never see a real key again.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-20+-green.svg)](https://nodejs.org/)
-[![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20Linux-lightgrey.svg)]()
 
 ---
 
-## 🎯 What is KeyProxy?
+## The Problem
 
-**KeyProxy** is a production-ready API key management system that sits between your development tools and AI providers. It automatically detects failures, rotates to healthy keys, and synchronizes the active key across your entire development environment — all in real-time.
+MCP servers (Claude Desktop, Cursor, Windsurf, Kiro, etc.) require API keys in plaintext config files:
 
-### 🔥 Core Features
-
-- **🔄 Intelligent Key Rotation** — Automatic failover on rate limits (429), quota exhaustion (402), or errors
-- **💊 Health Monitoring** — Real-time provider health checks with auto-recovery
-- **🎯 Multi-Destination Sync** — Updates System Environment, local files, and web proxy simultaneously
-- **📊 Usage Analytics** — Track requests, costs, and latency per key/provider
-- **🔐 Secure by Default** — Scrypt-encrypted passwords, CSRF protection, input validation
-- **🌐 Web Proxy** — Zero-config HTTP proxy at `localhost:8990` for any client
-- **⚡ Auto-Recovery** — Failed keys automatically recover after cooldown period
-- **🎨 Professional Admin UI** — Real-time monitoring, configuration, and management
-
----
-
-## 🚀 Quick Start
-
-<details>
-<summary><b>📦 Installation (Windows, Linux, Docker)</b></summary>
-
-### Windows (PowerShell)
-```powershell
-# Install as Windows service (starts on boot)
-./scripts/manage.ps1 install
-
-# Check status
-./scripts/manage.ps1 status
-
-# View logs
-./scripts/manage.ps1 logs
+```json
+// ~/.claude.json — your real API key, exposed on disk
+{
+  "search-brave": {
+    "env": { "BRAVE_API_KEY": "BSAD-real-key-here-a1b2c3" }
+  }
+}
 ```
 
-### Linux (Systemd)
+That means:
+
+- Keys sitting in plaintext in `~/.claude.json`, `settings.json`, `mcp.json`
+- Same key copied across 5+ config files
+- No rotation, no health checks, no rate-limit handling
+- One leaked config = one leaked key
+
+## The Solution
+
+KeyProxy runs locally as a transparent proxy. MCP servers talk to `localhost:8990` instead of the real API. KeyProxy injects a rotated key, forwards the request, and handles rate limits automatically.
+
+```
+Your MCP Config (placeholder key)          KeyProxy (real keys in .env)
+─────────────────────────────            ──────────────────────────────
+BRAVE_API_KEY = "placeholder"   ────►   Rotates 4 Brave keys
+EXA_API_KEY    = "placeholder"   ────►   Auto-recovers from 429/402
+JINA_API_KEY   = "placeholder"   ────►   Health checks every 5 min
+```
+
+Your config files only contain `"placeholder"`. Real keys live in KeyProxy's encrypted `.env`.
+
+---
+
+## Quick Start — MCP Injection
+
+### 1. Start KeyProxy
+
 ```bash
-# Install as systemd service
-sudo ./scripts/manage.sh install
+npm start
+# Running at http://localhost:8990
+```
 
-# Check status
+Add your real API keys to `.env`:
+```env
+OPENAI_BRAVE_API_KEYS=BSAD-key1,BSAD-key2,BSAD-key3
+OPENAI_EXA_API_KEYS=exa-key1,exa-key2
+OPENAI_JINA_API_KEYS=jina-key1
+```
+
+### 2. Inject into MCP servers
+
+Add the intercept module to your MCP server config:
+
+```json
+{
+  "search-brave": {
+    "command": "npx",
+    "args": ["-y", "@brave/brave-search-mcp-server"],
+    "env": {
+      "BRAVE_API_KEY": "placeholder",
+      "NODE_OPTIONS": "--require ./mcp-intercept.cjs"
+    }
+  }
+}
+```
+
+That's it. The intercept module rewrites all API calls through KeyProxy. Download it:
+
+```bash
+curl http://localhost:8990/inject/mcp-intercept.cjs -o mcp-intercept.cjs
+```
+
+### 3. Monitor via Admin Panel
+
+Open `http://localhost:8990/admin` — see key health, usage analytics, cost tracking, and rotate keys in real-time.
+
+---
+
+## What It Does
+
+| Feature | Description |
+| ------- | ----------- |
+| **Key rotation** | Automatically switches to next key on 429 (rate limit) or 402 (quota) |
+| **Health monitoring** | Probes exhausted keys every 5 min with exponential backoff |
+| **Permanent freeze** | Freezes keys with zero balance (Exa free tier) — no wasted retries |
+| **Multi-destination sync** | Updates system env vars, files, and proxy simultaneously |
+| **Usage analytics** | Tracks requests, tokens, and estimated cost per key/provider |
+| **Budget tracking** | Daily/monthly spend caps per key with auto-disable |
+| **Virtual keys** | Scoped `vk-xxxx` keys with provider/model whitelists and rate limits |
+| **Circuit breaker** | Per-provider failover with configurable thresholds |
+| **Response caching** | LRU cache for repeated requests |
+| **Fallback routing** | Cross-provider failover chains |
+| **Notifications** | Telegram bot + Slack webhooks for key events |
+| **Prometheus metrics** | `/metrics` endpoint for Grafana dashboards |
+
+---
+
+## Supported Providers
+
+### AI Models
+OpenAI, Gemini, Groq, Mistral, ZhipuAI, SiliconFlow
+
+### MCP / Search / Content
+Brave Search, Exa, Jina, Firecrawl, Context7, Tavily, SearchAPI, OnRef
+
+---
+
+## Installation
+
+<details>
+<summary>Windows (PowerShell)</summary>
+
+```powershell
+./scripts/manage.ps1 install   # Install as Windows service (starts on boot)
+./scripts/manage.ps1 status    # Check status
+./scripts/manage.ps1 logs      # View logs
+```
+
+</details>
+
+<details>
+<summary>Linux (Systemd)</summary>
+
+```bash
+sudo ./scripts/manage.sh install   # Install as systemd service
 sudo ./scripts/manage.sh status
-
-# View logs
 sudo ./scripts/manage.sh logs
 ```
-
-### Docker
-```bash
-# Using Docker Compose
-docker compose up -d
-
-# Check logs
-docker compose logs -f
-```
-
 </details>
 
 <details>
-<summary><b>⚙️ Configuration</b></summary>
-
-1. **Copy environment template:**
-   ```bash
-   cp .env.example .env
-   ```
-
-2. **Add your API keys** (use `_1`, `_2` suffix for multiple keys):
-   ```env
-   # OpenAI Keys
-   OPENAI_OPENAI_API_KEYS=sk-proj-xxx_1,sk-proj-yyy_2
-   
-   # Gemini Keys
-   OPENAI_GEMINI_API_KEYS=AIzaSyXXX_1,AIzaSyYYY_2
-   
-   # Search Keys
-   SEARCH_TAVILY_API_KEYS=tvly-xxx_1,tvly-yyy_2
-   ```
-
-3. **Start the service:**
-   ```bash
-   npm start
-   ```
-
-4. **Access admin panel:**
-   ```
-   http://localhost:8990/admin
-   Default password: admin123
-   ```
-
-</details>
-
----
-
-## 🏗️ Architecture
-
-<details>
-<summary><b>View System Architecture Diagram</b></summary>
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Development Tools                         │
-│  (Cursor, Antigravity, CLI, Custom Apps)                    │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-                     ▼
-┌─────────────────────────────────────────────────────────────┐
-│                      KeyProxy                                │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Key Rotator  │  │ Health Check │  │ Circuit      │      │
-│  │              │  │              │  │ Breaker      │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐      │
-│  │ Analytics    │  │ Budget       │  │ Exclusion    │      │
-│  │              │  │ Tracker      │  │ Manager      │      │
-│  └──────────────┘  └──────────────┘  └──────────────┘      │
-└────────────────────┬────────────────────────────────────────┘
-                     │
-        ┌────────────┼────────────┐
-        ▼            ▼            ▼
-┌──────────┐  ┌──────────┐  ┌──────────┐
-│ System   │  │ File     │  │ Web      │
-│ Env      │  │ Sync     │  │ Proxy    │
-└────┬─────┘  └────┬─────┘  └────┬─────┘
-     │             │             │
-     ▼             ▼             ▼
-┌─────────────────────────────────────────────────────────────┐
-│              AI Providers (OpenAI, Gemini, etc.)            │
-└─────────────────────────────────────────────────────────────┘
-```
-
-</details>
-
----
-
-## 🎨 Admin Panel Features
-
-### 📊 Available Tabs
-
-<details>
-<summary><b>1. API Keys — Provider & Key Management</b></summary>
-
-- ✅ View all configured providers (OpenAI, Gemini, Tavily, etc.)
-- ✅ Enable/disable individual keys
-- ✅ Reorder keys for rotation priority
-- ✅ View key status: Active, Fresh, Exhausted
-- ✅ Real-time RPM (requests per minute) tracking
-- ✅ Key expiration tracking with extend functionality
-- ✅ Test individual keys
-- ✅ Fetch and configure available models per provider
-- ✅ Toggle provider sync to environment
-
-</details>
-
-<details>
-<summary><b>2. API Logs — Request Monitoring</b></summary>
-
-- ✅ Real-time request logs (last 100 entries)
-- ✅ View request details: method, endpoint, status, latency
-- ✅ Filter by provider, status code
-- ✅ Response inspection for debugging
-
-</details>
-
-<details>
-<summary><b>3. Management — Provider Health Dashboard</b></summary>
-
-- ✅ Provider health status (Active, Degraded, Failed, Disabled)
-- ✅ Key counts: Total, Enabled, Disabled, Exhausted
-- ✅ Request statistics per provider
-- ✅ Average response time tracking
-- ✅ Last check timestamp
-- ✅ Manual health check trigger
-- ✅ Provider reset functionality
-
-</details>
-
-<details>
-<summary><b>4. Analytics — Usage & Cost Tracking</b></summary>
-
-- ✅ Request count tracking
-- ✅ Token usage estimation (input/output)
-- ✅ Cost estimation per provider/key
-- ✅ Date range filtering (7d, 30d, all)
-- ✅ Top keys by usage
-- ✅ Model breakdown
-- ⏳ Charts visualization (planned)
-
-</details>
-
-<details>
-<summary><b>5. Virtual Keys — Scoped Access Control</b></summary>
-
-- ✅ Generate virtual API keys (vk-xxxx format)
-- ✅ Provider whitelist per virtual key
-- ✅ Model whitelist per virtual key
-- ✅ Rate limiting per virtual key
-- ✅ Expiration dates
-- ✅ Enable/disable virtual keys
-- ✅ Revoke virtual keys
-
-</details>
-
-<details>
-<summary><b>6. Budgets — Spend Management</b></summary>
-
-- ✅ Set daily/monthly budget per key
-- ✅ Auto-disable keys when budget exceeded
-- ✅ Budget tracking and alerts
-- ✅ Reset budget counters
-- ✅ View available keys for budget assignment
-
-</details>
-
-<details>
-<summary><b>7. Configuration — Environment Management</b></summary>
-
-- ✅ Multi-environment support (.env files)
-- ✅ Add/remove environment files
-- ✅ Switch between environments
-- ✅ Reorder environment priority (drag-and-drop)
-- ✅ Enable/disable environment files
-- ✅ File system browser for .env selection
-- ✅ Hot reload configuration
-- ✅ Import/export configuration backup
-
-</details>
-
-<details>
-<summary><b>⚙️ Settings Modal</b></summary>
-
-- ✅ Change admin password
-- ✅ Telegram bot configuration
-- ✅ Slack webhook notifications
-- ✅ Notification event triggers
-- ✅ Test notifications
-- ✅ Cache configuration (enable/disable, TTL, max entries)
-- ✅ Circuit breaker settings
-- ✅ Fallback provider configuration
-- ✅ Load balancing strategy (round-robin, weighted-random, least-used)
-- ✅ Key weight configuration
-
-</details>
-
----
-
-## 🔄 How Key Rotation Works
-
-<details>
-<summary><b>View Rotation Flow</b></summary>
-
-1. **Request arrives** → KeyProxy receives API request
-2. **Select key** → Choose next healthy key using load balancing strategy
-3. **Forward request** → Send to provider with selected key
-4. **Monitor response** → Check for rate limits (429), quota errors (402), failures
-5. **Auto-rotate** → On error, mark key as exhausted and try next key
-6. **Sync everywhere** → Update System Env, `.active_keys.env`, and web proxy
-7. **Auto-recovery** → After cooldown (5 min default), retest exhausted keys with exponential backoff
-
-### Load Balancing Strategies
-
-- **Round-robin** — Distribute requests evenly across all keys (default)
-- **Weighted-random** — Assign weights to prioritize certain keys
-- **Least-used** — Route to key with lowest request count
-
-</details>
-
----
-
-## 🧩 Supported Providers
-
-<details>
-<summary><b>View All Supported Providers</b></summary>
-
-### LLM Providers
-- ✅ **OpenAI** — GPT-4, GPT-3.5, embeddings
-- ✅ **Gemini** — Gemini Pro, Gemini Flash
-- ✅ **Anthropic** — Claude models (via OpenAI-compatible API)
-- ✅ **Groq** — Fast inference
-
-### Search Providers
-- ✅ **Tavily** — AI-optimized search
-- ✅ **Exa** — Semantic search
-- ✅ **Brave Search** — Privacy-focused search
-
-### Tool Providers
-- ✅ **Firecrawl** — Web scraping and crawling
-- ✅ **Jina** — Document parsing and embeddings
-- ✅ **Context7** — Documentation search
-- ✅ **RTFM** — Package documentation
-
-</details>
-
----
-
-## 🛠️ Advanced Features
-
-<details>
-<summary><b>✅ Implemented Features</b></summary>
-
-### Health Monitoring & Auto-Recovery
-- Real-time provider health checks (every 5 minutes)
-- Automatic recovery of exhausted keys after cooldown
-- Exponential backoff for failed recovery attempts
-- Max recovery attempts limit (default: 5)
-- Configurable cooldown period (default: 5 minutes)
-
-### Circuit Breaker
-- Per-provider circuit breaker pattern
-- Threshold: 5 consecutive failures (configurable)
-- Timeout: 30 seconds before retry (configurable)
-- States: Closed → Open → Half-Open → Closed
-- Manual reset via admin panel
-
-### Response Caching
-- In-memory LRU cache for repeated requests
-- Configurable TTL (default: 300 seconds)
-- Configurable max entries (default: 1000)
-- X-Cache HIT/MISS headers
-- Enable/disable per provider
-
-### Virtual API Keys
-- Generate scoped virtual keys (vk-xxxx format)
-- Provider whitelist
-- Model whitelist
-- Rate limits per key
-- Expiration dates
-- Enable/disable/revoke functionality
-
-### Budget Tracking
-- Daily/monthly spend caps per key
-- Auto-disable when cap reached
-- Notification on budget exceeded
-- Reset counters
-- Cost estimation based on token usage
-
-### Key Exclusion Manager
-- Exclude specific keys from environment sync
-- Pattern-based exclusion (regex support)
-- Test exclusion patterns
-- Enable/disable exclusions
-
-### Fallback Routing
-- Cross-provider failover configuration
-- Fallback chains (provider → fallback provider)
-- Model mapping for fallbacks
-- Max fallback depth: 2
-
-### Configuration Management
-- Multi-environment support
-- Import/export configuration
-- Hot reload without restart
-- File system browser
-- Drag-and-drop priority ordering
-
-### Security
-- Scrypt password hashing
-- CSRF token protection
-- Input validation (Joi schemas)
-- Rate limiting on admin API
-- Session-based authentication
-- Security headers (CSP, X-Frame-Options, etc.)
-
-### Analytics
-- Request count tracking
-- Token usage estimation
-- Cost estimation per provider/key
-- Latency tracking
-- Top keys by usage
-- Model breakdown
-- Date range filtering
-
-### Notifications
-- Telegram bot integration
-- Slack webhook support
-- Configurable event triggers
-- Test notification functionality
-
-### Prometheus Metrics
-- `/metrics` endpoint for monitoring
-- Request counters by provider/status
-- Latency histograms
-- Key rotation counters
-- Error counters by type
-
-</details>
-
-<details>
-<summary><b>⏳ Planned Features</b></summary>
-
-- Analytics charts visualization (Task #27)
-- Complete circuit breaker UI integration (Task #28)
-- Settings tab reorganization (Task #33)
-- Collapsible provider sections (Task #32)
-- Comprehensive testing suite (Task #30)
-
-</details>
-
----
-
-## 📦 Deployment Options
-
-<details>
-<summary><b>Windows Service</b></summary>
-
-```powershell
-# Install
-./scripts/manage.ps1 install
-
-# Runs as background service, starts on boot
-# Logs: daemon/keyproxy.out.log
-```
-
-</details>
-
-<details>
-<summary><b>Linux Systemd</b></summary>
-
-```bash
-# Install
-sudo ./scripts/manage.sh install
-
-# Service: keyproxy.service
-# Logs: journalctl -u keyproxy -f
-```
-
-</details>
-
-<details>
-<summary><b>Docker</b></summary>
+<summary>Docker</summary>
 
 ```yaml
 # docker-compose.yml
-version: '3.8'
 services:
   keyproxy:
     build: .
-    ports:
-      - "8990:8990"
-    volumes:
-      - ./data:/app/data
-      - ./.env:/app/.env
+    ports: ["8990:8990"]
+    volumes: [./data:/app/data, ./.env:/app/.env]
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8990/metrics"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 ```
 
 </details>
 
 ---
 
-## 🔐 Security Best Practices
+## MCP Integration Examples
 
-<details>
-<summary><b>View Security Checklist</b></summary>
+Works with any MCP client that supports `NODE_OPTIONS`:
 
-1. **Change default password** immediately after first login
-2. **Use strong passwords** — Minimum 12 characters, mixed case, numbers, symbols
-3. **Enable CSRF protection** — Already enabled by default
-4. **Restrict admin access** — Use firewall rules to limit access to localhost
-5. **Never commit secrets** — Keep `.env` and `data/` in `.gitignore`
-6. **Regular backups** — Export configuration regularly
-7. **Monitor logs** — Check for suspicious activity
+| Client | Config File | Setup |
+| ------ | ----------- | ----- |
+| Claude Code | `~/.claude.json` | Add `NODE_OPTIONS` to server env |
+| Cursor | `settings.json` | Add `NODE_OPTIONS` to `mcp.servers` |
+| Windsurf | `~/.codeium/windsurf/mcp.json` | Add `NODE_OPTIONS` to server env |
+| Kiro | `~/.kiro/settings/mcp.json` | Add `NODE_OPTIONS` to server env |
+| VS Code | `settings.json` | Add `NODE_OPTIONS` to `mcp.servers` |
 
-</details>
-
----
-
-## 📊 Performance
-
-- **Latency overhead**: ~5-10ms per request
-- **Throughput**: 1000+ requests/second (single instance)
-- **Memory usage**: ~50-100MB (depends on cache size)
-- **Key rotation**: <100ms failover time
-- **Health checks**: Every 5 minutes (configurable)
+See [MCP Intercept README](src/inject/README.md) for full integration guides.
 
 ---
 
-## 📚 Documentation
+## Architecture
 
-- **[Quick Start Guide](./docs/guides/QUICK_START.md)** — Get started in 5 minutes
-- **[Environment Mapping](./docs/guides/ENVIRONMENT_MAPPING.md)** — Configure API keys
-- **[Desktop Shortcuts](./docs/guides/DESKTOP_SHORTCUTS.md)** — Windows shortcuts setup
-- **[Password Reset](./docs/troubleshooting/PASSWORD_RESET.md)** — Reset admin password
-- **[Login Issues](./docs/troubleshooting/LOGIN_ISSUES.md)** — Troubleshoot login problems
-- **[CSRF Protection](./docs/CSRF_PROTECTION.md)** — Security implementation details
-- **[Security Test Report](./docs/SECURITY_TEST_REPORT.md)** — Security audit results
+```
+MCP Servers                    KeyProxy                          AI Providers
+─────────────                  ─────────                         ────────────
+Brave Search  ──┐              Key Rotator     ──┐
+Exa           ──┤  intercept   Health Monitor  ──┤  rotated key   api.search.brave.com
+Jina          ──┤ ──────────►  Circuit Breaker ──┤ ───────────►  api.exa.ai
+Firecrawl     ──┤  :8990       Budget Tracker  ──┤               api.jina.ai
+Context7      ──┘              Analytics       ──┘               api.firecrawl.dev
+```
 
----
-
-## 🛣️ Roadmap
-
-<details>
-<summary><b>✅ Completed (23 tasks)</b></summary>
-
-- [x] Secure password storage with scrypt
-- [x] Multi-environment configuration
-- [x] Provider health monitoring
-- [x] Telegram & Slack notifications
-- [x] Auto-recovery of failed keys
-- [x] Analytics tracking with cost estimation
-- [x] Circuit breaker pattern
-- [x] Fallback provider routing
-- [x] Prometheus metrics endpoint
-- [x] Docker containerization
-- [x] Virtual API keys
-- [x] Budget tracking per key
-- [x] Response caching
-- [x] CSRF protection & input validation
-- [x] Key exclusion manager
-- [x] Model selection per provider
-- [x] Environment file priority management
-- [x] Enhanced provider management UI
-- [x] Load balancing strategies
-- [x] Request timeout configuration
-- [x] Key expiration tracking
-- [x] RPM tracking per key
-- [x] Configuration import/export
-
-</details>
-
-<details>
-<summary><b>🚧 In Progress (10 tasks)</b></summary>
-
-- [ ] Settings section enhancement (Task #22)
-- [ ] API rate limiting improvements (Task #25)
-- [ ] Enhanced auto-recovery UI (Task #26)
-- [ ] Complete analytics dashboard with charts (Task #27)
-- [ ] Complete circuit breaker integration (Task #28)
-- [ ] Complete fallback routing UI (Task #29)
-- [ ] Comprehensive testing suite (Task #30)
-- [ ] Enhanced provider management (Task #31)
-- [ ] Collapsible provider sections (Task #32)
-- [ ] Move Settings to tab level (Task #33)
-
-</details>
-
-<details>
-<summary><b>📋 Planned</b></summary>
-
-- [ ] Screenshots for README (Task #34 - after UI completion)
-- [ ] WebSocket support for real-time updates
-- [ ] Multi-user support with RBAC
-- [ ] Audit logging
-- [ ] Grafana dashboard templates
-
-</details>
+KeyProxy intercepts outgoing HTTP requests from MCP servers via `mcp-intercept.cjs`, injects a healthy rotated key, and forwards to the real API. No code changes needed in MCP servers.
 
 ---
 
-## 🤝 Contributing
+## Security
 
-Contributions are welcome! Please:
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Add tests
-5. Submit a pull request
+- Real API keys never appear in MCP config files
+- Admin panel protected with scrypt-hashed password + CSRF tokens
+- Rate limiting on all admin API endpoints
+- Security headers (CSP, X-Frame-Options, etc.)
+- Input validation with Joi schemas
+- Keys stored in `.env` (gitignored by default)
 
 ---
 
-## 📄 License
+## Performance
+
+- **Latency overhead**: ~5ms per request (local proxy)
+- **Throughput**: 1000+ req/s single instance
+- **Memory**: ~50-100MB
+- **Key failover**: <100ms
+
+---
+
+## License
 
 MIT License. Copyright (c) 2026 NestLab.
-
----
-
-## 🆘 Support
-
-- **Issues**: [GitHub Issues](https://github.com/AleksNeStu/keyproxy/issues)
-- **Documentation**: [./docs](./docs)
-- **Logs**: `./scripts/manage.ps1 logs` (Windows) or `./scripts/manage.sh logs` (Linux)
-
----
-
-**Made with ❤️ by NestLab**

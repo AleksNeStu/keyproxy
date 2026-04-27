@@ -12,14 +12,22 @@
   "keywords": [
     "api-key",
     "keyproxy",
-    "rotation",
+    "mcp",
+    "mcp-server",
+    "key-rotation",
     "proxy",
-    "orchestrator",
-    "mcp"
+    "api-key-management",
+    "claude-desktop",
+    "cursor",
+    "windsurf",
+    "brave-search",
+    "exa",
+    "jina",
+    "firecrawl"
   ],
   "author": "Alex Nesterovich",
   "license": "MIT",
-  "description": "Universal API Key Orchestrator & Proxy with native MCP support. Automates rotation, health checks, and environment injection for Windows/Linux Workstations and VPS.",
+  "description": "Local API key vault + proxy for MCP servers. Keep real keys out of config files — intercept, rotate, and health-check transparently.",
   "dependencies": {
     "joi": "^18.1.2",
     "node-windows": "^1.0.0-beta.8"
