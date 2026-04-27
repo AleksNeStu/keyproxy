@@ -49,6 +49,10 @@ class ProxyServer {
     this.logBuffer = []; // Store logs in RAM only (last 100 entries)
     this.responseStorage = new Map(); // Store response data for viewing
 
+    // Static file cache (loaded once, served from memory)
+    this.staticFileCache = new Map();
+    this._cachedAdminPassword = undefined;
+
     // File logging - debounced write
     this.pendingLogEntries = [];
     this.logFlushTimer = null;
@@ -120,6 +124,43 @@ class ProxyServer {
     destinationManager.setExclusionManager(this.exclusionManager);
   }
 
+  serveStaticFile(res, cacheKey, filePath, contentType, cacheControl = 'public, max-age=3600') {
+    const cached = this.staticFileCache.get(cacheKey);
+    if (cached) {
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Content-Length': cached.length,
+        'Cache-Control': cacheControl
+      });
+      res.end(cached);
+      return true;
+    }
+
+    try {
+      const content = fs.readFileSync(filePath);
+      this.staticFileCache.set(cacheKey, content);
+      res.writeHead(200, {
+        'Content-Type': contentType,
+        'Content-Length': content.length,
+        'Cache-Control': cacheControl
+      });
+      res.end(content);
+      return true;
+    } catch (error) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end('Not found');
+      return false;
+    }
+  }
+
+  clearStaticFileCache(key = null) {
+    if (key) {
+      this.staticFileCache.delete(key);
+    } else {
+      this.staticFileCache.clear();
+    }
+  }
+
   start() {
     this.server = http.createServer((req, res) => {
       this.handleRequest(req, res);
@@ -178,104 +219,30 @@ class ProxyServer {
     // Sanitize input (remove null bytes, excessive whitespace)
     sanitizeInput(req, res, () => {});
 
-    // Serve static files from public directory
-    if (req.url === '/tailwind-3.4.17.js' && (req.method === 'GET' || req.method === 'HEAD')) {
-      try {
-        const filePath = path.join(process.cwd(), 'public', 'tailwind-3.4.17.js');
-        console.log(`[STATIC] Serving file from: ${filePath}`);
+    // Serve static files from public directory (cached in memory)
+    if (req.method === 'GET' || req.method === 'HEAD') {
+      const staticRoutes = {
+        '/tailwind-3.4.17.js': { path: 'public/tailwind-3.4.17.js', type: 'application/javascript', cache: 'public, max-age=31536000' },
+        '/chart.min.js': { path: 'public/chart.min.js', type: 'application/javascript', cache: 'public, max-age=31536000' },
+        '/css/admin.css': { path: 'public/css/admin.css', type: 'text/css', cache: 'public, max-age=86400' },
+      };
 
-        if (req.method === 'HEAD') {
-          const stats = fs.statSync(filePath);
-          res.writeHead(200, {
-            'Content-Type': 'application/javascript',
-            'Content-Length': stats.size,
-            'Cache-Control': 'public, max-age=31536000'
-          });
-          res.end();
-        } else {
-          const fileContent = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, {
-            'Content-Type': 'application/javascript',
-            'Content-Length': Buffer.byteLength(fileContent),
-            'Cache-Control': 'public, max-age=31536000'
-          });
-          res.end(fileContent);
-        }
-        console.log(`[STATIC] Successfully served: ${req.url}`);
-      } catch (error) {
-        console.log(`[STATIC] Error serving file: ${error.message}`);
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('File not found');
+      if (staticRoutes[req.url]) {
+        const route = staticRoutes[req.url];
+        const filePath = path.join(process.cwd(), route.path);
+        this.serveStaticFile(res, req.url, filePath, route.type, route.cache);
+        return;
       }
-      return;
-    }
 
-    // Serve Chart.js locally
-    if (req.url === '/chart.min.js' && (req.method === 'GET' || req.method === 'HEAD')) {
-      try {
-        const filePath = path.join(process.cwd(), 'public', 'chart.min.js');
-        console.log(`[STATIC] Serving file from: ${filePath}`);
-
-        if (req.method === 'HEAD') {
-          const stats = fs.statSync(filePath);
-          res.writeHead(200, {
-            'Content-Type': 'application/javascript',
-            'Content-Length': stats.size,
-            'Cache-Control': 'public, max-age=31536000'
-          });
-          res.end();
-        } else {
-          const fileContent = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, {
-            'Content-Type': 'application/javascript',
-            'Content-Length': Buffer.byteLength(fileContent),
-            'Cache-Control': 'public, max-age=31536000'
-          });
-          res.end(fileContent);
-        }
-        console.log(`[STATIC] Successfully served: ${req.url}`);
-      } catch (error) {
-        console.log(`[STATIC] Error serving file: ${error.message}`);
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('File not found');
-      }
-      return;
-    }
-
-    
-    if (req.url === '/css/admin.css' && (req.method === 'GET' || req.method === 'HEAD')) {
-      try {
-        const filePath = path.join(process.cwd(), 'public', 'css', 'admin.css');
-        if (req.method === 'HEAD') {
-          const stats = fs.statSync(filePath);
-          res.writeHead(200, { 'Content-Type': 'text/css', 'Content-Length': stats.size, 'Cache-Control': 'public, max-age=86400' });
-          res.end();
-        } else {
-          const fileContent = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, { 'Content-Type': 'text/css', 'Content-Length': Buffer.byteLength(fileContent), 'Cache-Control': 'public, max-age=86400' });
-          res.end(fileContent);
-        }
-      } catch { res.writeHead(404); res.end(); }
-      return;
-    }
-
-    
-    // Serve JS modules
-    if (req.url.startsWith('/js/') && req.url.endsWith('.js') && (req.method === 'GET' || req.method === 'HEAD')) {
-      try {
+      // JS modules under /js/
+      if (req.url.startsWith('/js/') && req.url.endsWith('.js')) {
         const filePath = path.join(process.cwd(), 'public', req.url);
-        if (!filePath.startsWith(path.join(process.cwd(), 'public', 'js'))) { res.writeHead(403); res.end(); return; }
-        if (req.method === 'HEAD') {
-          const stats = fs.statSync(filePath);
-          res.writeHead(200, { 'Content-Type': 'application/javascript', 'Content-Length': stats.size, 'Cache-Control': 'public, max-age=3600' });
-          res.end();
-        } else {
-          const fileContent = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, { 'Content-Type': 'application/javascript', 'Content-Length': Buffer.byteLength(fileContent), 'Cache-Control': 'public, max-age=3600' });
-          res.end(fileContent);
+        if (!filePath.startsWith(path.join(process.cwd(), 'public', 'js'))) {
+          res.writeHead(403); res.end(); return;
         }
-      } catch { res.writeHead(404); res.end(); }
-      return;
+        this.serveStaticFile(res, req.url, filePath, 'application/javascript', 'public, max-age=3600');
+        return;
+      }
     }
 
     // Handle preflight OPTIONS requests
@@ -287,119 +254,13 @@ class ProxyServer {
 
     const body = await readRequestBody(req);
 
-    // Serve static files from public directory
-    if (req.url === '/tailwind-3.4.17.js' && (req.method === 'GET' || req.method === 'HEAD')) {
-      try {
-        const filePath = path.join(process.cwd(), 'public', 'tailwind-3.4.17.js');
-        console.log(`[STATIC] Serving file from: ${filePath}`);
-
-        if (req.method === 'HEAD') {
-          const stats = fs.statSync(filePath);
-          res.writeHead(200, {
-            'Content-Type': 'application/javascript',
-            'Content-Length': stats.size,
-            'Cache-Control': 'public, max-age=31536000'
-          });
-          res.end();
-        } else {
-          const fileContent = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, {
-            'Content-Type': 'application/javascript',
-            'Content-Length': Buffer.byteLength(fileContent),
-            'Cache-Control': 'public, max-age=31536000'
-          });
-          res.end(fileContent);
-        }
-        console.log(`[STATIC] Successfully served: ${req.url}`);
-      } catch (error) {
-        console.log(`[STATIC] Error serving file: ${error.message}`);
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('File not found');
-      }
-      return;
-    }
-
-    // Serve Chart.js locally
-    if (req.url === '/chart.min.js' && (req.method === 'GET' || req.method === 'HEAD')) {
-      try {
-        const filePath = path.join(process.cwd(), 'public', 'chart.min.js');
-        console.log(`[STATIC] Serving file from: ${filePath}`);
-
-        if (req.method === 'HEAD') {
-          const stats = fs.statSync(filePath);
-          res.writeHead(200, {
-            'Content-Type': 'application/javascript',
-            'Content-Length': stats.size,
-            'Cache-Control': 'public, max-age=31536000'
-          });
-          res.end();
-        } else {
-          const fileContent = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, {
-            'Content-Type': 'application/javascript',
-            'Content-Length': Buffer.byteLength(fileContent),
-            'Cache-Control': 'public, max-age=31536000'
-          });
-          res.end(fileContent);
-        }
-        console.log(`[STATIC] Successfully served: ${req.url}`);
-      } catch (error) {
-        console.log(`[STATIC] Error serving file: ${error.message}`);
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('File not found');
-      }
-      return;
-    }
-
-    
-    if (req.url === '/css/admin.css' && (req.method === 'GET' || req.method === 'HEAD')) {
-      try {
-        const filePath = path.join(process.cwd(), 'public', 'css', 'admin.css');
-        if (req.method === 'HEAD') {
-          const stats = fs.statSync(filePath);
-          res.writeHead(200, { 'Content-Type': 'text/css', 'Content-Length': stats.size, 'Cache-Control': 'public, max-age=86400' });
-          res.end();
-        } else {
-          const fileContent = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, { 'Content-Type': 'text/css', 'Content-Length': Buffer.byteLength(fileContent), 'Cache-Control': 'public, max-age=86400' });
-          res.end(fileContent);
-        }
-      } catch { res.writeHead(404); res.end(); }
-      return;
-    }
-
-    // Serve JS modules
-    if (req.url.startsWith('/js/') && req.url.endsWith('.js') && (req.method === 'GET' || req.method === 'HEAD')) {
-      try {
-        const filePath = path.join(process.cwd(), 'public', req.url);
-        if (!filePath.startsWith(path.join(process.cwd(), 'public', 'js'))) { res.writeHead(403); res.end(); return; }
-        if (req.method === 'HEAD') {
-          const stats = fs.statSync(filePath);
-          res.writeHead(200, { 'Content-Type': 'application/javascript', 'Content-Length': stats.size, 'Cache-Control': 'public, max-age=3600' });
-          res.end();
-        } else {
-          const fileContent = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, { 'Content-Type': 'application/javascript', 'Content-Length': Buffer.byteLength(fileContent), 'Cache-Control': 'public, max-age=3600' });
-          res.end(fileContent);
-        }
-      } catch { res.writeHead(404); res.end(); }
-      return;
-    }
-
-    // Serve MCP intercept module
+    // Serve MCP intercept module (no cache - development files)
     if (req.url.startsWith('/inject/') && req.method === 'GET') {
       try {
         const fileName = req.url.replace('/inject/', '').replace(/\.\./g, '');
         const filePath = path.join(process.cwd(), 'src', 'inject', fileName);
-        if (fs.existsSync(filePath) && fs.statSync(filePath).isFile()) {
-          const content = fs.readFileSync(filePath, 'utf8');
-          res.writeHead(200, {
-            'Content-Type': 'application/javascript; charset=utf-8',
-            'Content-Length': Buffer.byteLength(content),
-            'Cache-Control': 'no-cache',
-            'X-Content-Type-Options': 'nosniff'
-          });
-          res.end(content);
+        if (filePath.startsWith(path.join(process.cwd(), 'src', 'inject'))) {
+          this.serveStaticFile(res, `inject:${fileName}`, filePath, 'application/javascript; charset=utf-8', 'no-cache');
           return;
         }
       } catch (e) {
@@ -410,81 +271,41 @@ class ProxyServer {
       return;
     }
 
-    // Serve admin panel (BEFORE handleAdminRequest)
-    if ((req.url === '/admin' || req.url === '/admin.html') && req.method === 'GET') {
-      try {
-        const htmlPath = path.join(process.cwd(), 'public', 'admin.html');
+    // Serve HTML pages (cached in memory)
+    if (req.method === 'GET') {
+      const htmlRoutes = {
+        '/admin': { file: 'public/admin.html', type: 'text/html; charset=utf-8', cache: 'no-cache',
+          extraHeaders: { 'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';", 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN' } },
+        '/admin.html': { file: 'public/admin.html', type: 'text/html; charset=utf-8', cache: 'no-cache',
+          extraHeaders: { 'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';", 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'SAMEORIGIN' } },
+        '/test': { file: 'public/test-simple.html', type: 'text/html; charset=utf-8', cache: 'no-cache' },
+        '/test-simple.html': { file: 'public/test-simple.html', type: 'text/html; charset=utf-8', cache: 'no-cache' },
+        '/admin-minimal.html': { file: 'public/admin-minimal.html', type: 'text/html; charset=utf-8', cache: 'no-cache',
+          extraHeaders: { 'Content-Security-Policy': "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';", 'X-Content-Type-Options': 'nosniff' } },
+        '/test-login': { file: 'public/test-login.html', type: 'text/html', cache: 'no-cache' },
+        '/test-login.html': { file: 'public/test-login.html', type: 'text/html', cache: 'no-cache' },
+      };
 
-        const htmlContent = fs.readFileSync(htmlPath, 'utf8');
-        res.writeHead(200, {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Length': Buffer.byteLength(htmlContent),
-          'Content-Security-Policy': "default-src 'self' 'unsafe-inline' 'unsafe-eval'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline';",
-          'X-Content-Type-Options': 'nosniff',
-          'X-Frame-Options': 'SAMEORIGIN'
-        });
-        res.end(htmlContent);
-        console.log(`[ADMIN] Successfully served admin panel`);
-      } catch (error) {
-        console.log(`[ADMIN] Error serving admin panel: ${error.message}`);
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Error loading admin panel');
+      const route = htmlRoutes[req.url];
+      if (route) {
+        const cacheKey = `html:${req.url}`;
+        let content = this.staticFileCache.get(cacheKey);
+        if (!content) {
+          try {
+            content = fs.readFileSync(path.join(process.cwd(), route.file));
+            this.staticFileCache.set(cacheKey, content);
+          } catch (error) {
+            res.writeHead(500, { 'Content-Type': 'text/plain' });
+            res.end('Error loading page');
+            return;
+          }
+        }
+        const headers = { 'Content-Type': route.type, 'Content-Length': content.length, 'Cache-Control': route.cache };
+        if (route.extraHeaders) Object.assign(headers, route.extraHeaders);
+        res.writeHead(200, headers);
+        res.end(content);
+        return;
       }
-      return;
-    }
-
-    // Serve test page for debugging
-    if (req.url === '/test' || req.url === '/test-simple.html') {
-      try {
-        const htmlPath = path.join(process.cwd(), 'public', 'test-simple.html');
-        const htmlContent = fs.readFileSync(htmlPath, 'utf8');
-        res.writeHead(200, {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Length': Buffer.byteLength(htmlContent)
-        });
-        res.end(htmlContent);
-      } catch (error) {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Error loading test page');
-      }
-      return;
-    }
-
-    // Serve minimal admin page (no Tailwind/Chart.js - for debugging)
-    if (req.url === '/admin-minimal.html') {
-      try {
-        const htmlPath = path.join(process.cwd(), 'public', 'admin-minimal.html');
-        const htmlContent = fs.readFileSync(htmlPath, 'utf8');
-        res.writeHead(200, {
-          'Content-Type': 'text/html; charset=utf-8',
-          'Content-Length': Buffer.byteLength(htmlContent),
-          'Content-Security-Policy': "default-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline';",
-          'X-Content-Type-Options': 'nosniff'
-        });
-        res.end(htmlContent);
-      } catch (error) {
-        res.writeHead(500, { 'Content-Type': 'text/plain' });
-        res.end('Error loading minimal admin page');
-      }
-      return;
-    }
-
-    // Serve test login page
-    if (req.url === '/test-login' || req.url === '/test-login.html') {
-      try {
-        const filePath = path.join(process.cwd(), 'public', 'test-login.html');
-        const fileContent = fs.readFileSync(filePath, 'utf8');
-        res.writeHead(200, {
-          'Content-Type': 'text/html',
-          'Content-Length': Buffer.byteLength(fileContent)
-        });
-        res.end(fileContent);
-      } catch (error) {
-        console.log(`[STATIC] Error serving test-login.html: ${error.message}`);
-        res.writeHead(404, { 'Content-Type': 'text/plain' });
-        res.end('File not found');
-      }
-      return;
     }
 
     // Handle root route - redirect to admin
@@ -958,14 +779,31 @@ class ProxyServer {
   // ─── Server-owned methods (state management, logging, etc.) ────
 
   getAdminPassword() {
+    if (this._cachedAdminPassword !== undefined) {
+      return this._cachedAdminPassword;
+    }
+
     try {
+      const fileHash = Auth.loadHashFromFile();
+      if (fileHash) {
+        this._cachedAdminPassword = fileHash;
+        return fileHash;
+      }
+
       const envPath = path.join(process.cwd(), '.env');
       const envContent = fs.readFileSync(envPath, 'utf8');
       const envVars = this.config.parseEnvFile(envContent);
-      return Auth.getAdminPassword(envVars.ADMIN_PASSWORD);
+      const password = Auth.getAdminPassword(envVars.ADMIN_PASSWORD);
+      this._cachedAdminPassword = password;
+      return password;
     } catch (error) {
-      return Auth.getAdminPassword(null);
+      this._cachedAdminPassword = Auth.getAdminPassword(null);
+      return this._cachedAdminPassword;
     }
+  }
+
+  clearAdminPasswordCache() {
+    this._cachedAdminPassword = undefined;
   }
 
   getProviderStats() {
@@ -1269,14 +1107,19 @@ class ProxyServer {
   }
 
   serveAdminPanel(res) {
-    try {
-      const htmlPath = path.join(process.cwd(), 'public', 'admin.html');
-      const html = fs.readFileSync(htmlPath, 'utf8');
-      res.writeHead(200, { 'Content-Type': 'text/html' });
-      res.end(html);
-    } catch (error) {
-      sendError(res, 500, 'Admin panel not found');
+    const cacheKey = 'html:/admin';
+    let content = this.staticFileCache.get(cacheKey);
+    if (!content) {
+      try {
+        content = fs.readFileSync(path.join(process.cwd(), 'public', 'admin.html'));
+        this.staticFileCache.set(cacheKey, content);
+      } catch (error) {
+        sendError(res, 500, 'Admin panel not found');
+        return;
+      }
     }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(content);
   }
 
   /**

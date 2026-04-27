@@ -168,7 +168,6 @@ class HealthMonitor {
         // Skip frozen keys — permanent disable, requires manual unfreeze
         const keyStatus = historyManager.getKeyStatus(providerName, entry.fullKey);
         if (keyStatus.status === 'frozen') continue;
-        const attempts = entry.recoveryAttempts || 0;
 
         // Skip keys that exceeded max recovery attempts
         if (attempts >= this.maxRecoveryAttempts) {
