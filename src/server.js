@@ -259,6 +259,25 @@ class ProxyServer {
       return;
     }
 
+    
+    // Serve JS modules
+    if (req.url.startsWith('/js/') && req.url.endsWith('.js') && (req.method === 'GET' || req.method === 'HEAD')) {
+      try {
+        const filePath = path.join(process.cwd(), 'public', req.url);
+        if (!filePath.startsWith(path.join(process.cwd(), 'public', 'js'))) { res.writeHead(403); res.end(); return; }
+        if (req.method === 'HEAD') {
+          const stats = fs.statSync(filePath);
+          res.writeHead(200, { 'Content-Type': 'application/javascript', 'Content-Length': stats.size, 'Cache-Control': 'public, max-age=3600' });
+          res.end();
+        } else {
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, { 'Content-Type': 'application/javascript', 'Content-Length': Buffer.byteLength(fileContent), 'Cache-Control': 'public, max-age=3600' });
+          res.end(fileContent);
+        }
+      } catch { res.writeHead(404); res.end(); }
+      return;
+    }
+
     // Handle preflight OPTIONS requests
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -343,6 +362,24 @@ class ProxyServer {
         } else {
           const fileContent = fs.readFileSync(filePath, 'utf8');
           res.writeHead(200, { 'Content-Type': 'text/css', 'Content-Length': Buffer.byteLength(fileContent), 'Cache-Control': 'public, max-age=86400' });
+          res.end(fileContent);
+        }
+      } catch { res.writeHead(404); res.end(); }
+      return;
+    }
+
+    // Serve JS modules
+    if (req.url.startsWith('/js/') && req.url.endsWith('.js') && (req.method === 'GET' || req.method === 'HEAD')) {
+      try {
+        const filePath = path.join(process.cwd(), 'public', req.url);
+        if (!filePath.startsWith(path.join(process.cwd(), 'public', 'js'))) { res.writeHead(403); res.end(); return; }
+        if (req.method === 'HEAD') {
+          const stats = fs.statSync(filePath);
+          res.writeHead(200, { 'Content-Type': 'application/javascript', 'Content-Length': stats.size, 'Cache-Control': 'public, max-age=3600' });
+          res.end();
+        } else {
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, { 'Content-Type': 'application/javascript', 'Content-Length': Buffer.byteLength(fileContent), 'Cache-Control': 'public, max-age=3600' });
           res.end(fileContent);
         }
       } catch { res.writeHead(404); res.end(); }
