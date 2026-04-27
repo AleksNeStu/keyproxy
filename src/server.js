@@ -69,12 +69,15 @@ class ProxyServer {
     // Key rotation history (persistent across restarts)
     const KeyHistoryManager = require('./core/keyHistory');
     this.historyManager = new KeyHistoryManager();
+    this.historyManager.pruneInactiveProviders(Object.keys(config.providers || {}));
 
     // Prometheus metrics collector
     this.metrics = new MetricsCollector();
 
     // Analytics tracker (usage, cost estimation)
     this.analytics = new AnalyticsTracker();
+    this.analytics.purge(parseInt(config.envVars?.KEYPROXY_ANALYTICS_RETENTION_DAYS) || 90);
+    this._analyticsPruneTimer = setInterval(() => this.analytics.purge(), 24 * 60 * 60 * 1000);
 
     // Fallback router (cross-provider failover)
     this.fallbackRouter = null; // Initialized in start() after config loads

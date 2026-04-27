@@ -266,6 +266,27 @@ class KeyHistoryManager {
   }
 
   /**
+   * Remove providers not in the active list and compact data.
+   * @param {string[]} activeProviderNames - providers currently in config
+   * @returns {number} number of providers removed
+   */
+  pruneInactiveProviders(activeProviderNames = []) {
+    const activeSet = new Set(activeProviderNames.map(n => n.toLowerCase()));
+    let removed = 0;
+    for (const name of Object.keys(this.data.providers)) {
+      if (!activeSet.has(name.toLowerCase())) {
+        delete this.data.providers[name];
+        removed++;
+      }
+    }
+    if (removed > 0) {
+      console.log(`[HISTORY] Pruned ${removed} inactive provider entries`);
+      this._scheduleSave();
+    }
+    return removed;
+  }
+
+  /**
    * Reconcile known keys with history. Marks unknown keys as fresh,
    * removes keys no longer in the provider's config.
    */
