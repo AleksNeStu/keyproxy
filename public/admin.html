@@ -407,17 +407,20 @@
 
                     <!-- Add New Provider -->
                     <div class="section">
-                        <details id="addProviderDetails" open>
-                            <summary class="flex items-center justify-between cursor-pointer group mb-3">
+                        <details id="addProviderDetails">
+                            <summary class="flex items-center justify-between cursor-pointer group mb-2">
                                 <div class="flex items-center gap-2">
                                     <svg class="w-4 h-4 text-muted-foreground group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                    <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                                    </span>
                                     <h3 class="text-sm font-medium text-foreground">Add New Provider</h3>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <span class="text-[10px] text-muted-foreground">Saved as</span>
                                     <code id="addProviderEnvPreview" class="text-[10px] font-mono px-2 py-0.5 bg-primary/10 border border-primary/20 rounded text-primary">TYPE_NAME_API_KEYS=...</code>
                                 </div>
                             </summary>
+                            <p class="text-[11px] text-muted-foreground mb-3 ml-7">Create a provider entry with tested API keys. Keys are validated before saving.</p>
 
                             <div class="border border-border rounded-lg p-4 bg-muted/20 space-y-4">
                                 <!-- Step 1: Provider Identity -->
@@ -426,10 +429,14 @@
                                         <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">1</span>
                                         <span class="text-xs font-medium text-foreground">Provider Identity</span>
                                     </div>
-                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 ml-7">
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 step-connector">
                                         <div>
                                             <label class="block text-xs font-medium text-muted-foreground mb-1.5">
                                                 Provider Name <span class="text-destructive">*</span>
+                                                <span class="help-tooltip ml-1">
+                                                    <span class="tip-icon">?</span>
+                                                    <span class="tip-content">Unique name for this provider. Combined with API type to create the env variable name:<br><code style="font-size:10px">{TYPE}_{NAME}_API_KEYS</code><br>Example: name "groq" + type "openai" → <code style="font-size:10px">OPENAI_GROQ_API_KEYS</code></span>
+                                                </span>
                                             </label>
                                             <div class="relative">
                                                 <input
@@ -442,12 +449,15 @@
                                                 >
                                                 <span id="nameValidIcon" class="absolute right-1.5 top-1/2 -translate-y-1/2 hidden"></span>
                                             </div>
-                                            <p class="text-muted-foreground text-[10px] mt-1">Lowercase letters and numbers only. Leave empty + pick type for defaults.</p>
-                                            <p class="text-muted-foreground/60 text-[9px] mt-0.5">Examples: <code class="font-mono">groq</code> → <code class="font-mono">GROQ_API_KEYS</code>, <code class="font-mono">mistral</code> → <code class="font-mono">OPENAI_MISTRAL_API_KEYS</code></p>
+                                            <p class="text-muted-foreground text-[10px] mt-1">Lowercase letters, numbers, and underscores only.</p>
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-muted-foreground mb-1.5">
                                                 API Type <span class="text-destructive">*</span>
+                                                <span class="help-tooltip ml-1">
+                                                    <span class="tip-icon">?</span>
+                                                    <span class="tip-content">Selects the request format. "OpenAI (compatible)" works for most providers including Groq, Mistral, Together AI, DeepSeek, and others that expose an OpenAI-style API.</span>
+                                                </span>
                                             </label>
                                             <select
                                                 id="newProviderApiType"
@@ -461,7 +471,11 @@
                                         </div>
                                         <div>
                                             <label class="block text-xs font-medium text-muted-foreground mb-1.5">
-                                                Base URL <span class="text-muted-foreground font-normal">(auto-filled if empty)</span>
+                                                Base URL
+                                                <span class="help-tooltip ml-1">
+                                                    <span class="tip-icon">?</span>
+                                                    <span class="tip-content">The API endpoint URL. Leave empty to use the default for the selected type (e.g. <code style="font-size:10px">api.openai.com</code>). Set a custom URL for self-hosted proxies or alternative endpoints.</span>
+                                                </span>
                                             </label>
                                             <div class="relative">
                                                 <input
@@ -474,7 +488,7 @@
                                                 >
                                                 <span id="urlValidIcon" class="absolute right-1.5 top-1/2 -translate-y-1/2 hidden"></span>
                                             </div>
-                                            <p class="text-muted-foreground text-[10px] mt-1">Leave empty for default (openai.com / googleapis.com).</p>
+                                            <p class="text-muted-foreground text-[10px] mt-1">Leave empty for default. Must start with <code>https://</code></p>
                                         </div>
                                     </div>
                                 </div>
@@ -484,9 +498,13 @@
                                     <div class="flex items-center gap-2 mb-3">
                                         <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">2</span>
                                         <span class="text-xs font-medium text-foreground">API Keys</span>
-                                        <span class="text-[10px] text-muted-foreground">— at least one required, add more for rotation</span>
+                                        <span class="text-[10px] text-muted-foreground">— at least one required</span>
+                                        <span class="help-tooltip ml-0.5">
+                                            <span class="tip-icon">?</span>
+                                            <span class="tip-content">Add multiple keys for automatic round-robin rotation. When one key hits a rate limit, the proxy automatically switches to the next available key.</span>
+                                        </span>
                                     </div>
-                                    <div id="newProviderKeys" class="space-y-2 ml-7">
+                                    <div id="newProviderKeys" class="space-y-2 step-connector">
                                         <div class="flex items-center space-x-2" data-key-index="0">
                                             <input
                                                 type="text"
@@ -499,6 +517,7 @@
                                                 onclick="testNewProviderKey(0)"
                                                 class="btn btn-secondary px-2 py-1 text-xs font-medium"
                                                 title="Test this key against the provider"
+                                                data-test-btn="0"
                                             >
                                                 Test
                                             </button>
@@ -511,7 +530,7 @@
                                             </button>
                                         </div>
                                     </div>
-                                    <div class="flex items-center gap-2 mt-2 ml-7">
+                                    <div class="flex items-center gap-2 mt-2">
                                         <button
                                             onclick="addNewProviderKey()"
                                             class="btn btn-secondary px-3 py-1 text-xs font-medium"
@@ -522,61 +541,84 @@
                                 </div>
 
                                 <!-- Step 3: Optional -->
-                                <details class="ml-7 border border-border/50 rounded p-3 bg-background/30">
+                                <details class="step-connector border border-border/50 rounded p-3 bg-background/30">
                                     <summary class="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
                                         Optional: Access Key, Default Model, Sync
                                     </summary>
                                     <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
                                         <div>
-                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Access Key</label>
+                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">
+                                                Access Key
+                                                <span class="help-tooltip ml-1">
+                                                    <span class="tip-icon">?</span>
+                                                    <span class="tip-content">Some providers require a separate access key or secret alongside the API key. Most providers don't need this.</span>
+                                                </span>
+                                            </label>
                                             <input
                                                 type="text"
                                                 id="newProviderAccessKey"
                                                 class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors"
                                                 placeholder="Extra auth token (rare)"
+                                                oninput="updateProviderPreview()"
                                             >
-                                            <p class="text-muted-foreground text-[10px] mt-1">Only needed if provider uses a separate access key.</p>
                                         </div>
                                         <div>
-                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Default Model</label>
+                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">
+                                                Default Model
+                                                <span class="help-tooltip ml-1">
+                                                    <span class="tip-icon">?</span>
+                                                    <span class="tip-content">Pre-select a model for virtual key routing. Examples: <code style="font-size:10px">gpt-4o</code>, <code style="font-size:10px">claude-sonnet-4-20250514</code>, <code style="font-size:10px">gemini-2.0-flash</code></span>
+                                                </span>
+                                            </label>
                                             <input
                                                 type="text"
                                                 id="newProviderDefaultModel"
                                                 class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors"
                                                 placeholder="e.g. gpt-4o, gemini-2.0-flash"
+                                                oninput="updateProviderPreview()"
                                             >
-                                            <p class="text-muted-foreground text-[10px] mt-1">Pre-select a model when using virtual keys.</p>
                                         </div>
                                         <div>
-                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Sync to OS Env</label>
-                                            <select id="newProviderSyncEnv" class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors">
+                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">
+                                                Sync to OS Env
+                                                <span class="help-tooltip ml-1">
+                                                    <span class="tip-icon">?</span>
+                                                    <span class="tip-content">Writes the currently active key to a Windows system environment variable. Useful for tools that read keys from the OS env directly.</span>
+                                                </span>
+                                            </label>
+                                            <select id="newProviderSyncEnv" class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors" onchange="updateProviderPreview()">
                                                 <option value="">Use global setting</option>
                                                 <option value="true">Yes — sync active key</option>
                                                 <option value="false">No — don't sync</option>
                                             </select>
-                                            <p class="text-muted-foreground text-[10px] mt-1">Write the active key to a system environment variable.</p>
                                         </div>
                                     </div>
                                 </details>
 
                                 <!-- Save Button -->
-                                <div class="flex items-center gap-3 ml-7">
+                                <div class="flex items-center gap-3">
                                     <button
                                         id="addProviderSaveBtn"
                                         onclick="addNewProvider()"
                                         class="btn btn-primary px-4 py-1.5 text-xs font-medium flex items-center gap-2"
                                     >
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        <svg id="addProviderCheckIcon" class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        <svg id="addProviderSpinner" class="w-3.5 h-3.5 animate-spin hidden" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
                                         <span id="addProviderSaveText">Test & Save Provider</span>
                                     </button>
                                     <span id="addProviderStatus" class="text-[10px] text-muted-foreground"></span>
                                 </div>
 
                                 <!-- Live Preview -->
-                                <div id="newProviderPreview" class="ml-7 p-2.5 bg-muted/30 border border-border rounded text-[11px] text-muted-foreground font-mono">
-                                    <span id="previewText">Fill in provider details to see env variable preview</span>
+                                <div class="flex items-start gap-2">
+                                    <div id="newProviderPreview" class="flex-1 p-2.5 bg-muted/30 border border-border rounded text-[11px] text-muted-foreground font-mono">
+                                        <span id="previewText">Fill in provider details to see env variable preview</span>
+                                    </div>
+                                    <button id="copyPreviewBtn" onclick="copyEnvPreview()" class="btn btn-secondary px-2 py-1 text-xs font-medium shrink-0 hidden" title="Copy env variables to clipboard">
+                                        <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                                    </button>
                                 </div>
-                                <div id="newProviderResult" class="ml-7 mt-1"></div>
+                                <div id="newProviderResult" class="mt-1"></div>
                             </div>
                         </details>
                     </div>

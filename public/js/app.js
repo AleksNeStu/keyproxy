@@ -2734,6 +2734,7 @@
             const baseUrl = document.getElementById('newProviderBaseUrl').value.trim();
             const previewElement = document.getElementById('previewText');
             const envPreview = document.getElementById('addProviderEnvPreview');
+            const copyBtn = document.getElementById('copyPreviewBtn');
 
             if (!previewElement) return;
 
@@ -2746,6 +2747,7 @@
             const effectiveName = name || defaultConfig.name;
             const effectiveUrl = baseUrl || defaultConfig.baseUrl;
             const envVarName = `${apiType.toUpperCase()}_${effectiveName.toUpperCase()}_API_KEYS`;
+            const prefix = `${apiType.toUpperCase()}_${effectiveName.toUpperCase()}`;
 
             // Update the header env preview badge
             if (envPreview) {
@@ -2759,25 +2761,88 @@
             if (hasName && !hasBaseUrl) {
                 previewElement.innerHTML = `<span class="text-destructive">Base URL required when provider name is set</span>`;
                 previewElement.parentElement.style.borderColor = 'var(--destructive)';
+                if (copyBtn) copyBtn.classList.add('hidden');
                 return;
             }
 
             if (!hasName && hasBaseUrl) {
                 previewElement.innerHTML = `<span class="text-destructive">Provider name required when base URL is set</span>`;
                 previewElement.parentElement.style.borderColor = 'var(--destructive)';
+                if (copyBtn) copyBtn.classList.add('hidden');
                 return;
             }
 
             // Reset preview styling
             previewElement.parentElement.style.borderColor = '';
 
-            // Show env variable preview
+            // Build multi-line env var preview
             const keyInputs = document.querySelectorAll('.new-provider-key');
             const keyCount = [...keyInputs].filter(i => i.value.trim()).length;
-            const keyLabel = keyCount === 0 ? '<span class="text-muted-foreground">no keys yet</span>' : `<span class="text-primary">${keyCount} key${keyCount > 1 ? 's' : ''}</span>`;
+            const keyLabel = keyCount === 0 ? 'no keys yet' : `${keyCount} key${keyCount > 1 ? 's' : ''}`;
 
-            previewElement.innerHTML = `<span class="text-primary font-bold">${escapeHtml(envVarName)}</span>=<span class="text-foreground">${escapeHtml(keyLabel)}</span>` +
-                (baseUrl ? ` &nbsp; <span class="text-muted-foreground">${envVarName.replace('_API_KEYS', '_BASE_URL')}=${effectiveUrl}</span>` : '');
+            let lines = [];
+            lines.push(`<span class="text-primary font-bold">${escapeHtml(envVarName)}</span>=<span class="text-foreground">${escapeHtml(keyLabel)}</span>`);
+
+            if (baseUrl) {
+                lines.push(`<span class="text-muted-foreground">${escapeHtml(prefix)}_BASE_URL=${escapeHtml(effectiveUrl)}</span>`);
+            }
+
+            // Optional fields
+            const accessKey = document.getElementById('newProviderAccessKey')?.value.trim();
+            const defaultModel = document.getElementById('newProviderDefaultModel')?.value.trim();
+            const syncEnv = document.getElementById('newProviderSyncEnv')?.value;
+
+            if (accessKey) {
+                lines.push(`<span class="text-muted-foreground">${escapeHtml(prefix)}_ACCESS_KEY=***</span>`);
+            }
+            if (defaultModel) {
+                lines.push(`<span class="text-muted-foreground">${escapeHtml(prefix)}_DEFAULT_MODEL=${escapeHtml(defaultModel)}</span>`);
+            }
+            if (syncEnv) {
+                lines.push(`<span class="text-muted-foreground">${escapeHtml(prefix)}_SYNC_ENV=${escapeHtml(syncEnv)}</span>`);
+            }
+
+            previewElement.innerHTML = lines.join('<br>');
+
+            // Show/hide copy button
+            if (copyBtn) {
+                if (keyCount > 0) {
+                    copyBtn.classList.remove('hidden');
+                } else {
+                    copyBtn.classList.add('hidden');
+                }
+            }
+        }
+
+        function copyEnvPreview() {
+            const name = document.getElementById('newProviderName').value.trim();
+            const apiType = document.getElementById('newProviderApiType').value;
+            const baseUrl = document.getElementById('newProviderBaseUrl').value.trim();
+            const defaultConfig = getDefaultProviderConfig(apiType);
+            if (!defaultConfig) return;
+
+            const effectiveName = name || defaultConfig.name;
+            const effectiveUrl = baseUrl || defaultConfig.baseUrl;
+            const prefix = `${apiType.toUpperCase()}_${effectiveName.toUpperCase()}`;
+
+            const keyInputs = document.querySelectorAll('.new-provider-key');
+            const keys = [...keyInputs].filter(i => i.value.trim()).map(i => i.value.trim());
+
+            let lines = [`${prefix}_API_KEYS=${keys.join(',')}`];
+            if (baseUrl) lines.push(`${prefix}_BASE_URL=${effectiveUrl}`);
+
+            const accessKey = document.getElementById('newProviderAccessKey')?.value.trim();
+            const defaultModel = document.getElementById('newProviderDefaultModel')?.value.trim();
+            const syncEnv = document.getElementById('newProviderSyncEnv')?.value;
+            if (accessKey) lines.push(`${prefix}_ACCESS_KEY=${accessKey}`);
+            if (defaultModel) lines.push(`${prefix}_DEFAULT_MODEL=${defaultModel}`);
+            if (syncEnv) lines.push(`${prefix}_SYNC_ENV=${syncEnv}`);
+
+            navigator.clipboard.writeText(lines.join('\n')).then(() => {
+                showSuccessToast('Env variables copied to clipboard');
+            }).catch(() => {
+                showErrorToast('Failed to copy to clipboard');
+            });
         }
 
         // New provider functions
@@ -2785,8 +2850,16 @@
             const saveBtn = document.getElementById('addProviderSaveBtn');
             const saveText = document.getElementById('addProviderSaveText');
             const statusEl = document.getElementById('addProviderStatus');
+            const checkIcon = document.getElementById('addProviderCheckIcon');
+            const spinnerIcon = document.getElementById('addProviderSpinner');
             const originalText = saveText?.textContent || 'Test & Save Provider';
 
+            // Set loading state with spinner
+            if (saveBtn) saveBtn.disabled = true;
+            if (saveText) saveText.textContent = 'Testing keys...';
+            if (checkIcon) checkIcon.classList.add('hidden');
+            if (spinnerIcon) spinnerIcon.classList.remove('hidden');
+            if (statusEl) statusEl.textContent = '';
             // Set loading state
             if (saveBtn) saveBtn.disabled = true;
             if (saveText) saveText.textContent = 'Testing keys...';
@@ -2879,10 +2952,13 @@
             showInfoToast('Testing all API keys before saving...');
             let allKeysValid = true;
             const testedKeys = [];
-            
+
             for (let i = 0; i < apiKeys.length; i++) {
                 const apiKey = apiKeys[i];
                 const maskedKey = apiKey.length > 16 ? apiKey.substring(0, 8) + '...' + apiKey.slice(-4) : apiKey;
+
+                // Update save button with progress
+                if (saveText) saveText.textContent = `Testing key ${i + 1}/${apiKeys.length}...`;
                 
                 try {
                     showInfoToast(`Testing API key ${i + 1}/${apiKeys.length}: ${maskedKey}...`);
@@ -3018,24 +3094,54 @@
                     newProviderKeyIndex = 1;
                     
                     renderEnvVars();
-                    
-                    showSuccessToast(`🎉 Provider '${name}' created successfully with ${testedKeys.length} tested and valid API key${testedKeys.length > 1 ? 's' : ''}!`);
+
+                    showSuccessToast(`Provider '${name}' created successfully with ${testedKeys.length} tested and valid API key${testedKeys.length > 1 ? 's' : ''}!`);
+
+                    // Flash save button green
+                    if (saveBtn) {
+                        saveBtn.classList.add('btn-save-success');
+                        if (saveText) saveText.textContent = 'Saved!';
+                        setTimeout(() => {
+                            saveBtn.classList.remove('btn-save-success');
+                            if (saveText) saveText.textContent = originalText;
+                            if (checkIcon) checkIcon.classList.remove('hidden');
+                            if (spinnerIcon) spinnerIcon.classList.add('hidden');
+                            saveBtn.disabled = false;
+                        }, 1500);
+                        return; // skip normal reset below
+                    }
                 } else {
                     // Revert changes
                     delete envVars[keysVar];
                     if (baseUrl) delete envVars[baseUrlVar];
                     showErrorToast('Failed to save provider');
+
+                    // Flash save button red
+                    if (saveBtn) {
+                        saveBtn.classList.add('btn-save-fail');
+                        if (saveText) saveText.textContent = 'Failed';
+                        setTimeout(() => saveBtn.classList.remove('btn-save-fail'), 1500);
+                    }
                 }
             } catch (error) {
                 // Revert changes
                 delete envVars[keysVar];
                 if (baseUrl) delete envVars[baseUrlVar];
                 showErrorToast(`Failed to save provider: ${error.message}`);
+
+                // Flash save button red
+                if (saveBtn) {
+                    saveBtn.classList.add('btn-save-fail');
+                    if (saveText) saveText.textContent = 'Failed';
+                    setTimeout(() => saveBtn.classList.remove('btn-save-fail'), 1500);
+                }
             }
 
-            // Reset button state
+            // Reset button state (only reached on failure paths)
             if (saveBtn) saveBtn.disabled = false;
             if (saveText) saveText.textContent = originalText;
+            if (checkIcon) checkIcon.classList.remove('hidden');
+            if (spinnerIcon) spinnerIcon.classList.add('hidden');
             } // end try
         }
         
@@ -3045,6 +3151,8 @@
             const baseUrl = document.getElementById('newProviderBaseUrl').value.trim();
             const nameIcon = document.getElementById('nameValidIcon');
             const urlIcon = document.getElementById('urlValidIcon');
+            const nameInput = document.getElementById('newProviderName');
+            const urlInput = document.getElementById('newProviderBaseUrl');
             const saveBtn = document.getElementById('addProviderSaveBtn');
             const statusEl = document.getElementById('addProviderStatus');
             const checkSvg = '<svg class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
@@ -3052,36 +3160,40 @@
 
             // Validate name
             if (field === 'name' && nameIcon) {
+                nameInput.classList.remove('field-valid', 'field-invalid');
                 if (name.length === 0) {
                     nameIcon.innerHTML = '';
                     nameIcon.classList.add('hidden');
                 } else if (/^[a-z0-9_]+$/.test(name)) {
                     nameIcon.innerHTML = checkSvg;
                     nameIcon.classList.remove('hidden');
+                    nameInput.classList.add('field-valid');
                 } else {
                     nameIcon.innerHTML = crossSvg;
                     nameIcon.classList.remove('hidden');
+                    nameInput.classList.add('field-invalid');
                 }
             }
 
             // Validate URL
             if (field === 'url' && urlIcon) {
+                urlInput.classList.remove('field-valid', 'field-invalid');
                 if (baseUrl.length === 0) {
                     urlIcon.innerHTML = '';
                     urlIcon.classList.add('hidden');
                 } else if (baseUrl.startsWith('https://') && !baseUrl.endsWith('/')) {
                     urlIcon.innerHTML = checkSvg;
                     urlIcon.classList.remove('hidden');
+                    urlInput.classList.add('field-valid');
                 } else {
                     urlIcon.innerHTML = crossSvg;
                     urlIcon.classList.remove('hidden');
+                    urlInput.classList.add('field-invalid');
                 }
             }
 
             // Validate keys presence for save button state
             if (field === 'keys') {
-                const keyInputs = document.querySelectorAll('.new-provider-key');
-                const hasKeys = [...keyInputs].some(i => i.value.trim());
                 if (saveBtn) {
                     saveBtn.disabled = false; // Always enabled, validation happens on submit
                 }
@@ -3089,7 +3201,7 @@
                 updateProviderPreview();
             }
 
-            // Update status hint
+            // Update status hint with readiness indicator
             if (statusEl) {
                 const hasName = name.length > 0;
                 const hasUrl = baseUrl.length > 0;
@@ -3099,7 +3211,14 @@
                 if (!hasKeys) missing.push('API key');
                 if (hasName && !hasUrl) missing.push('base URL');
                 if (hasUrl && !hasName) missing.push('provider name');
-                statusEl.textContent = missing.length > 0 ? `Missing: ${missing.join(', ')}` : '';
+
+                if (missing.length > 0) {
+                    statusEl.textContent = `Missing: ${missing.join(', ')}`;
+                    statusEl.className = 'text-[10px] form-status-missing';
+                } else {
+                    statusEl.textContent = 'Ready to save';
+                    statusEl.className = 'text-[10px] form-status-ready';
+                }
             }
         }
 
@@ -3163,36 +3282,66 @@
             const apiType = document.getElementById('newProviderApiType').value;
             const baseUrl = document.getElementById('newProviderBaseUrl').value.trim();
             const keyInput = document.querySelector(`[data-key-index="${keyIndex}"] input`);
+            const testBtn = document.querySelector(`[data-test-btn="${keyIndex}"]`) ||
+                            keyInput?.parentElement?.querySelector('button[onclick*="testNewProviderKey"]');
             const apiKey = keyInput.value.trim();
-            
+
             if (!apiKey) {
                 showWarningToast('Please enter an API key to test');
                 return;
             }
-            
+
             const maskedKey = apiKey.length > 16 ? apiKey.substring(0, 8) + '...' + apiKey.slice(-4) : apiKey;
-            showInfoToast(`Testing new API key ${maskedKey}...`);
-            
+            const originalBtnText = testBtn?.textContent || 'Test';
+
+            // Show loading state on test button
+            if (testBtn) {
+                testBtn.disabled = true;
+                testBtn.textContent = '...';
+                testBtn.classList.remove('key-test-pass', 'key-test-fail');
+            }
+
             try {
                 const response = await fetch('/admin/api/test', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ 
-                        apiType: apiType, 
+                    body: JSON.stringify({
+                        apiType: apiType,
                         apiKey: apiKey,
-                        baseUrl: baseUrl 
+                        baseUrl: baseUrl
                     })
                 });
-                
+
                 const result = await response.json();
-                
+
                 if (result.success) {
-                    showSuccessToast(`✅ API key ${maskedKey} is valid! Ready to save.`);
+                    showSuccessToast(`API key ${maskedKey} is valid!`);
+                    if (testBtn) {
+                        testBtn.textContent = 'OK';
+                        testBtn.classList.add('key-test-pass');
+                    }
                 } else {
-                    showErrorToast(`❌ API key ${maskedKey} is invalid: ${result.error || 'Unknown error'}`);
+                    showErrorToast(`API key ${maskedKey} failed: ${result.error || 'Unknown error'}`);
+                    if (testBtn) {
+                        testBtn.textContent = 'X';
+                        testBtn.classList.add('key-test-fail');
+                    }
                 }
             } catch (error) {
-                showErrorToast(`❌ API key test failed: ${error.message}`);
+                showErrorToast(`API key test failed: ${error.message}`);
+                if (testBtn) {
+                    testBtn.textContent = 'X';
+                    testBtn.classList.add('key-test-fail');
+                }
+            }
+
+            // Reset button after 2s
+            if (testBtn) {
+                setTimeout(() => {
+                    testBtn.textContent = originalBtnText;
+                    testBtn.disabled = false;
+                    testBtn.classList.remove('key-test-pass', 'key-test-fail');
+                }, 2000);
             }
         }
         
