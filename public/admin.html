@@ -122,7 +122,7 @@
     </script>
 
     <!-- Login Form -->
-    <div id="loginForm" class="min-h-screen flex items-center justify-center p-4">
+    <div id="loginForm" class="min-h-screen flex items-center justify-center p-4" role="main">
         <div class="w-full max-w-md space-y-8">
             <div class="text-center">
                 <div class="mx-auto h-12 w-12 flex items-center justify-center bg-primary text-primary-foreground rounded-lg mb-4">
@@ -135,7 +135,7 @@
             </div>
             
             <div class="login-container p-6">
-                <form onsubmit="return false;">
+                <form onsubmit="return false;" aria-label="Admin login form">
                     <div class="space-y-4">
                         <div id="loginInputs">
                             <div>
@@ -145,6 +145,7 @@
                                     id="password"
                                     class="input-field w-full px-3 py-2 rounded-md transition-colors"
                                     placeholder="Enter admin password"
+                                    aria-label="Admin password"
                                     autofocus
                                 >
                             </div>
@@ -206,7 +207,7 @@
                             <svg class="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
                             </svg>
-                            <div class="theme-toggle" id="themeToggle" onclick="toggleTheme()"></div>
+                            <button class="theme-toggle" id="themeToggle" onclick="toggleTheme()" role="switch" aria-checked="false" aria-label="Toggle dark mode"></button>
                             <svg class="w-3 h-3 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                             </svg>
@@ -229,11 +230,14 @@
         <div id="navigationTabs" class="header-bg border-b border-border sticky-nav-tabs">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex items-center justify-between">
-                    <nav class="flex space-x-4 overflow-x-auto">
+                    <nav class="flex space-x-4 overflow-x-auto" role="tablist" aria-label="Admin panel tabs">
                         <button 
                             onclick="showTab('environment')" 
                             class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors active flex items-center space-x-2"
                             data-tab="environment"
+                            role="tab"
+                            aria-selected="true"
+                            aria-controls="environment"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1117 21a6 6 0 01-7.743-5.743z" />
@@ -244,6 +248,9 @@
                             onclick="showTab('logs')" 
                             class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
                             data-tab="logs"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="logs"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -254,6 +261,9 @@
                             onclick="showTab('management')"
                             class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
                             data-tab="management"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="management"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
@@ -264,6 +274,9 @@
                             onclick="showTab('analytics')"
                             class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
                             data-tab="analytics"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="analytics"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
@@ -274,6 +287,9 @@
                             onclick="showTab('virtualkeys')"
                             class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
                             data-tab="virtualkeys"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="virtualkeys"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1117 21a6 6 0 01-7.743-5.743z" />
@@ -284,6 +300,9 @@
                             onclick="showTab('budgets')"
                             class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
                             data-tab="budgets"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="budgets"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -294,6 +313,9 @@
                             onclick="showTab('settings')"
                             class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
                             data-tab="settings"
+                            role="tab"
+                            aria-selected="false"
+                            aria-controls="settings"
                         >
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
@@ -314,7 +336,7 @@
         <!-- Main Content -->
         <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 content-with-sticky-header">
             <!-- Environment Tab -->
-            <div id="environment" class="tab-content">
+            <div id="environment" class="tab-content" role="tabpanel" aria-labelledby="tab-environment">
                 <div class="section-header">
                     <div class="flex items-center justify-between">
                         <div>
@@ -567,7 +589,7 @@
             </div>
 
             <!-- Logs Tab -->
-            <div id="logs" class="tab-content hidden">
+            <div id="logs" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-logs">
                 <div class="section-header">
                     <h2 class="text-lg font-semibold text-foreground">API Request Logs</h2>
                     <p class="text-muted-foreground text-xs mt-1">Monitor OpenAI and Gemini API requests and responses</p>
@@ -595,7 +617,7 @@
             </div>
 
             <!-- Management Tab -->
-            <div id="management" class="tab-content hidden">
+            <div id="management" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-management">
                 <div class="section-header">
                     <div class="flex items-center justify-between">
                         <div>
@@ -639,16 +661,16 @@
                         <table class="w-full text-sm">
                             <thead>
                                 <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                                    <th class="pb-2 pr-3">Provider</th>
-                                    <th class="pb-2 pr-3">Status</th>
-                                    <th class="pb-2 pr-3">Circuit</th>
-                                    <th class="pb-2 pr-3">Type</th>
-                                    <th class="pb-2 pr-3">Keys</th>
-                                    <th class="pb-2 pr-3">Requests</th>
-                                    <th class="pb-2 pr-3">Avg RT</th>
-                                    <th class="pb-2 pr-3">Last Check</th>
-                                    <th class="pb-2 pr-3">Last Error</th>
-                                    <th class="pb-2">Actions</th>
+                                    <th scope="col" class="pb-2 pr-3">Provider</th>
+                                    <th scope="col" class="pb-2 pr-3">Status</th>
+                                    <th scope="col" class="pb-2 pr-3">Circuit</th>
+                                    <th scope="col" class="pb-2 pr-3">Type</th>
+                                    <th scope="col" class="pb-2 pr-3">Keys</th>
+                                    <th scope="col" class="pb-2 pr-3">Requests</th>
+                                    <th scope="col" class="pb-2 pr-3">Avg RT</th>
+                                    <th scope="col" class="pb-2 pr-3">Last Check</th>
+                                    <th scope="col" class="pb-2 pr-3">Last Error</th>
+                                    <th scope="col" class="pb-2">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="healthTableBody">
@@ -661,7 +683,7 @@
             </div>
 
             <!-- Analytics Tab -->
-            <div id="analytics" class="tab-content hidden">
+            <div id="analytics" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-analytics">
                 <div class="section-header">
                     <div class="flex items-center justify-between">
                         <div>
@@ -743,12 +765,12 @@
                         <table class="w-full text-sm">
                             <thead class="border-b border-border">
                                 <tr>
-                                    <th class="text-left py-2 pr-4">Provider</th>
-                                    <th class="text-right py-2 pr-4">Requests</th>
-                                    <th class="text-right py-2 pr-4">Errors</th>
-                                    <th class="text-right py-2 pr-4">Avg Latency</th>
-                                    <th class="text-right py-2 pr-4">Est. Tokens (In/Out)</th>
-                                    <th class="text-right py-2">Est. Cost</th>
+                                    <th scope="col" class="text-left py-2 pr-4">Provider</th>
+                                    <th scope="col" class="text-right py-2 pr-4">Requests</th>
+                                    <th scope="col" class="text-right py-2 pr-4">Errors</th>
+                                    <th scope="col" class="text-right py-2 pr-4">Avg Latency</th>
+                                    <th scope="col" class="text-right py-2 pr-4">Est. Tokens (In/Out)</th>
+                                    <th scope="col" class="text-right py-2">Est. Cost</th>
                                 </tr>
                             </thead>
                             <tbody id="analyticsProviderTable">
@@ -765,9 +787,9 @@
                         <table class="w-full text-sm">
                             <thead class="border-b border-border">
                                 <tr>
-                                    <th class="text-left py-2 pr-4">Model</th>
-                                    <th class="text-right py-2 pr-4">Requests</th>
-                                    <th class="text-right py-2">Est. Cost</th>
+                                    <th scope="col" class="text-left py-2 pr-4">Model</th>
+                                    <th scope="col" class="text-right py-2 pr-4">Requests</th>
+                                    <th scope="col" class="text-right py-2">Est. Cost</th>
                                 </tr>
                             </thead>
                             <tbody id="analyticsModelTable">
@@ -784,10 +806,10 @@
                         <table class="w-full text-sm">
                             <thead class="border-b border-border">
                                 <tr>
-                                    <th class="text-left py-2 pr-4">Key</th>
-                                    <th class="text-right py-2 pr-4">Requests</th>
-                                    <th class="text-right py-2 pr-4">Errors</th>
-                                    <th class="text-right py-2">Est. Cost</th>
+                                    <th scope="col" class="text-left py-2 pr-4">Key</th>
+                                    <th scope="col" class="text-right py-2 pr-4">Requests</th>
+                                    <th scope="col" class="text-right py-2 pr-4">Errors</th>
+                                    <th scope="col" class="text-right py-2">Est. Cost</th>
                                 </tr>
                             </thead>
                             <tbody id="analyticsKeysTable">
@@ -799,7 +821,7 @@
             </div>
 
             <!-- Virtual Keys Tab -->
-            <div id="virtualkeys" class="tab-content hidden">
+            <div id="virtualkeys" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-virtualkeys">
                 <div class="section-header">
                     <div class="flex items-center justify-between">
                         <div>
@@ -845,15 +867,15 @@
                         <table class="w-full text-sm">
                             <thead>
                                 <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                                    <th class="pb-2 pr-3">Name</th>
-                                    <th class="pb-2 pr-3">Token</th>
-                                    <th class="pb-2 pr-3">Providers</th>
-                                    <th class="pb-2 pr-3">Models</th>
-                                    <th class="pb-2 pr-3">RPM Limit</th>
-                                    <th class="pb-2 pr-3">Expires</th>
-                                    <th class="pb-2 pr-3">Usage</th>
-                                    <th class="pb-2 pr-3">Status</th>
-                                    <th class="pb-2">Actions</th>
+                                    <th scope="col" class="pb-2 pr-3">Name</th>
+                                    <th scope="col" class="pb-2 pr-3">Token</th>
+                                    <th scope="col" class="pb-2 pr-3">Providers</th>
+                                    <th scope="col" class="pb-2 pr-3">Models</th>
+                                    <th scope="col" class="pb-2 pr-3">RPM Limit</th>
+                                    <th scope="col" class="pb-2 pr-3">Expires</th>
+                                    <th scope="col" class="pb-2 pr-3">Usage</th>
+                                    <th scope="col" class="pb-2 pr-3">Status</th>
+                                    <th scope="col" class="pb-2">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="virtualKeysTableBody">
@@ -865,7 +887,7 @@
             </div>
 
             <!-- Budgets Tab -->
-            <div id="budgets" class="tab-content hidden">
+            <div id="budgets" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-budgets">
                 <div class="section-header">
                     <div class="flex items-center justify-between">
                         <div>
@@ -911,14 +933,14 @@
                         <table class="w-full text-sm">
                             <thead>
                                 <tr class="border-b border-border text-left text-xs text-muted-foreground">
-                                    <th class="pb-2 pr-3">Key</th>
-                                    <th class="pb-2 pr-3">Provider</th>
-                                    <th class="pb-2 pr-3">Status</th>
-                                    <th class="pb-2 pr-3">Daily Spend</th>
-                                    <th class="pb-2 pr-3">Daily Limit</th>
-                                    <th class="pb-2 pr-3">Monthly Spend</th>
-                                    <th class="pb-2 pr-3">Monthly Limit</th>
-                                    <th class="pb-2">Actions</th>
+                                    <th scope="col" class="pb-2 pr-3">Key</th>
+                                    <th scope="col" class="pb-2 pr-3">Provider</th>
+                                    <th scope="col" class="pb-2 pr-3">Status</th>
+                                    <th scope="col" class="pb-2 pr-3">Daily Spend</th>
+                                    <th scope="col" class="pb-2 pr-3">Daily Limit</th>
+                                    <th scope="col" class="pb-2 pr-3">Monthly Spend</th>
+                                    <th scope="col" class="pb-2 pr-3">Monthly Limit</th>
+                                    <th scope="col" class="pb-2">Actions</th>
                                 </tr>
                             </thead>
                             <tbody id="budgetTableBody">
@@ -931,7 +953,7 @@
             </div>
 
             <!-- Settings Tab -->
-            <div id="settings" class="tab-content hidden">
+            <div id="settings" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-settings">
                 <div class="section-header">
                     <div class="flex items-center justify-between">
                         <div>
@@ -1598,12 +1620,12 @@
                                 <table class="w-full text-sm">
                                     <thead class="bg-muted/30">
                                         <tr class="border-b border-border">
-                                            <th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Provider</th>
-                                            <th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">API Type</th>
-                                            <th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Original Base URL</th>
-                                            <th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Your Endpoint</th>
-                                            <th class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Expected Pattern</th>
-                                            <th class="text-center py-2 px-3 text-xs font-medium text-muted-foreground">Actions</th>
+                                            <th scope="col" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Provider</th>
+                                            <th scope="col" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">API Type</th>
+                                            <th scope="col" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Original Base URL</th>
+                                            <th scope="col" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Your Endpoint</th>
+                                            <th scope="col" class="text-left py-2 px-3 text-xs font-medium text-muted-foreground">Expected Pattern</th>
+                                            <th scope="col" class="text-center py-2 px-3 text-xs font-medium text-muted-foreground">Actions</th>
                                         </tr>
                                     </thead>
                                     <tbody id="providerConfigTableBody">
@@ -1630,7 +1652,7 @@
     </div>
 
     <!-- Single Notification Overlay -->
-    <div id="singleNotification" class="fixed bg-card border border-border rounded-md shadow-lg z-[150] transition-all duration-300 hidden" style="top: 140px; right: 20px; min-width: 400px; max-width: 600px;">
+    <div id="singleNotification" class="fixed bg-card border border-border rounded-md shadow-lg z-[150] transition-all duration-300 hidden" style="top: 140px; right: 20px; min-width: 400px; max-width: 600px;" role="alert" aria-live="polite">
         <div class="flex items-center space-x-3 px-4 py-3">
             <div id="singleIcon" class="flex-shrink-0"></div>
             <span id="singleMessage" class="flex-1 text-sm text-foreground"></span>
@@ -1659,7 +1681,7 @@
     </div>
 
     <!-- Confirmation Dialog -->
-    <div id="confirmDialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
+    <div id="confirmDialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
         <div class="bg-card border border-border rounded-lg p-6 max-w-md w-full shadow-xl">
             <div class="flex items-center space-x-3 mb-4">
                 <div class="h-10 w-10 bg-destructive/10 rounded-full flex items-center justify-center">
@@ -1668,7 +1690,7 @@
                     </svg>
                 </div>
                 <div>
-                    <h3 class="text-lg font-semibold text-foreground">Delete API Key</h3>
+                    <h3 class="text-lg font-semibold text-foreground" id="confirmTitle">Delete API Key</h3>
                     <p class="text-sm text-muted-foreground">This action cannot be undone</p>
                 </div>
             </div>
@@ -1691,11 +1713,11 @@
     </div>
 
     <!-- Create Virtual Key Dialog -->
-    <div id="createVirtualKeyDialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
+    <div id="createVirtualKeyDialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]" role="dialog" aria-modal="true" aria-labelledby="vkDialogTitle">
         <div class="bg-card border border-border rounded-lg p-6 max-w-md w-full shadow-xl">
             <div class="flex items-center justify-between mb-4">
                 <div>
-                    <h3 class="text-lg font-semibold text-foreground">Create Virtual Key</h3>
+                    <h3 class="text-lg font-semibold text-foreground" id="vkDialogTitle">Create Virtual Key</h3>
                     <p class="text-sm text-muted-foreground">Generate a scoped access token</p>
                 </div>
                 <button onclick="closeCreateVirtualKeyDialog()" class="text-muted-foreground hover:text-foreground transition-colors p-1">
@@ -1745,11 +1767,11 @@
     </div>
 
     <!-- Response Viewer Dialog -->
-    <div id="responseDialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]">
+    <div id="responseDialog" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-[110]" role="dialog" aria-modal="true" aria-labelledby="responseDialogTitle">
         <div class="bg-card border border-border rounded-lg p-6 max-w-4xl w-full h-[80vh] flex flex-col shadow-xl">
             <div class="flex items-center justify-between mb-4 flex-shrink-0">
                 <div>
-                    <h3 class="text-lg font-semibold text-foreground">API Response</h3>
+                    <h3 class="text-lg font-semibold text-foreground" id="responseDialogTitle">API Response</h3>
                     <p class="text-sm text-muted-foreground" id="responseInfo">Loading...</p>
                 </div>
                 <button 
@@ -1793,7 +1815,7 @@
     <script src="/js/app.js"></script>
 <script src="/js/panels.js"></script>
 <!-- File Browser Modal -->
-<div id="fsBrowserModal" class="fixed inset-0 z-[60] hidden">
+<div id="fsBrowserModal" class="fixed inset-0 z-[60] hidden" role="dialog" aria-modal="true" aria-label="Browse Files">
     <div class="absolute inset-0 bg-black/60 backdrop-blur-sm" onclick="closeFsBrowser()"></div>
     <div class="absolute inset-0 flex items-center justify-center p-4 pointer-events-none">
         <div class="bg-card border border-border rounded-xl shadow-2xl w-full max-w-2xl pointer-events-auto flex flex-col max-h-[85vh] overflow-hidden">
@@ -1834,7 +1856,7 @@
     </div>
 
     <!-- Set Budget Modal -->
-    <div id="setBudgetModal" class="fixed inset-0 z-50 hidden">
+    <div id="setBudgetModal" class="fixed inset-0 z-50 hidden" role="dialog" aria-modal="true" aria-label="Set Budget">
         <div class="absolute inset-0 bg-black/40" onclick="closeSetBudgetModal()"></div>
         <div class="absolute inset-y-0 right-0 w-full max-w-md bg-card border-l border-border shadow-xl overflow-y-auto">
             <div class="p-4">

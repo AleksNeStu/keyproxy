@@ -572,14 +572,16 @@
             if (body.classList.contains('dark')) {
                 body.classList.remove('dark');
                 themeToggle.classList.remove('dark');
+                themeToggle.setAttribute('aria-checked', 'false');
                 localStorage.setItem('theme', 'light');
             } else {
                 body.classList.add('dark');
                 themeToggle.classList.add('dark');
+                themeToggle.setAttribute('aria-checked', 'true');
                 localStorage.setItem('theme', 'dark');
             }
         }
-        
+
         // Initialize theme from localStorage
         function initializeTheme() {
             const savedTheme = localStorage.getItem('theme');
@@ -591,6 +593,7 @@
                 body.classList.add('dark');
                 if (themeToggle) {
                     themeToggle.classList.add('dark');
+                    themeToggle.setAttribute('aria-checked', 'true');
                 }
             }
         }
@@ -5036,6 +5039,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 btn.classList.remove('active');
                 btn.classList.add('text-muted-foreground');
                 btn.classList.remove('text-foreground', 'border-primary');
+                btn.setAttribute('aria-selected', 'false');
             });
 
             // Show selected tab
@@ -5045,6 +5049,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             const activeBtn = document.querySelector(`[data-tab="${tabName}"]`);
             activeBtn.classList.add('active', 'text-foreground', 'border-primary');
             activeBtn.classList.remove('text-muted-foreground');
+            activeBtn.setAttribute('aria-selected', 'true');
 
             // Stop recovery poller when switching away from relevant tabs
             stopRecoveryPoller();
@@ -5445,13 +5450,37 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         document.addEventListener('DOMContentLoaded', function() {
             // Initialize theme
             initializeTheme();
-            
+
             const activeTab = document.querySelector('.tab-btn.active');
             if (activeTab) {
                 activeTab.classList.add('text-foreground', 'border-primary');
                 activeTab.classList.remove('text-muted-foreground');
             }
-            
+
+            // Keyboard navigation for tab list
+            const tabList = document.querySelector('[role="tablist"]');
+            if (tabList) {
+                tabList.addEventListener('keydown', function(e) {
+                    const tabs = Array.from(tabList.querySelectorAll('[role="tab"]'));
+                    const current = tabs.findIndex(t => t.getAttribute('aria-selected') === 'true');
+                    let next = -1;
+                    if (e.key === 'ArrowRight' || e.key === 'ArrowDown') {
+                        next = (current + 1) % tabs.length;
+                    } else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') {
+                        next = (current - 1 + tabs.length) % tabs.length;
+                    } else if (e.key === 'Home') {
+                        next = 0;
+                    } else if (e.key === 'End') {
+                        next = tabs.length - 1;
+                    }
+                    if (next >= 0) {
+                        e.preventDefault();
+                        tabs[next].focus();
+                        tabs[next].click();
+                    }
+                });
+            }
+
             // Initialize provider preview
             updateProviderPreview();
             
