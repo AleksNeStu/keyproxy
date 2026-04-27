@@ -242,6 +242,23 @@ class ProxyServer {
       return;
     }
 
+    
+    if (req.url === '/css/admin.css' && (req.method === 'GET' || req.method === 'HEAD')) {
+      try {
+        const filePath = path.join(process.cwd(), 'public', 'css', 'admin.css');
+        if (req.method === 'HEAD') {
+          const stats = fs.statSync(filePath);
+          res.writeHead(200, { 'Content-Type': 'text/css', 'Content-Length': stats.size, 'Cache-Control': 'public, max-age=86400' });
+          res.end();
+        } else {
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, { 'Content-Type': 'text/css', 'Content-Length': Buffer.byteLength(fileContent), 'Cache-Control': 'public, max-age=86400' });
+          res.end(fileContent);
+        }
+      } catch { res.writeHead(404); res.end(); }
+      return;
+    }
+
     // Handle preflight OPTIONS requests
     if (req.method === 'OPTIONS') {
       res.writeHead(204);
@@ -312,6 +329,23 @@ class ProxyServer {
         res.writeHead(404, { 'Content-Type': 'text/plain' });
         res.end('File not found');
       }
+      return;
+    }
+
+    
+    if (req.url === '/css/admin.css' && (req.method === 'GET' || req.method === 'HEAD')) {
+      try {
+        const filePath = path.join(process.cwd(), 'public', 'css', 'admin.css');
+        if (req.method === 'HEAD') {
+          const stats = fs.statSync(filePath);
+          res.writeHead(200, { 'Content-Type': 'text/css', 'Content-Length': stats.size, 'Cache-Control': 'public, max-age=86400' });
+          res.end();
+        } else {
+          const fileContent = fs.readFileSync(filePath, 'utf8');
+          res.writeHead(200, { 'Content-Type': 'text/css', 'Content-Length': Buffer.byteLength(fileContent), 'Cache-Control': 'public, max-age=86400' });
+          res.end(fileContent);
+        }
+      } catch { res.writeHead(404); res.end(); }
       return;
     }
 
