@@ -3142,9 +3142,15 @@
             if (saveText) saveText.textContent = originalText;
             if (checkIcon) checkIcon.classList.remove('hidden');
             if (spinnerIcon) spinnerIcon.classList.add('hidden');
-            } // end try
+            } catch (error) {
+                showErrorToast(`Failed to add provider: ${error.message}`);
+                if (saveBtn) saveBtn.disabled = false;
+                if (saveText) saveText.textContent = originalText;
+                if (checkIcon) checkIcon.classList.remove('hidden');
+                if (spinnerIcon) spinnerIcon.classList.add('hidden');
+            }
         }
-        
+
         function validateNewProviderField(field) {
             const name = document.getElementById('newProviderName').value.trim();
             const apiType = document.getElementById('newProviderApiType').value;
