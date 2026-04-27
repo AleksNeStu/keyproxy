@@ -2227,6 +2227,18 @@
 
 
     <script>
+        // XSS protection — escape user-controlled data before injecting into HTML
+        function escapeHtml(str) {
+            if (str == null) return '';
+            const s = String(str);
+            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+        // Escape for use inside onclick="func('...')" — HTML attr + JS string literal
+        function safeJsAttr(str) {
+            if (str == null) return '';
+            return String(str).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+        }
+
         let envVars = {};
         let defaultStatusCodes = '429';
 
@@ -2450,7 +2462,7 @@
                 // Add dismiss button for each notification
                 div.innerHTML = `
                     ${notification.iconSvg}
-                    <span class="flex-1">${notification.message}</span>
+                    <span class="flex-1">${escapeHtml(notification.message)}</span>
                     <span class="text-xs opacity-75">${new Date(notification.timestamp).toLocaleTimeString()}</span>
                     <button onclick="hideNotification(${notification.id})" class="flex-shrink-0 text-muted-foreground hover:text-foreground transition-colors p-1" title="Dismiss">
                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3521,7 +3533,7 @@
 
                 return `
                     <div class="config-env-item flex items-center gap-2 p-2 rounded bg-card border border-border hover:border-border transition-colors ${disabledClass}"
-                         data-env-name="${file.name}" data-priority="${file.priority}">
+                         data-env-name="${escapeHtml(file.name)}" data-priority="${file.priority}">
                         <!-- Drag Handle -->
                         <div class="cursor-grab active:cursor-grabbing p-1 text-muted-foreground hover:text-foreground" title="Drag to reorder">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -3535,7 +3547,7 @@
                         <!-- File Info -->
                         <div class="flex-1 min-w-0">
                             <div class="flex items-center gap-2">
-                                <span class="text-sm font-medium text-foreground truncate">${file.name}</span>
+                                <span class="text-sm font-medium text-foreground truncate">${escapeHtml(file.name)}</span>
                                 ${file.disabled ? '<span class="px-1.5 py-0.5 text-xs bg-muted text-muted-foreground rounded-full">Disabled</span>' : '<span class="px-1.5 py-0.5 text-xs bg-green-500/20 text-green-400 rounded-full">Loaded</span>'}
                             </div>
                             <div class="text-xs text-muted-foreground truncate" title="${file.path}">${file.path}</div>
@@ -3843,11 +3855,8 @@
             }
         }
 
-        function escapeHtml(str) {
-            const div = document.createElement('div');
-            div.textContent = str;
-            return div.innerHTML;
-        }
+        // escapeHtml moved to top of script block
+
 
         let originalValues = {};
         let keyUsageData = {};
@@ -4120,20 +4129,27 @@
                 const providerCollapseId = `${provider.apiType}_${provider.name}`;
                 const providerCategory = getProviderCategory(provider.name);
                 const categoryBadgeHtml = providerCategory ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded category-badge-${providerCategory}">${providerCategory.toUpperCase()}</span> ` : '';
+                // Pre-computed safe values for XSS prevention
+                const _pn = escapeHtml(provider.name);
+                const _pa = escapeHtml(provider.apiType);
+                const _jn = safeJsAttr(provider.name);
+                const _ja = safeJsAttr(provider.apiType);
+                const _pc = escapeHtml(providerCollapseId);
+                const _jc = safeJsAttr(providerCollapseId);
 
                 providerDiv.innerHTML = `
                     <div class="space-y-4${isProviderDisabled ? ' opacity-60' : ''}">
                         <!-- Header with provider name and actions -->
-                        <div class="flex items-center justify-between cursor-pointer select-none provider-header" onclick="toggleProviderCollapse('${providerCollapseId}')">
+                        <div class="flex items-center justify-between cursor-pointer select-none provider-header" onclick="toggleProviderCollapse('${_jc}')">
                             <div class="flex items-center space-x-3">
                                 <svg id="provider-chevron-${providerCollapseId}" class="w-4 h-4 text-muted-foreground transition-transform duration-200 provider-chevron" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
                                 <label class="toggle-switch" title="${isProviderDisabled ? 'Enable provider' : 'Disable provider'}" onclick="event.stopPropagation()">
-                                    <input type="checkbox" ${!isProviderDisabled ? 'checked' : ''} onchange="toggleProvider('${provider.apiType}', '${provider.name}', !this.checked)">
+                                    <input type="checkbox" ${!isProviderDisabled ? 'checked' : ''} onchange="toggleProvider('${_ja}', '${_jn}', !this.checked)">
                                     <span class="toggle-slider"></span>
                                 </label>
-                                <div id="provider-name-${provider.apiType}-${provider.name}" class="flex items-center gap-1.5">
-                                    <h4 class="text-sm font-medium text-foreground">${provider.name} ${categoryBadgeHtml}${isProviderDisabled ? '<span class="text-xs text-destructive font-normal">(disabled)</span>' : ''}</h4>
-                                    <button onclick="event.stopPropagation(); startRenameProvider('${provider.apiType}', '${provider.name}')" class="transition-colors p-0.5 text-muted-foreground hover:text-foreground" title="Rename provider">
+                                <div id="provider-name-${_pa}-${_pn}" class="flex items-center gap-1.5">
+                                    <h4 class="text-sm font-medium text-foreground">${_pn} ${categoryBadgeHtml}${isProviderDisabled ? '<span class="text-xs text-destructive font-normal">(disabled)</span>' : ''}</h4>
+                                    <button onclick="event.stopPropagation(); startRenameProvider('${_ja}', '${_jn}')" class="transition-colors p-0.5 text-muted-foreground hover:text-foreground" title="Rename provider">
                                         <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
                                     </button>
                                 </div>
@@ -4141,37 +4157,37 @@
                             </div>
                             <div class="flex items-center space-x-1.5" onclick="event.stopPropagation()">
                                 <button
-                                    onclick="copyAgentContext('${provider.apiType}', '${provider.name}')"
+                                    onclick="copyAgentContext('${_ja}', '${_jn}')"
                                     class="btn btn-secondary px-2 py-1 text-xs font-medium"
                                     title="Copy agent context"
                                 >
                                     <svg class="w-3.5 h-3.5 inline mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Agent
                                 </button>
                                 <button
-                                    onclick="copyActiveKey('${provider.apiType}', '${provider.name}')"
+                                    onclick="copyActiveKey('${_ja}', '${_jn}')"
                                     class="btn btn-secondary px-2 py-1 text-xs font-medium"
                                     title="Copy active API key (raw value)"
                                 >Key</button>
                                 <button
-                                    onclick="copyProviderCurl('${provider.apiType}', '${provider.name}', 'completions')"
+                                    onclick="copyProviderCurl('${_ja}', '${_jn}', 'completions')"
                                     class="btn btn-secondary px-2 py-1 text-xs font-medium"
                                     title="Copy cURL command"
                                 >cURL</button>
                                 <button
-                                    onclick="copyProviderEnvVar('${provider.apiType}', '${provider.name}')"
+                                    onclick="copyProviderEnvVar('${_ja}', '${_jn}')"
                                     class="btn btn-secondary px-2 py-1 text-xs font-medium"
                                     title="Copy .env variables"
                                 >.env</button>
                                 <button
-                                    id="syncBtn_${provider.apiType}_${provider.name}"
-                                    onclick="toggleSyncEnv('${provider.apiType}', '${provider.name}')"
+                                    id="syncBtn_${_pa}_${_pn}"
+                                    onclick="toggleSyncEnv('${_ja}', '${_jn}')"
                                     class="transition-colors p-1 ${isProviderSyncOn(provider) ? 'text-green-500' : 'text-muted-foreground hover:text-foreground'}"
                                     title="${isProviderSyncOn(provider) ? 'Sync ON — click to disable' : 'Sync OFF — click to enable'}"
                                 >
                                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
                                 </button>
                                 <button
-                                    onclick="showDeleteProviderConfirmation('${provider.apiType}', '${provider.name}')"
+                                    onclick="showDeleteProviderConfirmation('${_ja}', '${_jn}')"
                                     class="text-destructive hover:text-destructive/80 transition-colors p-1"
                                     title="Delete Provider"
                                 >
@@ -4192,18 +4208,18 @@
                                 <div class="relative max-w-md">
                                     <input
                                         type="text"
-                                        id="defaultModel_${provider.apiType}_${provider.name}"
+                                        id="defaultModel_${_pa}_${_pn}"
                                         value="${provider.defaultModel || ''}"
                                         data-original="${provider.defaultModel || ''}"
                                         class="input-field w-full px-3 py-2 pr-20 text-xs rounded transition-colors"
                                         placeholder="${provider.apiType === 'openai' ? 'e.g., gpt-4o-mini' : 'e.g., gemini-1.5-flash'}"
-                                        oninput="checkForChanges('defaultModel', '${provider.apiType}', '${provider.name}')"
-                                        onkeypress="if(event.key === 'Enter') saveDefaultModel('${provider.apiType}', '${provider.name}')"
+                                        oninput="checkForChanges('defaultModel', '${_ja}', '${_jn}')"
+                                        onkeypress="if(event.key === 'Enter') saveDefaultModel('${_ja}', '${_jn}')"
                                         autocomplete="off"
                                     >
                                     <button
-                                        id="historyBtn_defaultModel_${provider.apiType}_${provider.name}"
-                                        onclick="toggleModelHistory('${provider.apiType}', '${provider.name}')"
+                                        id="historyBtn_defaultModel_${_pa}_${_pn}"
+                                        onclick="toggleModelHistory('${_ja}', '${_jn}')"
                                         class="absolute right-12 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
                                         title="Model History"
                                         ${(!provider.modelHistory || provider.modelHistory.length === 0) ? 'disabled style="opacity: 0.3; cursor: not-allowed; pointer-events: none;"' : ''}
@@ -4213,7 +4229,7 @@
                                         </svg>
                                     </button>
                                     <button
-                                        id="saveBtn_defaultModel_${provider.apiType}_${provider.name}"
+                                        id="saveBtn_defaultModel_${_pa}_${_pn}"
                                         ${defaultModelAction ? `onclick="${defaultModelAction}"` : ''}
                                         class="${defaultModelClass}"
                                         style="${defaultModelStyle}"
@@ -4221,17 +4237,17 @@
                                     >
                                         ${defaultModelButtonHtml}
                                     </button>
-                                    <div id="modelHistory_${provider.apiType}_${provider.name}" class="hidden absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg z-10 max-h-48 overflow-y-auto">
+                                    <div id="modelHistory_${_pa}_${_pn}" class="hidden absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg z-10 max-h-48 overflow-y-auto">
                                         ${(provider.modelHistory && provider.modelHistory.length > 0) ? provider.modelHistory.map(model => `
                                             <div class="flex items-center justify-between px-3 py-2 text-xs hover:bg-secondary transition-colors group">
                                                 <button
-                                                    onclick="selectModelFromHistory('${provider.apiType}', '${provider.name}', '${model.replace(/'/g, "&apos;")}')"
+                                                    onclick="selectModelFromHistory('${_ja}', '${_jn}', '${model.replace(/'/g, "&apos;")}')"
                                                     class="flex-1 text-left"
                                                 >
                                                     ${model}
                                                 </button>
                                                 <button
-                                                    onclick="showDeleteModelConfirmation(event, '${provider.apiType}', '${provider.name}', '${model.replace(/'/g, "&apos;")}')"
+                                                    onclick="showDeleteModelConfirmation(event, '${_ja}', '${_jn}', '${model.replace(/'/g, "&apos;")}')"
                                                     class="ml-2 text-muted-foreground hover:text-destructive transition-colors opacity-0 group-hover:opacity-100"
                                                     title="Remove from history"
                                                 >
@@ -4263,13 +4279,13 @@
                             }
                             
                             return `
-                        <div class="bg-muted/30 rounded-lg p-3 space-y-3" id="modelAccess_${provider.apiType}_${provider.name}">
+                        <div class="bg-muted/30 rounded-lg p-3 space-y-3" id="modelAccess_${_pa}_${_pn}">
                             <div class="flex items-center justify-between">
                                 <div class="text-xs font-medium text-muted-foreground uppercase tracking-wider">Model Access</div>
                                 <div class="flex items-center space-x-2">
                                     ${provider.allowedModels && provider.allowedModels.length > 0 ? `<span class="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400 border border-green-500/20">${provider.allowedModels.length} allowed</span>` : `<span class="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground border border-border">All models</span>`}
                                     <button
-                                        onclick="clearAllowedModels('${provider.apiType}', '${provider.name}')"
+                                        onclick="clearAllowedModels('${_ja}', '${_jn}')"
                                         class="text-[10px] px-1.5 py-0.5 rounded text-muted-foreground hover:text-foreground border border-border hover:border-foreground/20 transition-colors"
                                         title="Remove all model restrictions"
                                     >Clear</button>
@@ -4277,45 +4293,45 @@
                             </div>
                             <div class="flex items-center space-x-2">
                                 <button
-                                    onclick="fetchProviderModels('${provider.apiType}', '${provider.name}')"
-                                    id="fetchModelsBtn_${provider.apiType}_${provider.name}"
+                                    onclick="fetchProviderModels('${_ja}', '${_jn}')"
+                                    id="fetchModelsBtn_${_pa}_${_pn}"
                                     class="btn btn-secondary px-2.5 py-1.5 text-xs font-medium"
                                     title="Query provider API to discover available models"
                                 >
-                                    <svg class="w-3.5 h-3.5 inline mr-1 animate-spin hidden" id="fetchModelsSpinner_${provider.apiType}_${provider.name}" fill="none" viewBox="0 0 24 24">
+                                    <svg class="w-3.5 h-3.5 inline mr-1 animate-spin hidden" id="fetchModelsSpinner_${_pa}_${_pn}" fill="none" viewBox="0 0 24 24">
                                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                                     </svg>
-                                    <span id="fetchModelsBtnText_${provider.apiType}_${provider.name}">Fetch Models</span>
+                                    <span id="fetchModelsBtnText_${_pa}_${_pn}">Fetch Models</span>
                                 </button>
                                 <input
                                     type="text"
-                                    id="modelSearch_${provider.apiType}_${provider.name}"
+                                    id="modelSearch_${_pa}_${_pn}"
                                     placeholder="Filter models..."
                                     class="input-field flex-1 px-2 py-1.5 text-xs rounded transition-colors"
-                                    oninput="filterModelList('${provider.apiType}', '${provider.name}')"
+                                    oninput="filterModelList('${_ja}', '${_jn}')"
                                 >
                             </div>
-                            <div id="modelListContainer_${provider.apiType}_${provider.name}" class="hidden">
+                            <div id="modelListContainer_${_pa}_${_pn}" class="hidden">
                                 <div class="flex items-center justify-between mb-2">
-                                    <span class="text-[10px] text-muted-foreground" id="modelCount_${provider.apiType}_${provider.name}"></span>
+                                    <span class="text-[10px] text-muted-foreground" id="modelCount_${_pa}_${_pn}"></span>
                                     <div class="flex items-center space-x-2">
-                                        <button onclick="selectAllModels('${provider.apiType}', '${provider.name}')" class="text-[10px] text-primary hover:underline">Select All</button>
-                                        <button onclick="deselectAllModels('${provider.apiType}', '${provider.name}')" class="text-[10px] text-muted-foreground hover:underline">Deselect All</button>
+                                        <button onclick="selectAllModels('${_ja}', '${_jn}')" class="text-[10px] text-primary hover:underline">Select All</button>
+                                        <button onclick="deselectAllModels('${_ja}', '${_jn}')" class="text-[10px] text-muted-foreground hover:underline">Deselect All</button>
                                     </div>
                                 </div>
-                                <div id="modelList_${provider.apiType}_${provider.name}" class="max-h-48 overflow-y-auto space-y-0.5 border border-border rounded bg-background"></div>
+                                <div id="modelList_${_pa}_${_pn}" class="max-h-48 overflow-y-auto space-y-0.5 border border-border rounded bg-background"></div>
                                 <div class="mt-2 flex items-center justify-between">
-                                    <span class="text-[10px] text-muted-foreground" id="selectedModelCount_${provider.apiType}_${provider.name}">0 selected</span>
+                                    <span class="text-[10px] text-muted-foreground" id="selectedModelCount_${_pa}_${_pn}">0 selected</span>
                                     <button
-                                        onclick="saveAllowedModels('${provider.apiType}', '${provider.name}')"
+                                        onclick="saveAllowedModels('${_ja}', '${_jn}')"
                                         class="btn btn-primary px-3 py-1.5 text-xs font-medium"
                                     >Save Selection</button>
                                 </div>
                             </div>
                             ${provider.allowedModels && provider.allowedModels.length > 0 ? `
-                            <div class="flex flex-wrap gap-1" id="allowedModelsTags_${provider.apiType}_${provider.name}">
-                                ${provider.allowedModels.map(m => `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-primary/10 text-primary border border-primary/20">${escHtml(m)}</span>`).join('')}
+                            <div class="flex flex-wrap gap-1" id="allowedModelsTags_${_pa}_${_pn}">
+                                ${provider.allowedModels.map(m => `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-mono bg-primary/10 text-primary border border-primary/20">${escapeHtml(m)}</span>`).join('')}
                             </div>` : ''}
                         </div>`;
                         })()}
@@ -4425,7 +4441,7 @@
                                         badgeHtml = '<span class="key-badge badge-active">ACTIVE</span>';
                                     } else if (keyStatus === 'exhausted') {
                                         badgeHtml = `<span class="key-badge badge-exhausted">EXHAUSTED${rotationReason ? ' ' + rotationReason : ''}</span>
-                                               <span class="recovery-countdown text-xs text-amber-400" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Recovery status">...</span>`;
+                                               <span class="recovery-countdown text-xs text-amber-400" data-provider="${_pn}" data-fullkey="${keyVal}" title="Recovery status">...</span>`;
                                     } else if (keyStatus === 'verified') {
                                         badgeHtml = '<span class="key-badge badge-verified">VERIFIED</span>';
                                     } else if (keyStatus === 'failed') {
@@ -4458,18 +4474,18 @@
                                         ${badgeHtml}
                                         <!-- Reorder arrows -->
                                         <div class="flex flex-col">
-                                            <button onclick="moveKey('${provider.apiType}', '${provider.name}', ${keyIndex}, 'up')"
+                                            <button onclick="moveKey('${_ja}', '${_jn}', ${keyIndex}, 'up')"
                                                 class="text-muted-foreground hover:text-foreground p-0 leading-none${keyIndex === 0 ? ' invisible' : ''}" title="Move up">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7"/></svg>
                                             </button>
-                                            <button onclick="moveKey('${provider.apiType}', '${provider.name}', ${keyIndex}, 'down')"
+                                            <button onclick="moveKey('${_ja}', '${_jn}', ${keyIndex}, 'down')"
                                                 class="text-muted-foreground hover:text-foreground p-0 leading-none${keyIndex === provider.keys.length - 1 ? ' invisible' : ''}" title="Move down">
                                                 <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                                             </button>
                                         </div>
                                         <!-- Toggle key -->
                                         <label class="toggle-switch toggle-sm" title="${isKeyDisabled ? 'Enable key' : 'Disable key'}">
-                                            <input type="checkbox" ${!isKeyDisabled ? 'checked' : ''} onchange="toggleKey('${provider.apiType}', '${provider.name}', ${keyIndex}, !this.checked)">
+                                            <input type="checkbox" ${!isKeyDisabled ? 'checked' : ''} onchange="toggleKey('${_ja}', '${_jn}', ${keyIndex}, !this.checked)">
                                             <span class="toggle-slider"></span>
                                         </label>
                                         <!-- Key value -->
@@ -4484,19 +4500,19 @@
                                         </button>
                                         <!-- Usage count + rotation count + RPM + Expiry -->
                                         <span class="text-xs text-muted-foreground whitespace-nowrap" title="Times used${rotationCount > 0 ? ' / Rotations: ' + rotationCount : ''}">${usageDisplay} uses${rotationCount > 0 ? ' / ' + rotationCount + ' rot' : ''}</span>
-                                        <span class="rpm-badge text-xs px-1.5 py-0.5 rounded" data-key="${maskedKey}" data-provider="${provider.apiType}" title="Requests per minute">--rpm</span>
-                                        <span class="expiry-badge expiry-none expiry-slot" data-key="${maskedKey}" data-maskedkey="${keyVal.length >= 8 ? keyVal.substring(0, 4) + '...' + keyVal.slice(-4) : keyVal}" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Key TTL">${usageEntry?.expiry ? formatExpiry(usageEntry.expiry) : '—'}</span>
-                                        ${usageEntry?.expiry ? `<button onclick="extendKeyTtl('${provider.name}', this)" class="btn btn-extend px-2 py-1 text-xs font-medium" data-provider="${provider.name}" data-fullkey="${keyVal}" title="Reset key TTL timer">Extend</button>` : ''}
+                                        <span class="rpm-badge text-xs px-1.5 py-0.5 rounded" data-key="${maskedKey}" data-provider="${_pa}" title="Requests per minute">--rpm</span>
+                                        <span class="expiry-badge expiry-none expiry-slot" data-key="${maskedKey}" data-maskedkey="${keyVal.length >= 8 ? keyVal.substring(0, 4) + '...' + keyVal.slice(-4) : keyVal}" data-provider="${_pn}" data-fullkey="${keyVal}" title="Key TTL">${usageEntry?.expiry ? formatExpiry(usageEntry.expiry) : '—'}</span>
+                                        ${usageEntry?.expiry ? `<button onclick="extendKeyTtl('${_jn}', this)" class="btn btn-extend px-2 py-1 text-xs font-medium" data-provider="${_pn}" data-fullkey="${keyVal}" title="Reset key TTL timer">Extend</button>` : ''}
                                         ${keyStatus === 'frozen'
-                                            ? `<button onclick="unfreezeKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid rgba(139,92,246,0.3)" title="Manually unfreeze this key">Unfreeze</button>
-                                               <button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
+                                            ? `<button onclick="unfreezeKey('${_jn}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(139,92,246,0.15);color:#8b5cf6;border:1px solid rgba(139,92,246,0.3)" title="Manually unfreeze this key">Unfreeze</button>
+                                               <button onclick="testProviderKey('${_ja}', '${_jn}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
                                             : keyStatus === 'exhausted'
-                                            ? `<button onclick="testAndRecoverKey('${provider.name}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">Test & Reset</button>
-                                               <button onclick="forceProbeKey('${provider.name}', '${keyVal}', this)" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3)" title="Force immediate recovery probe">Force Probe</button>`
-                                            : `<button onclick="testProviderKey('${provider.apiType}', '${provider.name}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
+                                            ? `<button onclick="testAndRecoverKey('${_jn}', '${keyVal}')" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(234,179,8,0.15);color:#eab308;border:1px solid rgba(234,179,8,0.3)">Test & Reset</button>
+                                               <button onclick="forceProbeKey('${_jn}', '${keyVal}', this)" class="btn px-2 py-1 text-xs font-medium" style="background:rgba(59,130,246,0.15);color:#3b82f6;border:1px solid rgba(59,130,246,0.3)" title="Force immediate recovery probe">Force Probe</button>`
+                                            : `<button onclick="testProviderKey('${_ja}', '${_jn}', '${keyVal}', ${keyIndex})" class="btn btn-secondary px-2 py-1 text-xs font-medium">Test</button>`
                                         }
                                         <button
-                                            onclick="showDeleteKeyConfirmation('${provider.apiType}', '${provider.name}', ${keyIndex})"
+                                            onclick="showDeleteKeyConfirmation('${_ja}', '${_jn}', ${keyIndex})"
                                             class="btn btn-destructive px-2 py-1 text-xs font-medium"
                                             title="Delete Key"
                                         >
@@ -4507,27 +4523,27 @@
                                 <div class="flex items-center space-x-2 mt-2 pt-2 border-t border-border">
                                     <input 
                                         type="text" 
-                                        id="newKey_${provider.apiType}_${provider.name}" 
+                                        id="newKey_${_pa}_${_pn}" 
                                         class="input-field flex-1 px-2 py-1 text-xs rounded transition-colors" 
                                         placeholder="Enter new API key"
                                     >
                                     <button 
-                                        onclick="testProviderNewKey('${provider.apiType}', '${provider.name}')" 
+                                        onclick="testProviderNewKey('${_ja}', '${_jn}')" 
                                         class="btn btn-secondary px-2 py-1 text-xs font-medium"
                                     >
                                         Test
                                     </button>
                                     <button 
-                                        onclick="saveProviderKey('${provider.apiType}', '${provider.name}')" 
+                                        onclick="saveProviderKey('${_ja}', '${_jn}')" 
                                         class="btn btn-primary px-2 py-1 text-xs font-medium"
                                     >
                                         Test & Save
                                     </button>
                                 </div>
-                                <div id="newKeyResult_${provider.apiType}_${provider.name}" class="mt-2"></div>
+                                <div id="newKeyResult_${_pa}_${_pn}" class="mt-2"></div>
                                 <!-- Reset History Button -->
                                 <div class="flex justify-end mt-1">
-                                    <button onclick="resetKeyHistory('${provider.name}')" class="text-xs text-muted-foreground hover:text-foreground underline" title="Clear rotation history for this provider">Reset History</button>
+                                    <button onclick="resetKeyHistory('${_jn}')" class="text-xs text-muted-foreground hover:text-foreground underline" title="Clear rotation history for this provider">Reset History</button>
                                 </div>
                             </div>
                             </div>
@@ -4986,7 +5002,7 @@
             const keyCount = [...keyInputs].filter(i => i.value.trim()).length;
             const keyLabel = keyCount === 0 ? '<span class="text-muted-foreground">no keys yet</span>' : `<span class="text-primary">${keyCount} key${keyCount > 1 ? 's' : ''}</span>`;
 
-            previewElement.innerHTML = `<span class="text-primary font-bold">${envVarName}</span>=<span class="text-foreground">${keyLabel}</span>` +
+            previewElement.innerHTML = `<span class="text-primary font-bold">${escapeHtml(envVarName)}</span>=<span class="text-foreground">${escapeHtml(keyLabel)}</span>` +
                 (baseUrl ? ` &nbsp; <span class="text-muted-foreground">${envVarName.replace('_API_KEYS', '_BASE_URL')}=${effectiveUrl}</span>` : '');
         }
 
@@ -5410,7 +5426,7 @@
             const dialog = document.getElementById('confirmDialog');
             const message = document.getElementById('confirmMessage');
 
-            message.innerHTML = `Delete provider '${providerName}'?<br><br><span class="text-amber-500 text-xs">This removes the provider from the running configuration. Keys will still exist in your .env file and will reappear on next Reload Config. To permanently remove them, edit your .env file manually.</span>`;
+            message.innerHTML = `Delete provider '${escapeHtml(providerName)}'?<br><br><span class="text-amber-500 text-xs">This removes the provider from the running configuration. Keys will still exist in your .env file and will reappear on next Reload Config. To permanently remove them, edit your .env file manually.</span>`;
             
             // Set up the confirm button to call the actual delete function
             const confirmBtn = dialog.querySelector('button[onclick="confirmDelete()"]');
@@ -6143,10 +6159,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 return `
                     <label class="flex items-center justify-between px-2.5 py-1.5 hover:bg-secondary transition-colors cursor-pointer rounded">
                         <div class="flex items-center space-x-2 min-w-0">
-                            <input type="checkbox" class="model-checkbox flex-shrink-0" data-model="${escHtml(m.id)}" ${checked ? 'checked' : ''}>
-                            <span class="text-xs font-mono truncate" title="${escHtml(m.id)}">${escHtml(m.display_name || m.id)}</span>
+                            <input type="checkbox" class="model-checkbox flex-shrink-0" data-model="${escapeHtml(m.id)}" ${checked ? 'checked' : ''}>
+                            <span class="text-xs font-mono truncate" title="${escapeHtml(m.id)}">${escapeHtml(m.display_name || m.id)}</span>
                         </div>
-                        ${m.id !== m.display_name ? `<span class="text-[10px] text-muted-foreground font-mono flex-shrink-0 ml-2">${escHtml(m.id)}</span>` : ''}
+                        ${m.id !== m.display_name ? `<span class="text-[10px] text-muted-foreground font-mono flex-shrink-0 ml-2">${escapeHtml(m.id)}</span>` : ''}
                     </label>`;
             }).join('');
 
@@ -6497,7 +6513,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             const dialog = document.getElementById('confirmDialog');
             const message = document.getElementById('confirmMessage');
 
-            message.innerHTML = `Remove this API key from provider '${providerName}'?<br><br><span class="text-amber-500 text-xs">This removes the key from the running configuration. The key will still exist in your .env file and will reappear on next Reload Config. To permanently remove it, edit your .env file manually.</span>`;
+            message.innerHTML = `Remove this API key from provider '${escapeHtml(providerName)}'?<br><br><span class="text-amber-500 text-xs">This removes the key from the running configuration. The key will still exist in your .env file and will reappear on next Reload Config. To permanently remove it, edit your .env file manually.</span>`;
             
             // Set up the confirm button to call the actual delete function
             const confirmBtn = dialog.querySelector('button[onclick="confirmDelete()"]');
@@ -6521,17 +6537,17 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 <div class="flex items-center space-x-2">
                     <input
                         type="text"
-                        id="rename-input-${apiType}-${providerName}"
-                        value="${currentName}"
-                        data-original="${currentName}"
+                        id="rename-input-${escapeHtml(apiType)}-${escapeHtml(providerName)}"
+                        value="${escapeHtml(currentName)}"
+                        data-original="${escapeHtml(currentName)}"
                         class="px-2 py-1 text-sm border border-border rounded bg-input text-foreground"
                         style="width: 150px;"
-                        oninput="handleProviderNameInput(this, '${apiType}', '${providerName}')"
-                        onkeydown="handleRenameKeyPress(event, '${apiType}', '${providerName}')"
+                        oninput="handleProviderNameInput(this, '${safeJsAttr(apiType)}', '${safeJsAttr(providerName)}')"
+                        onkeydown="handleRenameKeyPress(event, '${safeJsAttr(apiType)}', '${safeJsAttr(providerName)}')"
                     />
                     <button
-                        id="rename-save-btn-${apiType}-${providerName}"
-                        onclick="confirmRenameProvider('${apiType}', '${providerName}')"
+                        id="rename-save-btn-${escapeHtml(apiType)}-${escapeHtml(providerName)}"
+                        onclick="confirmRenameProvider('${safeJsAttr(apiType)}', '${safeJsAttr(providerName)}')"
                         class="text-muted-foreground hover:text-foreground p-0.5"
                         title="Save name"
                     >
@@ -6949,10 +6965,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 if (result.success) {
                     resultDiv.innerHTML = '<div class="bg-green-50 border border-green-200 text-green-800 px-3 py-2 rounded-md text-sm mt-3 flex items-center space-x-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg><span>API key is valid!</span></div>';
                 } else {
-                    resultDiv.innerHTML = `<div class="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md text-sm mt-3 flex items-center space-x-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg><span>${result.error}</span></div>`;
+                    resultDiv.innerHTML = `<div class="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md text-sm mt-3 flex items-center space-x-2"><svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg><span>${escapeHtml(result.error)}</span></div>`;
                 }
             } catch (error) {
-                resultDiv.innerHTML = `<div class="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md text-sm mt-3">Test failed: ${error.message}</div>`;
+                resultDiv.innerHTML = `<div class="bg-destructive/10 border border-destructive/20 text-destructive px-3 py-2 rounded-md text-sm mt-3">Test failed: ${escapeHtml(error.message)}</div>`;
             }
         }
         
@@ -7107,7 +7123,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     }).join('\n');
                 }
                 
-                logsContainer.innerHTML = processedLogs || 'No logs available';
+                logsContainer.innerHTML = escapeHtml(processedLogs) || 'No logs available';
 
                 // Latest logs are already at top, scroll to top
                 logsContainer.scrollTop = 0;
@@ -7966,27 +7982,27 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
 
             row.innerHTML = `
                 <td class="py-2 px-3">
-                    <div class="font-medium">${provider.name}</div>
+                    <div class="font-medium">${escapeHtml(provider.name)}</div>
                     <div class="text-xs text-muted-foreground">${provider.disabled ? '(disabled)' : ''}</div>
                 </td>
                 <td class="py-2 px-3">
-                    <span class="text-xs font-mono bg-muted/30 rounded px-2 py-1">${provider.apiType.toUpperCase()}</span>
+                    <span class="text-xs font-mono bg-muted/30 rounded px-2 py-1">${escapeHtml(provider.apiType.toUpperCase())}</span>
                 </td>
                 <td class="py-2 px-3">
-                    <div class="font-mono text-xs bg-muted/30 rounded px-2 py-1 max-w-xs truncate" title="${provider.baseUrl || 'Using Default URL'}">
-                        ${provider.baseUrl || 'Using Default URL'}
+                    <div class="font-mono text-xs bg-muted/30 rounded px-2 py-1 max-w-xs truncate" title="${escapeHtml(provider.baseUrl || 'Using Default URL')}">
+                        ${escapeHtml(provider.baseUrl || 'Using Default URL')}
                     </div>
                 </td>
                 <td class="py-2 px-3">
-                    <div class="font-mono text-xs bg-primary/10 text-primary rounded px-2 py-1 max-w-xs truncate" title="${endpointUrl}">
-                        ${endpointUrl}
+                    <div class="font-mono text-xs bg-primary/10 text-primary rounded px-2 py-1 max-w-xs truncate" title="${escapeHtml(endpointUrl)}">
+                        ${escapeHtml(endpointUrl)}
                     </div>
                 </td>
                 <td class="py-2 px-3">
-                    <span class="font-mono text-xs bg-muted/30 rounded px-2 py-1 text-primary">${expectedPattern}</span>
+                    <span class="font-mono text-xs bg-muted/30 rounded px-2 py-1 text-primary">${escapeHtml(expectedPattern)}</span>
                 </td>
                 <td class="py-2 px-3 text-center">
-                    <button onclick="copyToClipboard('${expectedPattern}')" class="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors">Copy</button>
+                    <button onclick="copyToClipboard('${safeJsAttr(expectedPattern)}')" class="text-xs px-2 py-1 rounded bg-blue-500/10 text-blue-500 hover:bg-blue-500/20 transition-colors">Copy</button>
                 </td>
             `;
             tbody.appendChild(row);
@@ -8083,11 +8099,11 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             } else {
                 list.innerHTML = entries.map(([from, to]) =>
                     `<div class="flex items-center gap-2 bg-muted/30 rounded-md px-3 py-2 text-sm">
-                        <span class="font-medium">${esc(from)}</span>
+                        <span class="font-medium">${escapeHtml(from)}</span>
                         <span class="text-muted-foreground">&rarr;</span>
-                        <span class="font-medium">${esc(to.provider)}</span>
-                        ${to.model ? `<span class="text-xs text-muted-foreground">(model: ${esc(to.model)})</span>` : ''}
-                        <button onclick="removeFallback('${esc(from)}')" class="ml-auto text-red-400 hover:text-red-300 text-xs">Remove</button>
+                        <span class="font-medium">${escapeHtml(to.provider)}</span>
+                        ${to.model ? `<span class="text-xs text-muted-foreground">(model: ${escapeHtml(to.model)})</span>` : ''}
+                        <button onclick="removeFallback('${escapeHtml(from)}')" class="ml-auto text-red-400 hover:text-red-300 text-xs">Remove</button>
                     </div>`
                 ).join('');
             }
@@ -8174,8 +8190,8 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 return '<option value="' + s + '"' + (s === cfg.strategy ? ' selected' : '') + '>' + s + '</option>';
             }).join('');
             return '<div class="flex items-center gap-3 bg-muted/30 rounded-md px-3 py-2">' +
-                '<span class="font-medium text-sm flex-1">' + esc(name) + '</span>' +
-                '<select onchange="saveLbStrategy(\'' + esc(name) + '\', this.value)" class="input-field px-2 py-1 rounded-md text-xs">' +
+                '<span class="font-medium text-sm flex-1">' + escapeHtml(name) + '</span>' +
+                '<select onchange="saveLbStrategy(\'' + escapeHtml(name) + '\', this.value)" class="input-field px-2 py-1 rounded-md text-xs">' +
                 opts + '</select></div>';
         }).join('');
 
@@ -8189,14 +8205,14 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             var cfg = lbStrategyData[name];
             var weightRows = cfg.weights.map(function(w, i) {
                 return '<div class="flex items-center gap-2">' +
-                    '<span class="text-xs text-muted-foreground font-mono flex-1 truncate">' + esc(w.maskedKey) + '</span>' +
+                    '<span class="text-xs text-muted-foreground font-mono flex-1 truncate">' + escapeHtml(w.maskedKey) + '</span>' +
                     '<input type="range" min="1" max="10" value="' + w.weight + '" class="w-20 accent-primary"' +
                     ' oninput="this.nextElementSibling.textContent=this.value"' +
-                    ' onchange="saveLbWeight(\'' + esc(name) + '\', ' + i + ', this.value)">' +
+                    ' onchange="saveLbWeight(\'' + escapeHtml(name) + '\', ' + i + ', this.value)">' +
                     '<span class="text-xs font-medium w-4 text-center">' + w.weight + '</span></div>';
             }).join('');
             return '<div class="bg-muted/30 rounded-md px-3 py-2">' +
-                '<p class="text-xs font-medium text-foreground mb-1">' + esc(name) + ' — Key Weights</p>' +
+                '<p class="text-xs font-medium text-foreground mb-1">' + escapeHtml(name) + ' — Key Weights</p>' +
                 '<div class="space-y-1.5">' + weightRows + '</div></div>';
         }).join('');
     }
@@ -8387,13 +8403,13 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             <div class="flex items-center gap-3 p-2 rounded bg-card border border-border hover:border-primary/30 transition-colors">
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
-                        <span class="text-sm font-medium text-foreground">${source.name}</span>
+                        <span class="text-sm font-medium text-foreground">${escapeHtml(source.name)}</span>
                         <span class="text-xs ${statusColor}">${statusText}</span>
                     </div>
-                    <div class="text-xs text-muted-foreground truncate" title="${source.filePath}">${source.filePath}</div>
+                    <div class="text-xs text-muted-foreground truncate" title="${escapeHtml(source.filePath)}">${escapeHtml(source.filePath)}</div>
                 </div>
-                <button onclick="previewPullEnvSource('${source.id}')" class="btn btn-primary px-3 py-1 text-xs">Pull</button>
-                <button onclick="removeEnvSource('${source.id}')" class="p-1.5 hover:bg-red-500/10 text-red-500 rounded transition-colors" title="Remove source">
+                <button onclick="previewPullEnvSource('${safeJsAttr(source.id)}')" class="btn btn-primary px-3 py-1 text-xs">Pull</button>
+                <button onclick="removeEnvSource('${safeJsAttr(source.id)}')" class="p-1.5 hover:bg-red-500/10 text-red-500 rounded transition-colors" title="Remove source">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
             </div>`;
@@ -8470,15 +8486,16 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             const keysDiv = document.getElementById('envSourcePreviewKeys');
             const keyEntries = Object.entries(data.newKeys);
             keysDiv.innerHTML = keyEntries.map(([key, value]) => {
+            const _ek = escapeHtml(key); const _ev = escapeHtml(value);
                 const isKeyList = key.endsWith('_API_KEYS');
                 const count = isKeyList ? value.split(',').filter(Boolean).length : 1;
                 const display = isKeyList
                     ? value.split(',').map(k => k.trim()).map(k => k.length > 20 ? k.substring(0, 8) + '...' + k.substring(k.length - 4) : k).join(', ')
                     : value;
                 return `<div class="flex items-center gap-2 p-1.5 rounded bg-muted/50">
-                    <span class="font-mono text-foreground">${key}</span>
+                    <span class="font-mono text-foreground">${_ek}</span>
                     <span class="text-muted-foreground">${isKeyList ? '(' + count + ' key' + (count > 1 ? 's' : '') + ')' : ''}</span>
-                    <span class="ml-auto font-mono text-muted-foreground truncate max-w-[50%]">${display}</span>
+                    <span class="ml-auto font-mono text-muted-foreground truncate max-w-[50%]">${escapeHtml(display)}</span>
                 </div>`;
             }).join('');
 
@@ -8501,7 +8518,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             });
             const data = await res.json();
             if (!res.ok) {
-                statusEl.innerHTML = '<span class="text-red-400">' + (data.error || 'Pull failed') + '</span>';
+                statusEl.innerHTML = '<span class="text-red-400">' + escapeHtml(data.error || 'Pull failed') + '</span>';
                 return;
             }
             cancelPullEnvSource();
@@ -8600,7 +8617,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 statusEl.innerHTML = '<span class="text-red-500 font-medium">Failed to save</span>';
             }
         } catch (err) {
-            statusEl.innerHTML = '<span class="text-red-500 font-medium">Error: ' + err.message + '</span>';
+            statusEl.innerHTML = '<span class="text-red-500 font-medium">Error: ' + escapeHtml(err.message) + '</span>';
         }
     }
 
@@ -8631,7 +8648,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             const data = await res.json();
             const select = document.getElementById('fsDriveSelect');
             if (select) {
-                select.innerHTML = data.drives.map(d => `<option value="${d.path}">${d.name}</option>`).join('');
+                select.innerHTML = data.drives.map(d => `<option value="${escapeHtml(d.path)}">${escapeHtml(d.name)}</option>`).join('');
                 
                 // Select current drive
                 if (currentFsPath) {
@@ -8767,7 +8784,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 const inK = (p.estimatedInputTokens / 1000).toFixed(1);
                 const outK = (p.estimatedOutputTokens / 1000).toFixed(1);
                 return `<tr class="border-b border-border/50">
-                    <td class="py-2 pr-4 font-medium">${esc(name)}</td>
+                    <td class="py-2 pr-4 font-medium">${escapeHtml(name)}</td>
                     <td class="text-right py-2 pr-4">${p.requests.toLocaleString()}</td>
                     <td class="text-right py-2 pr-4 ${p.errors > 0 ? 'text-red-500' : ''}">${p.errors}</td>
                     <td class="text-right py-2 pr-4">${avgLat}ms</td>
@@ -8783,7 +8800,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             keysBody.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-muted-foreground">No data yet</td></tr>';
         } else {
             keysBody.innerHTML = data.topKeys.map(k => `<tr class="border-b border-border/50">
-                <td class="py-2 pr-4 font-mono text-xs">${esc(k.key)}</td>
+                <td class="py-2 pr-4 font-mono text-xs">${escapeHtml(k.key)}</td>
                 <td class="text-right py-2 pr-4">${k.requests.toLocaleString()}</td>
                 <td class="text-right py-2 pr-4 ${k.errors > 0 ? 'text-red-500' : ''}">${k.errors}</td>
                 <td class="text-right py-2">$${k.estimatedCost.toFixed(4)}</td>
@@ -8797,7 +8814,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             modelBody.innerHTML = '<tr><td colspan="3" class="py-4 text-center text-muted-foreground">No data yet</td></tr>';
         } else {
             modelBody.innerHTML = modelEntries.map(([model, s]) => `<tr class="border-b border-border/50">
-                <td class="py-2 pr-4 font-mono text-xs">${esc(model)}</td>
+                <td class="py-2 pr-4 font-mono text-xs">${escapeHtml(model)}</td>
                 <td class="text-right py-2 pr-4">${s.requests.toLocaleString()}</td>
                 <td class="text-right py-2">$${s.estimatedCost.toFixed(4)}</td>
             </tr>`).join('');
@@ -9109,7 +9126,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         });
     }
 
-    function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+    // escapeHtml() replaced by global escapeHtml() at top of script
 
     // ─── Unified Status Loader (solves N+1 problem) ────────────────────────────
     
@@ -9346,11 +9363,11 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 : '<span class="key-badge badge-exhausted">DISABLED</span>';
 
             const providers = k.allowedProviders && k.allowedProviders.length > 0
-                ? k.allowedProviders.map(p => `<span class="key-badge" style="background:rgba(59,130,246,0.15);color:#3b82f6">${escHtml(p)}</span>`).join(' ')
+                ? k.allowedProviders.map(p => `<span class="key-badge" style="background:rgba(59,130,246,0.15);color:#3b82f6">${escapeHtml(p)}</span>`).join(' ')
                 : '<span class="text-xs text-muted-foreground">All</span>';
 
             const models = k.allowedModels && k.allowedModels.length > 0
-                ? `<span class="text-xs text-muted-foreground" title="${escHtml(k.allowedModels.join(', '))}">${escHtml(k.allowedModels.join(', '))}</span>`
+                ? `<span class="text-xs text-muted-foreground" title="${escapeHtml(k.allowedModels.join(', '))}">${escapeHtml(k.allowedModels.join(', '))}</span>`
                 : '<span class="text-xs text-muted-foreground">All</span>';
 
             const rpmLimit = k.rpmLimit > 0
@@ -9375,10 +9392,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
 
             return `<tr class="border-b border-border hover:bg-muted/20 transition-colors">
                 <td class="py-2.5 pr-3">
-                    <div class="font-medium text-foreground text-xs">${escHtml(k.name)}</div>
+                    <div class="font-medium text-foreground text-xs">${escapeHtml(k.name)}</div>
                     <div class="text-[10px] text-muted-foreground">Created ${new Date(k.createdAt).toLocaleDateString()}</div>
                 </td>
-                <td class="py-2.5 pr-3"><code class="text-xs font-mono text-muted-foreground">${escHtml(k.tokenPrefix)}...</code></td>
+                <td class="py-2.5 pr-3"><code class="text-xs font-mono text-muted-foreground">${escapeHtml(k.tokenPrefix)}...</code></td>
                 <td class="py-2.5 pr-3"><div class="flex flex-wrap gap-1">${providers}</div></td>
                 <td class="py-2.5 pr-3">${models}</td>
                 <td class="py-2.5 pr-3">${rpmLimit}</td>
@@ -9390,10 +9407,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 <td class="py-2.5 pr-3">${statusBadge}</td>
                 <td class="py-2.5">
                     <div class="flex items-center space-x-1">
-                        <button onclick="toggleVirtualKey('${k.id}')" class="btn btn-secondary px-2 py-1 text-[10px] font-medium" title="${k.enabled ? 'Disable' : 'Enable'}">
+                        <button onclick="toggleVirtualKey('${safeJsAttr(k.id)}')" class="btn btn-secondary px-2 py-1 text-[10px] font-medium" title="${k.enabled ? 'Disable' : 'Enable'}">
                             ${k.enabled ? 'Disable' : 'Enable'}
                         </button>
-                        <button onclick="showRevokeVirtualKeyConfirmation('${k.id}', '${escHtml(k.name)}')" class="btn btn-destructive px-2 py-1 text-[10px] font-medium" title="Revoke">
+                        <button onclick="showRevokeVirtualKeyConfirmation('${safeJsAttr(k.id)}', '${escapeHtml(k.name)}')" class="btn btn-destructive px-2 py-1 text-[10px] font-medium" title="Revoke">
                             Revoke
                         </button>
                     </div>
@@ -9402,12 +9419,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         }).join('');
     }
 
-    function escHtml(str) {
-        if (!str) return '';
-        const div = document.createElement('div');
-        div.textContent = str;
-        return div.innerHTML;
-    }
+    // escapeHtml replaced by global function at top of script
 
     function openCreateVirtualKeyDialog() {
         document.getElementById('vkName').value = '';
@@ -9582,8 +9594,8 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             const dailyBar = dailyPct >= 0 ? renderProgressBar(dailyPct, b.dailySpent, b.dailyLimit) : '<span class="text-muted-foreground">no limit</span>';
             const monthlyBar = monthlyPct >= 0 ? renderProgressBar(monthlyPct, b.monthlySpent, b.monthlyLimit) : '<span class="text-muted-foreground">no limit</span>';
             return `<tr class="border-b border-border/50">
-                <td class="py-2 pr-3 font-mono text-xs">${esc(displayKey)}</td>
-                <td class="py-2 pr-3">${esc(provider)}</td>
+                <td class="py-2 pr-3 font-mono text-xs">${escapeHtml(displayKey)}</td>
+                <td class="py-2 pr-3">${escapeHtml(provider)}</td>
                 <td class="py-2 pr-3">${statusBadge}</td>
                 <td class="py-2 pr-3">${dailyBar}</td>
                 <td class="py-2 pr-3 text-xs">$${(b.dailyLimit || 0).toFixed(2)}</td>
@@ -9591,9 +9603,9 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 <td class="py-2 pr-3 text-xs">$${(b.monthlyLimit || 0).toFixed(2)}</td>
                 <td class="py-2">
                     <div class="flex items-center gap-1">
-                        <button onclick="editBudget('${esc(hash)}')" class="text-xs text-blue-400 hover:text-blue-300" title="Edit">Edit</button>
+                        <button onclick="editBudget('${safeJsAttr(hash)}')" class="text-xs text-blue-400 hover:text-blue-300" title="Edit">Edit</button>
                         <span class="text-border">|</span>
-                        <button onclick="removeBudget('${esc(hash)}')" class="text-xs text-red-400 hover:text-red-300" title="Remove">Remove</button>
+                        <button onclick="removeBudget('${safeJsAttr(hash)}')" class="text-xs text-red-400 hover:text-red-300" title="Remove">Remove</button>
                     </div>
                 </td>
             </tr>`;
@@ -9630,7 +9642,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             const keys = await res.json();
             const select = document.getElementById('budgetKeySelect');
             select.innerHTML = '<option value="">-- Select a key --</option>' +
-                keys.map(k => `<option value="${esc(k.keyHash)}" data-provider="${esc(k.provider)}" data-masked="${esc(k.maskedKey)}">${esc(k.provider)}: ${esc(k.maskedKey)}${k.hasBudget ? ' (has budget)' : ''}</option>`).join('');
+                keys.map(k => `<option value="${escapeHtml(k.keyHash)}" data-provider="${escapeHtml(k.provider)}" data-masked="${escapeHtml(k.maskedKey)}">${escapeHtml(k.provider)}: ${escapeHtml(k.maskedKey)}${k.hasBudget ? ' (has budget)' : ''}</option>`).join('');
 
             // If editing, pre-select the key
             if (prefillHash) {
