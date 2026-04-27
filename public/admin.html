@@ -821,132 +821,177 @@
 
                     <!-- Add New Provider -->
                     <div class="section">
-                        <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-sm font-medium text-foreground">Add New Provider</h3>
-                            <div class="flex items-center space-x-1.5 px-2 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[10px] text-blue-500">
-                                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                <span>Pattern: TYPE_NAME_API_KEY_01</span>
-                            </div>
-                        </div>
-                        <p class="text-[11px] text-muted-foreground mb-4">
-                            Providers are saved to <code class="bg-muted px-1 rounded">.env</code> using pattern: 
-                            <code class="text-primary font-bold">TYPE_NAME_API_KEY_01</code>. 
-                            You can also edit <code>.env</code> manually — server auto-discovers keys on restart.
-                        </p>
+                        <details id="addProviderDetails" open>
+                            <summary class="flex items-center justify-between cursor-pointer group mb-3">
+                                <div class="flex items-center gap-2">
+                                    <svg class="w-4 h-4 text-muted-foreground group-open:rotate-90 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                    <h3 class="text-sm font-medium text-foreground">Add New Provider</h3>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-[10px] text-muted-foreground">Saved as</span>
+                                    <code id="addProviderEnvPreview" class="text-[10px] font-mono px-2 py-0.5 bg-primary/10 border border-primary/20 rounded text-primary">TYPE_NAME_API_KEYS=...</code>
+                                </div>
+                            </summary>
 
-                        <div class="border-dashed border border-border rounded p-4 bg-muted/30 space-y-4">
-                            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="border border-border rounded-lg p-4 bg-muted/20 space-y-4">
+                                <!-- Step 1: Provider Identity -->
                                 <div>
-                                    <label class="block text-xs font-medium text-muted-foreground mb-2">Provider Name <span class="text-destructive">*</span></label>
-                                    <input
-                                        type="text"
-                                        id="newProviderName"
-                                        class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors"
-                                        placeholder="e.g., groq, mistral, zhipuai"
-                                        oninput="handleProviderNameInput(this); updateProviderPreview()"
-                                    >
-                                    <p class="text-muted-foreground text-xs mt-1">Lowercase, alphanumeric, underscores only</p>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-muted-foreground mb-2">API Type <span class="text-destructive">*</span></label>
-                                    <select 
-                                        id="newProviderApiType" 
-                                        class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors"
-                                        onchange="updateProviderPreview()"
-                                    >
-                                        <option value="openai">OpenAI</option>
-                                        <option value="gemini">Gemini</option>
-                                    </select>
-                                    <p class="text-muted-foreground text-xs mt-1">API protocol type</p>
-                                </div>
-                                <div>
-                                    <label class="block text-xs font-medium text-muted-foreground mb-2">Base URL <span class="text-destructive">*</span></label>
-                                    <input 
-                                        type="text" 
-                                        id="newProviderBaseUrl" 
-                                        class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors" 
-                                        placeholder="https://api.provider.com/v1"
-                                        oninput="handleBaseUrlInput(this); updateProviderPreview()"
-                                    >
-                                    <p class="text-muted-foreground text-xs mt-1">Provider's API endpoint</p>
-                                </div>
-                            </div>
-                            
-                            <!-- Optional fields -->
-                            <details class="border border-border rounded p-3 bg-background/50">
-                                <summary class="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
-                                    Optional Configuration (Access Key, Default Model)
-                                </summary>
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-3">
-                                    <div>
-                                        <label class="block text-xs font-medium text-muted-foreground mb-2">Access Key (Optional)</label>
-                                        <input 
-                                            type="text" 
-                                            id="newProviderAccessKey" 
-                                            class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors" 
-                                            placeholder="For providers requiring additional auth"
-                                        >
-                                        <p class="text-muted-foreground text-xs mt-1">Some providers need extra authentication</p>
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">1</span>
+                                        <span class="text-xs font-medium text-foreground">Provider Identity</span>
                                     </div>
-                                    <div>
-                                        <label class="block text-xs font-medium text-muted-foreground mb-2">Default Model (Optional)</label>
-                                        <input 
-                                            type="text" 
-                                            id="newProviderDefaultModel" 
-                                            class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors" 
-                                            placeholder="e.g., gpt-4, gemini-pro"
-                                        >
-                                        <p class="text-muted-foreground text-xs mt-1">Default model for this provider</p>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 ml-7">
+                                        <div>
+                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">
+                                                Provider Name <span class="text-destructive">*</span>
+                                            </label>
+                                            <div class="relative">
+                                                <input
+                                                    type="text"
+                                                    id="newProviderName"
+                                                    class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors pr-6"
+                                                    placeholder="e.g. groq, mistral"
+                                                    oninput="handleProviderNameInput(this); updateProviderPreview(); validateNewProviderField('name')"
+                                                    onblur="validateNewProviderField('name')"
+                                                >
+                                                <span id="nameValidIcon" class="absolute right-1.5 top-1/2 -translate-y-1/2 hidden"></span>
+                                            </div>
+                                            <p class="text-muted-foreground text-[10px] mt-1">Lowercase letters and numbers only. Leave empty + pick type for defaults.</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">
+                                                API Type <span class="text-destructive">*</span>
+                                            </label>
+                                            <select
+                                                id="newProviderApiType"
+                                                class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors"
+                                                onchange="updateProviderPreview(); validateNewProviderField('type')"
+                                            >
+                                                <option value="openai">OpenAI (compatible)</option>
+                                                <option value="gemini">Gemini</option>
+                                            </select>
+                                            <p class="text-muted-foreground text-[10px] mt-1">Most providers use OpenAI-compatible API.</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">
+                                                Base URL <span class="text-muted-foreground font-normal">(auto-filled if empty)</span>
+                                            </label>
+                                            <div class="relative">
+                                                <input
+                                                    type="text"
+                                                    id="newProviderBaseUrl"
+                                                    class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors pr-6"
+                                                    placeholder="https://api.provider.com/v1"
+                                                    oninput="handleBaseUrlInput(this); updateProviderPreview(); validateNewProviderField('url')"
+                                                    onblur="validateNewProviderField('url')"
+                                                >
+                                                <span id="urlValidIcon" class="absolute right-1.5 top-1/2 -translate-y-1/2 hidden"></span>
+                                            </div>
+                                            <p class="text-muted-foreground text-[10px] mt-1">Leave empty for default (openai.com / googleapis.com).</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </details>
 
-                            <div>
-                                <label class="block text-xs font-medium text-muted-foreground mb-2">API Keys <span class="text-destructive">*</span></label>
-                                <div id="newProviderKeys" class="space-y-2">
-                                    <div class="flex items-center space-x-2" data-key-index="0">
-                                        <input 
-                                            type="text" 
-                                            class="input-field flex-1 px-2 py-1.5 text-xs rounded transition-colors new-provider-key" 
-                                            placeholder="Enter API key"
-                                            data-key-index="0"
+                                <!-- Step 2: API Keys -->
+                                <div>
+                                    <div class="flex items-center gap-2 mb-3">
+                                        <span class="flex items-center justify-center w-5 h-5 rounded-full bg-primary/10 text-primary text-[10px] font-bold">2</span>
+                                        <span class="text-xs font-medium text-foreground">API Keys</span>
+                                        <span class="text-[10px] text-muted-foreground">— at least one required, add more for rotation</span>
+                                    </div>
+                                    <div id="newProviderKeys" class="space-y-2 ml-7">
+                                        <div class="flex items-center space-x-2" data-key-index="0">
+                                            <input
+                                                type="text"
+                                                class="input-field flex-1 px-2 py-1.5 text-xs rounded transition-colors new-provider-key"
+                                                placeholder="sk-proj-... or your API key"
+                                                data-key-index="0"
+                                                oninput="validateNewProviderField('keys')"
+                                            >
+                                            <button
+                                                onclick="testNewProviderKey(0)"
+                                                class="btn btn-secondary px-2 py-1 text-xs font-medium"
+                                                title="Test this key against the provider"
+                                            >
+                                                Test
+                                            </button>
+                                            <button
+                                                onclick="removeNewProviderKey(0)"
+                                                class="btn btn-destructive px-2 py-1 text-xs font-medium"
+                                                style="display: none;"
+                                            >
+                                                Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div class="flex items-center gap-2 mt-2 ml-7">
+                                        <button
+                                            onclick="addNewProviderKey()"
+                                            class="btn btn-secondary px-3 py-1 text-xs font-medium"
                                         >
-                                        <button 
-                                            onclick="testNewProviderKey(0)" 
-                                            class="btn btn-secondary px-2 py-1 text-xs font-medium"
-                                        >
-                                            Test
-                                        </button>
-                                        <button 
-                                            onclick="removeNewProviderKey(0)" 
-                                            class="btn btn-destructive px-2 py-1 text-xs font-medium"
-                                            style="display: none;"
-                                        >
-                                            Remove
+                                            + Add Key
                                         </button>
                                     </div>
                                 </div>
-                                <div class="flex items-center space-x-2 mt-2">
-                                    <button 
-                                        onclick="addNewProviderKey()" 
-                                        class="btn btn-secondary px-3 py-1.5 text-xs font-medium"
+
+                                <!-- Step 3: Optional -->
+                                <details class="ml-7 border border-border/50 rounded p-3 bg-background/30">
+                                    <summary class="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors">
+                                        Optional: Access Key, Default Model, Sync
+                                    </summary>
+                                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-3">
+                                        <div>
+                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Access Key</label>
+                                            <input
+                                                type="text"
+                                                id="newProviderAccessKey"
+                                                class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors"
+                                                placeholder="Extra auth token (rare)"
+                                            >
+                                            <p class="text-muted-foreground text-[10px] mt-1">Only needed if provider uses a separate access key.</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Default Model</label>
+                                            <input
+                                                type="text"
+                                                id="newProviderDefaultModel"
+                                                class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors"
+                                                placeholder="e.g. gpt-4o, gemini-2.0-flash"
+                                            >
+                                            <p class="text-muted-foreground text-[10px] mt-1">Pre-select a model when using virtual keys.</p>
+                                        </div>
+                                        <div>
+                                            <label class="block text-xs font-medium text-muted-foreground mb-1.5">Sync to OS Env</label>
+                                            <select id="newProviderSyncEnv" class="input-field w-full px-2 py-1.5 text-sm rounded transition-colors">
+                                                <option value="">Use global setting</option>
+                                                <option value="true">Yes — sync active key</option>
+                                                <option value="false">No — don't sync</option>
+                                            </select>
+                                            <p class="text-muted-foreground text-[10px] mt-1">Write the active key to a system environment variable.</p>
+                                        </div>
+                                    </div>
+                                </details>
+
+                                <!-- Save Button -->
+                                <div class="flex items-center gap-3 ml-7">
+                                    <button
+                                        id="addProviderSaveBtn"
+                                        onclick="addNewProvider()"
+                                        class="btn btn-primary px-4 py-1.5 text-xs font-medium flex items-center gap-2"
                                     >
-                                        + Add Another Key
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                                        <span id="addProviderSaveText">Test & Save Provider</span>
                                     </button>
-                                    <button 
-                                        onclick="addNewProvider()" 
-                                        class="btn btn-primary px-3 py-1.5 text-xs font-medium"
-                                    >
-                                        Test & Save Provider
-                                    </button>
+                                    <span id="addProviderStatus" class="text-[10px] text-muted-foreground"></span>
                                 </div>
-                                <p class="text-muted-foreground text-xs mt-1">Add multiple keys for automatic rotation. All keys will be tested before saving.</p>
+
+                                <!-- Live Preview -->
+                                <div id="newProviderPreview" class="ml-7 p-2.5 bg-muted/30 border border-border rounded text-[11px] text-muted-foreground font-mono">
+                                    <span id="previewText">Fill in provider details to see env variable preview</span>
+                                </div>
+                                <div id="newProviderResult" class="ml-7 mt-1"></div>
                             </div>
-                            <div id="newProviderPreview" class="mt-3 p-3 bg-muted/20 border border-border rounded text-xs text-muted-foreground">
-                                <strong>Preview:</strong> <span id="previewText">Fill in provider details to see preview</span>
-                            </div>
-                            <div id="newProviderResult" class="mt-2"></div>
-                        </div>
+                        </details>
                     </div>
 
                 </div>
@@ -4897,49 +4942,66 @@
             const apiType = document.getElementById('newProviderApiType').value;
             const baseUrl = document.getElementById('newProviderBaseUrl').value.trim();
             const previewElement = document.getElementById('previewText');
-            
+            const envPreview = document.getElementById('addProviderEnvPreview');
+
             if (!previewElement) return;
-            
+
             const defaultConfig = getDefaultProviderConfig(apiType);
             if (!defaultConfig) {
                 previewElement.textContent = 'Unknown API type';
                 return;
             }
-            
+
+            const effectiveName = name || defaultConfig.name;
+            const effectiveUrl = baseUrl || defaultConfig.baseUrl;
+            const envVarName = `${apiType.toUpperCase()}_${effectiveName.toUpperCase()}_API_KEYS`;
+
+            // Update the header env preview badge
+            if (envPreview) {
+                envPreview.textContent = `${envVarName}=...`;
+            }
+
             const hasName = name.length > 0;
             const hasBaseUrl = baseUrl.length > 0;
-            
+
             // Check for validation errors
             if (hasName && !hasBaseUrl) {
-                previewElement.innerHTML = `<span style="color: var(--destructive);">⚠️ <strong>Validation Error:</strong> Provider name provided but base URL is missing. Please provide both or leave both empty for default.</span>`;
+                previewElement.innerHTML = `<span class="text-destructive">Base URL required when provider name is set</span>`;
                 previewElement.parentElement.style.borderColor = 'var(--destructive)';
-                previewElement.parentElement.style.backgroundColor = 'rgb(239 68 68 / 0.1)';
                 return;
             }
-            
+
             if (!hasName && hasBaseUrl) {
-                previewElement.innerHTML = `<span style="color: var(--destructive);">⚠️ <strong>Validation Error:</strong> Base URL provided but provider name is missing. Please provide both or leave both empty for default.</span>`;
+                previewElement.innerHTML = `<span class="text-destructive">Provider name required when base URL is set</span>`;
                 previewElement.parentElement.style.borderColor = 'var(--destructive)';
-                previewElement.parentElement.style.backgroundColor = 'rgb(239 68 68 / 0.1)';
                 return;
             }
-            
-            // Reset preview styling for valid inputs
-            previewElement.parentElement.style.borderColor = 'var(--border)';
-            previewElement.parentElement.style.backgroundColor = 'var(--muted)/20';
-            
-            // Valid combinations
-            if (!hasName && !hasBaseUrl) {
-                // Default provider
-                previewElement.innerHTML = `Will create <strong>default ${apiType.toUpperCase()}</strong> provider '<strong>${defaultConfig.name}</strong>' → <code>${defaultConfig.baseUrl}</code>`;
-            } else {
-                // Custom provider (both name and base URL provided)
-                previewElement.innerHTML = `Will create <strong>custom</strong> provider '<strong>${name}</strong>' → <code>${baseUrl}</code>`;
-            }
+
+            // Reset preview styling
+            previewElement.parentElement.style.borderColor = '';
+
+            // Show env variable preview
+            const keyInputs = document.querySelectorAll('.new-provider-key');
+            const keyCount = [...keyInputs].filter(i => i.value.trim()).length;
+            const keyLabel = keyCount === 0 ? '<span class="text-muted-foreground">no keys yet</span>' : `<span class="text-primary">${keyCount} key${keyCount > 1 ? 's' : ''}</span>`;
+
+            previewElement.innerHTML = `<span class="text-primary font-bold">${envVarName}</span>=<span class="text-foreground">${keyLabel}</span>` +
+                (baseUrl ? ` &nbsp; <span class="text-muted-foreground">${envVarName.replace('_API_KEYS', '_BASE_URL')}=${effectiveUrl}</span>` : '');
         }
 
         // New provider functions
         async function addNewProvider() {
+            const saveBtn = document.getElementById('addProviderSaveBtn');
+            const saveText = document.getElementById('addProviderSaveText');
+            const statusEl = document.getElementById('addProviderStatus');
+            const originalText = saveText?.textContent || 'Test & Save Provider';
+
+            // Set loading state
+            if (saveBtn) saveBtn.disabled = true;
+            if (saveText) saveText.textContent = 'Testing keys...';
+            if (statusEl) statusEl.textContent = '';
+
+            try {
             let name = document.getElementById('newProviderName').value.trim();
             const apiType = document.getElementById('newProviderApiType').value;
             let baseUrl = document.getElementById('newProviderBaseUrl').value.trim();
@@ -5096,6 +5158,12 @@
                 const defaultModelVar = `${apiType.toUpperCase()}_${name.toUpperCase()}_DEFAULT_MODEL`;
                 envVars[defaultModelVar] = defaultModel;
             }
+
+            const syncEnv = document.getElementById('newProviderSyncEnv')?.value;
+            if (syncEnv) {
+                const syncEnvVar = `${apiType.toUpperCase()}_${name.toUpperCase()}_SYNC_ENV`;
+                envVars[syncEnvVar] = syncEnv;
+            }
             
             try {
                 const response = await fetch('/admin/api/env', {
@@ -5114,7 +5182,20 @@
                     if (document.getElementById('newProviderDefaultModel')) {
                         document.getElementById('newProviderDefaultModel').value = '';
                     }
-                    
+                    if (document.getElementById('newProviderSyncEnv')) {
+                        document.getElementById('newProviderSyncEnv').value = '';
+                    }
+
+                    // Clear validation icons
+                    ['nameValidIcon', 'urlValidIcon'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) { el.innerHTML = ''; el.classList.add('hidden'); }
+                    });
+
+                    // Clear status
+                    const statusEl = document.getElementById('addProviderStatus');
+                    if (statusEl) statusEl.textContent = '';
+
                     // Clear all key inputs
                     keyInputs.forEach(input => input.value = '');
                     
@@ -5160,8 +5241,77 @@
                 if (baseUrl) delete envVars[baseUrlVar];
                 showErrorToast(`Failed to save provider: ${error.message}`);
             }
+
+            // Reset button state
+            if (saveBtn) saveBtn.disabled = false;
+            if (saveText) saveText.textContent = originalText;
+            } // end try
         }
         
+        function validateNewProviderField(field) {
+            const name = document.getElementById('newProviderName').value.trim();
+            const apiType = document.getElementById('newProviderApiType').value;
+            const baseUrl = document.getElementById('newProviderBaseUrl').value.trim();
+            const nameIcon = document.getElementById('nameValidIcon');
+            const urlIcon = document.getElementById('urlValidIcon');
+            const saveBtn = document.getElementById('addProviderSaveBtn');
+            const statusEl = document.getElementById('addProviderStatus');
+            const checkSvg = '<svg class="w-3.5 h-3.5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+            const crossSvg = '<svg class="w-3.5 h-3.5 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+
+            // Validate name
+            if (field === 'name' && nameIcon) {
+                if (name.length === 0) {
+                    nameIcon.innerHTML = '';
+                    nameIcon.classList.add('hidden');
+                } else if (/^[a-z0-9_]+$/.test(name)) {
+                    nameIcon.innerHTML = checkSvg;
+                    nameIcon.classList.remove('hidden');
+                } else {
+                    nameIcon.innerHTML = crossSvg;
+                    nameIcon.classList.remove('hidden');
+                }
+            }
+
+            // Validate URL
+            if (field === 'url' && urlIcon) {
+                if (baseUrl.length === 0) {
+                    urlIcon.innerHTML = '';
+                    urlIcon.classList.add('hidden');
+                } else if (baseUrl.startsWith('https://') && !baseUrl.endsWith('/')) {
+                    urlIcon.innerHTML = checkSvg;
+                    urlIcon.classList.remove('hidden');
+                } else {
+                    urlIcon.innerHTML = crossSvg;
+                    urlIcon.classList.remove('hidden');
+                }
+            }
+
+            // Validate keys presence for save button state
+            if (field === 'keys') {
+                const keyInputs = document.querySelectorAll('.new-provider-key');
+                const hasKeys = [...keyInputs].some(i => i.value.trim());
+                if (saveBtn) {
+                    saveBtn.disabled = false; // Always enabled, validation happens on submit
+                }
+                // Update preview with key count
+                updateProviderPreview();
+            }
+
+            // Update status hint
+            if (statusEl) {
+                const hasName = name.length > 0;
+                const hasUrl = baseUrl.length > 0;
+                const keyInputs = document.querySelectorAll('.new-provider-key');
+                const hasKeys = [...keyInputs].some(i => i.value.trim());
+                const missing = [];
+                if (!hasKeys) missing.push('API key');
+                if (hasName && !hasUrl) missing.push('base URL');
+                if (hasUrl && !hasName) missing.push('provider name');
+                statusEl.textContent = missing.length > 0 ? `Missing: ${missing.join(', ')}` : '';
+            }
+        }
+
         let newProviderKeyIndex = 1;
         
         function addNewProviderKey() {
