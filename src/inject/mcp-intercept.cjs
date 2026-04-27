@@ -29,6 +29,7 @@ const DEFAULT_ROUTES = {
   'api.firecrawl.dev': 'firecrawl',
   'api.context7.com': 'context7',
   'api.tavily.com': 'tavily',
+  'api.ref.tools': 'onref',
 };
 
 // Auto-fill missing API key env vars so MCP servers start without real keys
@@ -39,6 +40,7 @@ const KNOWN_KEYS = {
   'FIRECRAWL_API_KEY': 'firecrawl',
   'CONTEXT7_API_KEY': 'context7',
   'TAVILY_API_KEY': 'tavily',
+  'REF_API_KEY': 'onref',
 };
 for (const [envVar] of Object.entries(KNOWN_KEYS)) {
   if (!process.env[envVar]) {
@@ -187,6 +189,12 @@ try {
         newOpts.path = `/${route.provider}${options.path || '/'}`;
         newOpts.headers = { ...options.headers };
       }
+
+      // Strip HTTPS properties that conflict with HTTP proxy
+      delete newOpts.protocol;
+      delete newOpts.host;
+      delete newOpts.agent;
+      delete newOpts.socketPath;
 
       // Strip auth headers
       for (const key of Object.keys(newOpts.headers || {})) {
