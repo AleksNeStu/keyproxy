@@ -159,7 +159,7 @@ async function getProviderClient(server, providerName, provider, legacy = false)
     const lbStrategy = server.config.envVars[lbStrategyKey] || 'round-robin';
     const ttlKey = `${provider.apiType.toUpperCase()}_${providerName.toUpperCase().replace(/-/g, '_')}_KEY_TTL_HOURS`;
     const ttlMs = parseFloat(server.config.envVars[ttlKey]) ? parseFloat(server.config.envVars[ttlKey]) * 3600000 : 0;
-    const keyRotator = new server.KeyRotator(enabledKeys, provider.apiType, systemEnvName, server.historyManager, lbStrategy, ttlMs);
+    const keyRotator = new server.KeyRotator(enabledKeys, provider.apiType, systemEnvName, server.historyManager, lbStrategy, ttlMs, providerName);
     keyRotator.onRotation = (provName, statusCode) => {
       server.metrics.incCounter('keyproxy_key_rotations_total', { provider: provName });
     };

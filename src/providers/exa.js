@@ -1,3 +1,6 @@
+// NOTE: This provider is not currently used. Exa is handled as an OpenAI-compatible
+// provider via OpenAIClient, with freezeOnStatusCodes=[402] configured in config.js.
+// Kept for reference in case Exa needs a custom request format in the future.
 const BaseProvider = require('./BaseProvider');
 
 class ExaProvider extends BaseProvider {

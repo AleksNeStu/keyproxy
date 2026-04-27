@@ -1,9 +1,10 @@
 const { maskApiKey } = require('./utils');
 
 class KeyRotator {
-  constructor(apiKeys, apiType = 'unknown', systemEnvName = null, historyManager = null, strategy = 'round-robin', ttlMs = 0) {
+  constructor(apiKeys, apiType = 'unknown', systemEnvName = null, historyManager = null, strategy = 'round-robin', ttlMs = 0, providerName = null) {
     this.apiKeys = [...apiKeys];
     this.apiType = apiType;
+    this.providerName = providerName || apiType;
     this.systemEnvName = systemEnvName;
     this.historyManager = historyManager;
     this.strategy = strategy; // 'round-robin', 'weighted-random', 'least-used'
@@ -53,7 +54,7 @@ class KeyRotator {
     // Exclude frozen keys from rotation
     if (this.historyManager) {
       activeKeys = activeKeys.filter(key => {
-        const status = this.historyManager.getKeyStatus(this.apiType, key);
+        const status = this.historyManager.getKeyStatus(this.providerName, key);
         return status.status !== 'frozen';
       });
     }
