@@ -4094,11 +4094,16 @@
                             <div class="flex items-center space-x-1.5" onclick="event.stopPropagation()">
                                 <button
                                     onclick="copyAgentContext('${provider.apiType}', '${provider.name}')"
-                                    class="transition-colors p-1 text-muted-foreground hover:text-foreground"
+                                    class="btn btn-secondary px-2 py-1 text-xs font-medium"
                                     title="Copy agent context"
                                 >
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+                                    <svg class="w-3.5 h-3.5 inline mr-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>Agent
                                 </button>
+                                <button
+                                    onclick="copyActiveKey('${provider.apiType}', '${provider.name}')"
+                                    class="btn btn-secondary px-2 py-1 text-xs font-medium"
+                                    title="Copy active API key (raw value)"
+                                >Key</button>
                                 <button
                                     onclick="copyProviderCurl('${provider.apiType}', '${provider.name}', 'completions')"
                                     class="btn btn-secondary px-2 py-1 text-xs font-medium"
@@ -4341,7 +4346,11 @@
                             </div>`;
                         })()}
                         <div>
-                            <label class="block text-muted-foreground mb-1 text-xs">API Keys</label>
+                            <div class="flex items-center justify-between cursor-pointer select-none mb-1" onclick="toggleSection('keys-${providerCollapseId}')">
+                                <label class="text-muted-foreground text-xs font-medium cursor-pointer">API Keys</label>
+                                <svg class="w-3 h-3 text-muted-foreground transition-transform" id="section-chevron-keys-${providerCollapseId}" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                            </div>
+                            <div id="section-keys-${providerCollapseId}">
                             <div class="space-y-1">
                                 ${provider.keys.map((keyObj, keyIndex) => {
                                     const keyVal = keyObj.key;
@@ -4466,6 +4475,7 @@
                                     <button onclick="resetKeyHistory('${provider.name}')" class="text-xs text-muted-foreground hover:text-foreground underline" title="Clear rotation history for this provider">Reset History</button>
                                 </div>
                             </div>
+                            </div>
                         </div>
                         </div>
                     </div>
@@ -4565,6 +4575,15 @@
             container.style.display = isExpanded ? 'none' : 'block';
             if (chevron) chevron.classList.toggle('rotate-90', !isExpanded);
             saveCollapseState();
+        }
+
+        function toggleSection(sectionId) {
+            const container = document.getElementById(`section-${sectionId}`);
+            const chevron = document.getElementById(`section-chevron-${sectionId}`);
+            if (!container) return;
+            const isExpanded = container.style.display !== 'none';
+            container.style.display = isExpanded ? 'none' : 'block';
+            if (chevron) chevron.classList.toggle('rotate-90', !isExpanded);
         }
 
         function saveCollapseState() {
@@ -5288,6 +5307,15 @@
             const sourceMap = window._keySourceMap || {};
             const sourceName = sourceMap[providerName + ':' + firstKey] || envKey;
             await copyToClipboard(`${sourceName}=${firstKey}`, 'Env var copied');
+        }
+
+        // Copy the active (first enabled) API key value only — no env var prefix
+        async function copyActiveKey(apiType, providerName) {
+            const envKey = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_API_KEYS`;
+            const keysStr = envVars[envKey] || '';
+            const firstKey = keysStr.split(',').map(k => k.trim()).filter(k => k && !k.startsWith('~'))[0];
+            if (!firstKey) { showErrorToast('No enabled key found for this provider'); return; }
+            await copyToClipboard(firstKey, `Active key for '${providerName}' copied`);
         }
 
         // Generate and copy cURL command for testing a provider
