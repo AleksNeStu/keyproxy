@@ -42,6 +42,7 @@ async function handleToggleKey(server, req, res, body) {
     server.writeEnvFile(envVars);
     server.config.loadConfig();
     server.reinitializeClients();
+    server.auditLog.log('toggle_key', { apiType, providerName, keyIndex, disabled });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
@@ -80,6 +81,7 @@ async function handleReorderKeys(server, req, res, body) {
     server.writeEnvFile(envVars);
     server.config.loadConfig();
     server.reinitializeClients();
+    server.auditLog.log('reorder_keys', { apiType, providerName });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));

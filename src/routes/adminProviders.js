@@ -34,6 +34,7 @@ async function handleToggleProvider(server, req, res, body) {
     server.writeEnvFile(envVars);
     server.config.loadConfig();
     server.reinitializeClients();
+    server.auditLog.log('toggle_provider', { apiType, providerName, disabled });
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));

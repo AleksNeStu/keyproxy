@@ -90,6 +90,10 @@ class ProxyServer {
     // Config exporter/importer
     this.configExporter = new ConfigExporter(config);
 
+    // Audit log (admin actions tracking)
+    const AuditLog = require('./core/auditLog');
+    this.auditLog = new AuditLog();
+
     // Per-key RPM tracker (sliding window)
     this.rpmTracker = new SlidingWindowCounter();
     this._rpmPruneTimer = setInterval(() => this.rpmTracker.prune(), 60000);
@@ -759,6 +763,12 @@ class ProxyServer {
     }
     if (adminPath === '/admin/api/analytics/reset' && req.method === 'POST') {
       return handleResetAnalytics(this, req, res);
+    }
+    if (adminPath === '/admin/api/audit-log' && req.method === 'GET') {
+      const limit = parseInt(params.get('limit')) || 100;
+      const offset = parseInt(params.get('offset')) || 0;
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      return res.end(JSON.stringify(this.auditLog.query(limit, offset)));
     }
     if (adminPath === '/admin/api/fallbacks' && req.method === 'GET') {
       return handleGetFallbacks(this, res);

@@ -155,6 +155,7 @@ async function handleChangePassword(server, req, res, body) {
     Auth.saveHashToFile(hashed);
     const path = require('path');
     Auth.removePasswordFromEnv(path.join(process.cwd(), '.env'));
+    server.auditLog.log('change_password', {});
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ success: true }));
