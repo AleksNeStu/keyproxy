@@ -275,7 +275,7 @@ describe('MCP Intercept Module', () => {
 
     it('rewrites http.request options for tracked hosts', () => {
       // Mock http.request
-      const mockReq = { on: () => {}, end: () => {} };
+      const mockReq = { on: () => {}, end: () => {}, write: () => {} };
       http.request = function(opts, cb) {
         interceptedCalls.push(opts);
         return mockReq;
@@ -315,7 +315,7 @@ describe('MCP Intercept Module', () => {
     });
 
     it('passes through untracked hosts', () => {
-      const mockReq = { on: () => {}, end: () => {} };
+      const mockReq = { on: () => {}, end: () => {}, write: () => {} };
       http.request = function(opts, cb) {
         interceptedCalls.push(opts);
         return mockReq;
@@ -341,7 +341,7 @@ describe('MCP Intercept Module', () => {
     });
 
     it('handles string URL input for http.request', () => {
-      const mockReq = { on: () => {}, end: () => {} };
+      const mockReq = { on: () => {}, end: () => {}, write: () => {} };
       http.request = function(opts, cb) {
         interceptedCalls.push(opts);
         return mockReq;
@@ -649,7 +649,7 @@ describe('MCP Intercept Module', () => {
     });
 
     it('handles URL instance as input to http.request', () => {
-      const mockReq = { on: () => {}, end: () => {} };
+      const mockReq = { on: () => {}, end: () => {}, write: () => {} };
       http.request = function(opts, cb) {
         interceptedCalls.push(opts);
         return mockReq;
@@ -670,7 +670,7 @@ describe('MCP Intercept Module', () => {
     });
 
     it('uses opts.host when opts.hostname is absent', () => {
-      const mockReq = { on: () => {}, end: () => {} };
+      const mockReq = { on: () => {}, end: () => {}, write: () => {} };
       http.request = function(opts, cb) {
         interceptedCalls.push(opts);
         return mockReq;

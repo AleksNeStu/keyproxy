@@ -168,9 +168,9 @@ describe('KeyHistoryManager', () => {
       manager = new KeyHistoryManager(historyFile);
     });
 
-    it('returns fresh status for unknown key', () => {
+    it('returns unverified status for unknown key', () => {
       const status = manager.getKeyStatus('openai', testKey);
-      assert.deepStrictEqual(status, { status: 'fresh' });
+      assert.deepStrictEqual(status, { status: 'unverified' });
     });
 
     it('returns full status for known key', () => {
@@ -181,9 +181,9 @@ describe('KeyHistoryManager', () => {
       assert.ok(status.lastUsed);
     });
 
-    it('returns empty object for unknown provider', () => {
+    it('returns unverified status for unknown provider', () => {
       const status = manager.getKeyStatus('unknown', testKey);
-      assert.deepStrictEqual(status, { status: 'fresh' });
+      assert.deepStrictEqual(status, { status: 'unverified' });
     });
 
     it('gets provider history with all keys', () => {
