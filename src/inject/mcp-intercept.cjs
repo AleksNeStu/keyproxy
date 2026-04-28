@@ -235,10 +235,23 @@ try {
       newOpts.headers['X-KeyProxy-Original-Host'] = host;
 
       // Use http.request (not https) since KeyProxy listens on plain HTTP
-      // NOTE: No body buffering in Layer 2 — follow-redirects (axios) creates a
-      // Writable stream that calls _currentRequest.write() but may not call .end()
-      // in all code paths, causing deadlocks. Body stripping is handled in Layer 1.
       const req = http.request(newOpts, cb);
+
+      // Intercept req.write() to strip API key fields from JSON body.
+      // This is needed for MCP servers using axios (Layer 2) that send api_key
+      // in the request body (e.g. Tavily MCP sends both header + body auth).
+      // We intercept write() instead of buffering the entire body to avoid
+      // deadlocks with follow-redirects Writable stream lifecycle.
+      const origWrite = req.write.bind(req);
+      let firstWrite = true;
+      req.write = function(data, encoding, callback) {
+        if (firstWrite && typeof data === 'string') {
+          firstWrite = false;
+          const stripped = stripBodyKeys(data);
+          return origWrite(stripped, encoding, callback);
+        }
+        return origWrite(data, encoding, callback);
+      };
 
       return req;
     };
