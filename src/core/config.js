@@ -66,10 +66,12 @@ class Config {
     this.providers.clear();
     this.keySourceMap = {};
 
-    // Load providers from vault if available, otherwise from env vars
+    // Load providers: vault is primary, env is legacy fallback
     if (this.keyVault && !this.keyVault.needsMigration()) {
+      console.log('[CONFIG] Vault mode: loading providers from keyvault.json');
       this.loadProvidersFromVault();
     } else {
+      console.log('[CONFIG] Legacy mode: loading providers from .env files');
       this.parseProviders(envVars);
       this.parseBackwardCompatibility(envVars);
     }
