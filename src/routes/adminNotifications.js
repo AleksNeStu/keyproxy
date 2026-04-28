@@ -11,6 +11,17 @@ const { sendError } = require('./httpHelpers');
  * GET /admin/api/notifications — get notification settings.
  */
 async function handleGetNotifications(server, res) {
+  const sm = server.settingsManager;
+  if (sm) {
+    const n = sm.getGroup('notifications');
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      slackWebhookUrl: n.slackWebhookUrl || '',
+      slackNotifyOn: n.slackNotifyOn || '',
+      telegramNotifyOn: n.telegramNotifyOn || ''
+    }));
+    return;
+  }
   const envVars = server.config.envVars;
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify({
@@ -27,15 +38,25 @@ async function handleGetNotifications(server, res) {
 async function handleUpdateNotifications(server, req, res, body) {
   try {
     const { slackWebhookUrl, slackNotifyOn, telegramNotifyOn } = JSON.parse(body);
-    const envPath = path.join(process.cwd(), '.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
-    const envVars = server.config.parseEnvFile(envContent);
+    const sm = server.settingsManager;
 
+    if (sm) {
+      const updates = {};
+      if (slackWebhookUrl !== undefined) updates.slackWebhookUrl = slackWebhookUrl;
+      if (slackNotifyOn !== undefined) updates.slackNotifyOn = slackNotifyOn;
+      if (telegramNotifyOn !== undefined) updates.telegramNotifyOn = telegramNotifyOn;
+      sm.updateGroup('notifications', updates);
+      sm.flushSync();
+    }
+    // Also write to .env for backward compat
+    const envPath = path.join(process.cwd(), '.env');
+    const envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
+    const envVars = server.config.parseEnvFile(envContent);
     if (slackWebhookUrl !== undefined) envVars.SLACK_WEBHOOK_URL = slackWebhookUrl;
     if (slackNotifyOn !== undefined) envVars.SLACK_NOTIFY_ON = slackNotifyOn;
     if (telegramNotifyOn !== undefined) envVars.TELEGRAM_NOTIFY_ON = telegramNotifyOn;
-
     server.writeEnvFile(envVars);
+
     server.config.loadConfig();
 
     if (server.notifier) {
@@ -78,18 +99,19 @@ async function handleTestNotification(server, req, res, body) {
 async function handleGetTelegramSettings(server, res) {
   try {
     const envPath = path.join(process.cwd(), '.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
+    const envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
     const envVars = server.config.parseEnvFile(envContent);
 
-    const keepAliveRaw = envVars.KEEP_ALIVE_MINUTES;
-    const keepAliveMinutes = keepAliveRaw != null ? parseInt(keepAliveRaw) : 10;
+    const sm = server.settingsManager;
+    const keepAliveMinutes = sm ? sm.get('notifications', 'keepAliveMinutes') : 10;
+    const defaultStatusCodes = sm ? sm.get('performance', 'defaultStatusCodes') : '429';
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       botToken: envVars.TELEGRAM_BOT_TOKEN || '',
       allowedUsers: envVars.TELEGRAM_ALLOWED_USERS || '',
-      defaultStatusCodes: envVars.DEFAULT_STATUS_CODES || '429',
-      keepAliveMinutes,
+      defaultStatusCodes: defaultStatusCodes || '429',
+      keepAliveMinutes: keepAliveMinutes != null ? keepAliveMinutes : 10,
       botRunning: server.telegramBot.polling
     }));
   } catch (error) {
@@ -105,9 +127,11 @@ async function handleUpdateTelegramSettings(server, req, res, body) {
   try {
     const { botToken, allowedUsers, defaultStatusCodes, keepAliveMinutes } = JSON.parse(body);
     const envPath = path.join(process.cwd(), '.env');
-    const envContent = fs.readFileSync(envPath, 'utf8');
+    const envContent = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
     const envVars = server.config.parseEnvFile(envContent);
+    const sm = server.settingsManager;
 
+    // Bot token and allowed users stay in .env (security-sensitive)
     if (botToken !== undefined) {
       if (botToken) {
         envVars.TELEGRAM_BOT_TOKEN = botToken;
@@ -122,8 +146,9 @@ async function handleUpdateTelegramSettings(server, req, res, body) {
         delete envVars.TELEGRAM_ALLOWED_USERS;
       }
     }
+
+    // Operational settings go to SettingsManager
     if (defaultStatusCodes !== undefined) {
-      // Parse, deduplicate, sort numerically
       const codes = defaultStatusCodes
         .split(',')
         .map(s => s.trim())
@@ -131,21 +156,21 @@ async function handleUpdateTelegramSettings(server, req, res, body) {
         .map(Number)
         .filter((v, i, a) => a.indexOf(v) === i)
         .sort((a, b) => a - b);
-      if (codes.length > 0) {
-        envVars.DEFAULT_STATUS_CODES = codes.join(',');
-      } else {
-        delete envVars.DEFAULT_STATUS_CODES;
-      }
+      const codesStr = codes.length > 0 ? codes.join(',') : '429';
+      envVars.DEFAULT_STATUS_CODES = codesStr;
+      if (sm) sm.set('performance', 'defaultStatusCodes', codesStr);
     }
     if (keepAliveMinutes !== undefined) {
       const val = parseInt(keepAliveMinutes);
       if (val > 0) {
         envVars.KEEP_ALIVE_MINUTES = String(val);
+        if (sm) sm.set('notifications', 'keepAliveMinutes', val);
       } else {
         delete envVars.KEEP_ALIVE_MINUTES;
+        if (sm) sm.set('notifications', 'keepAliveMinutes', 0);
       }
     }
-
+    if (sm) sm.flushSync();
     server.writeEnvFile(envVars);
 
     // Restart bot with new settings
@@ -154,8 +179,7 @@ async function handleUpdateTelegramSettings(server, req, res, body) {
       ? envVars.TELEGRAM_ALLOWED_USERS.split(',').map(s => s.trim()).filter(Boolean)
       : [];
 
-    // Apply keep-alive setting
-    const kaMinutes = envVars.KEEP_ALIVE_MINUTES ? parseInt(envVars.KEEP_ALIVE_MINUTES) : 0;
+    const kaMinutes = keepAliveMinutes != null ? parseInt(keepAliveMinutes) : 0;
     server.telegramBot.setKeepAliveInterval(kaMinutes);
 
     if (token) {

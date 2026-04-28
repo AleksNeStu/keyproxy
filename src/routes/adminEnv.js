@@ -94,22 +94,26 @@ async function handleUpdateEnvVars(server, req, res, body) {
 async function handleUpdateSettings(server, req, res, body) {
   try {
     const settings = JSON.parse(body);
-    const envPath = path.join(process.cwd(), '.env');
-    let envContent = '';
-    if (fs.existsSync(envPath)) {
-      envContent = fs.readFileSync(envPath, 'utf8');
-    }
-    const envVars = server.config.parseEnvFile(envContent);
+    const sm = server.settingsManager;
 
     if (settings.EXTERNAL_ENV_PATH !== undefined) {
+      if (sm) {
+        sm.set('general', 'externalEnvPath', settings.EXTERNAL_ENV_PATH.trim());
+        sm.flushSync();
+      }
+      // Also update env for backward compat
+      const envPath = path.join(process.cwd(), '.env');
+      let envContent = '';
+      if (fs.existsSync(envPath)) envContent = fs.readFileSync(envPath, 'utf8');
+      const envVars = server.config.parseEnvFile(envContent);
       if (settings.EXTERNAL_ENV_PATH.trim() === '') {
         delete envVars.EXTERNAL_ENV_PATH;
       } else {
         envVars.EXTERNAL_ENV_PATH = settings.EXTERNAL_ENV_PATH;
       }
+      server.writeEnvFile(envVars);
     }
 
-    server.writeEnvFile(envVars);
     server.config.loadConfig();
     server.reinitializeClients();
 
@@ -161,43 +165,54 @@ async function handleGetRetryConfig(server, res) {
 async function handleUpdateRetryConfig(server, req, res, body) {
   try {
     const data = JSON.parse(body);
-    const envPath = path.join(process.cwd(), '.env');
-    let envContent = '';
-    if (fs.existsSync(envPath)) {
-      envContent = fs.readFileSync(envPath, 'utf8');
-    }
-    const envVars = server.config.parseEnvFile(envContent);
+    const sm = server.settingsManager;
 
-    // Global settings
-    if (data.global) {
-      if (data.global.maxRetries !== undefined) envVars.KEYPROXY_MAX_RETRIES = String(data.global.maxRetries);
-      if (data.global.retryDelayMs !== undefined) envVars.KEYPROXY_RETRY_DELAY_MS = String(data.global.retryDelayMs);
-      if (data.global.retryBackoff !== undefined) envVars.KEYPROXY_RETRY_BACKOFF = String(data.global.retryBackoff);
-    }
-
-    // Per-provider overrides
-    if (data.perProvider) {
-      // Clear existing per-provider retry settings
-      for (const key of Object.keys(envVars)) {
-        if (key.endsWith('_MAX_RETRIES') && !key.startsWith('KEYPROXY_')) delete envVars[key];
-        if (key.endsWith('_RETRY_DELAY_MS') && !key.startsWith('KEYPROXY_')) delete envVars[key];
-        if (key.endsWith('_RETRY_BACKOFF') && !key.startsWith('KEYPROXY_')) delete envVars[key];
+    if (sm) {
+      const retry = {};
+      if (data.global) {
+        if (data.global.maxRetries !== undefined) retry.maxRetries = data.global.maxRetries;
+        if (data.global.retryDelayMs !== undefined) retry.delayMs = data.global.retryDelayMs;
+        if (data.global.retryBackoff !== undefined) retry.backoff = data.global.retryBackoff;
       }
-      for (const [prov, settings] of Object.entries(data.perProvider)) {
-        const provUpper = prov.toUpperCase();
-        if (settings.maxRetries !== undefined && settings.maxRetries !== null) {
-          envVars[`${provUpper}_MAX_RETRIES`] = String(settings.maxRetries);
-        }
-        if (settings.retryDelayMs !== undefined && settings.retryDelayMs !== null) {
-          envVars[`${provUpper}_RETRY_DELAY_MS`] = String(settings.retryDelayMs);
-        }
-        if (settings.retryBackoff !== undefined && settings.retryBackoff !== null) {
-          envVars[`${provUpper}_RETRY_BACKOFF`] = String(settings.retryBackoff);
+      if (data.perProvider) {
+        retry.perProvider = {};
+        for (const [prov, settings] of Object.entries(data.perProvider)) {
+          const entry = {};
+          if (settings.maxRetries !== undefined && settings.maxRetries !== null) entry.maxRetries = settings.maxRetries;
+          if (settings.retryDelayMs !== undefined && settings.retryDelayMs !== null) entry.delayMs = settings.retryDelayMs;
+          if (settings.retryBackoff !== undefined && settings.retryBackoff !== null) entry.backoff = settings.retryBackoff;
+          if (Object.keys(entry).length) retry.perProvider[prov] = entry;
         }
       }
+      sm.updateGroup('retry', retry);
+      sm.flushSync();
+    } else {
+      // Fallback: write to .env
+      const envPath = path.join(process.cwd(), '.env');
+      let envContent = '';
+      if (fs.existsSync(envPath)) envContent = fs.readFileSync(envPath, 'utf8');
+      const envVars = server.config.parseEnvFile(envContent);
+      if (data.global) {
+        if (data.global.maxRetries !== undefined) envVars.KEYPROXY_MAX_RETRIES = String(data.global.maxRetries);
+        if (data.global.retryDelayMs !== undefined) envVars.KEYPROXY_RETRY_DELAY_MS = String(data.global.retryDelayMs);
+        if (data.global.retryBackoff !== undefined) envVars.KEYPROXY_RETRY_BACKOFF = String(data.global.retryBackoff);
+      }
+      if (data.perProvider) {
+        for (const key of Object.keys(envVars)) {
+          if (key.endsWith('_MAX_RETRIES') && !key.startsWith('KEYPROXY_')) delete envVars[key];
+          if (key.endsWith('_RETRY_DELAY_MS') && !key.startsWith('KEYPROXY_')) delete envVars[key];
+          if (key.endsWith('_RETRY_BACKOFF') && !key.startsWith('KEYPROXY_')) delete envVars[key];
+        }
+        for (const [prov, settings] of Object.entries(data.perProvider)) {
+          const provUpper = prov.toUpperCase();
+          if (settings.maxRetries !== undefined && settings.maxRetries !== null) envVars[`${provUpper}_MAX_RETRIES`] = String(settings.maxRetries);
+          if (settings.retryDelayMs !== undefined && settings.retryDelayMs !== null) envVars[`${provUpper}_RETRY_DELAY_MS`] = String(settings.retryDelayMs);
+          if (settings.retryBackoff !== undefined && settings.retryBackoff !== null) envVars[`${provUpper}_RETRY_BACKOFF`] = String(settings.retryBackoff);
+        }
+      }
+      server.writeEnvFile(envVars);
     }
 
-    server.writeEnvFile(envVars);
     server.config.loadConfig();
     server.reinitializeClients();
 
@@ -353,6 +368,29 @@ $form.Dispose()
 }
 async function handleGetGeneralSettings(server, res) {
   try {
+    const sm = server.settingsManager;
+    if (sm) {
+      const all = sm.getAll();
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        corsOrigin: all.general.corsOrigin,
+        defaultTimeoutMs: all.general.defaultTimeoutMs,
+        cacheEnabled: all.performance.cacheEnabled,
+        cacheTtlSec: all.performance.cacheTtlSec,
+        cacheMaxEntries: all.performance.cacheMaxEntries,
+        cbThreshold: all.performance.cbThreshold,
+        cbTimeoutSec: all.performance.cbTimeoutSec,
+        recoveryCooldownSec: all.performance.recoveryCooldownSec,
+        recoveryEnabled: all.performance.recoveryEnabled,
+        logLevel: all.logging.level,
+        logBufferMax: all.logging.bufferMax,
+        rateLimitWindowMs: all.performance.rateLimitWindowMs,
+        rateLimitMax: all.performance.rateLimitMax,
+        autoCheckKeys: all.performance.autoCheckKeys,
+      }));
+      return;
+    }
+    // Fallback to env vars
     const ev = server.config.envVars || {};
     const settings = {
       corsOrigin: ev.CORS_ORIGIN || '*',
@@ -380,44 +418,53 @@ async function handleGetGeneralSettings(server, res) {
 async function handleUpdateGeneralSettings(server, req, res, body) {
   try {
     const data = JSON.parse(body);
-    const envPath = path.join(process.cwd(), '.env');
-    let envContent = '';
-    if (fs.existsSync(envPath)) {
-      envContent = fs.readFileSync(envPath, 'utf8');
-    }
-    const envVars = server.config.parseEnvFile(envContent);
+    const sm = server.settingsManager;
 
-    const mapping = {
-      corsOrigin: 'CORS_ORIGIN',
-      defaultTimeoutMs: 'KEYPROXY_DEFAULT_TIMEOUT_MS',
-      cacheTtlSec: 'KEYPROXY_CACHE_TTL_SEC',
-      cacheMaxEntries: 'KEYPROXY_CACHE_MAX_ENTRIES',
-      cbThreshold: 'KEYPROXY_CB_THRESHOLD',
-      cbTimeoutSec: 'KEYPROXY_CB_TIMEOUT_SEC',
-      recoveryCooldownSec: 'KEYPROXY_RECOVERY_COOLDOWN_SEC',
-      logLevel: 'KEYPROXY_LOG_LEVEL',
-      logBufferMax: 'KEYPROXY_LOG_BUFFER_MAX',
-      rateLimitWindowMs: 'KEYPROXY_RATE_LIMIT_WINDOW_MS',
-      rateLimitMax: 'KEYPROXY_RATE_LIMIT_MAX'
-    };
-
-    for (const [dataKey, envKey] of Object.entries(mapping)) {
-      if (data[dataKey] !== undefined) {
-        envVars[envKey] = String(data[dataKey]);
+    if (sm) {
+      const general = {};
+      const performance = {};
+      const logging = {};
+      if (data.corsOrigin !== undefined) general.corsOrigin = data.corsOrigin;
+      if (data.defaultTimeoutMs !== undefined) general.defaultTimeoutMs = data.defaultTimeoutMs;
+      if (data.cacheTtlSec !== undefined) performance.cacheTtlSec = data.cacheTtlSec;
+      if (data.cacheMaxEntries !== undefined) performance.cacheMaxEntries = data.cacheMaxEntries;
+      if (data.cacheEnabled !== undefined) performance.cacheEnabled = data.cacheEnabled;
+      if (data.cbThreshold !== undefined) performance.cbThreshold = data.cbThreshold;
+      if (data.cbTimeoutSec !== undefined) performance.cbTimeoutSec = data.cbTimeoutSec;
+      if (data.recoveryCooldownSec !== undefined) performance.recoveryCooldownSec = data.recoveryCooldownSec;
+      if (data.recoveryEnabled !== undefined) performance.recoveryEnabled = data.recoveryEnabled;
+      if (data.rateLimitWindowMs !== undefined) performance.rateLimitWindowMs = data.rateLimitWindowMs;
+      if (data.rateLimitMax !== undefined) performance.rateLimitMax = data.rateLimitMax;
+      if (data.autoCheckKeys !== undefined) performance.autoCheckKeys = data.autoCheckKeys;
+      if (data.logLevel !== undefined) logging.level = data.logLevel;
+      if (data.logBufferMax !== undefined) logging.bufferMax = data.logBufferMax;
+      if (Object.keys(general).length) sm.updateGroup('general', general);
+      if (Object.keys(performance).length) sm.updateGroup('performance', performance);
+      if (Object.keys(logging).length) sm.updateGroup('logging', logging);
+      sm.flushSync();
+    } else {
+      // Fallback: write to .env
+      const envPath = path.join(process.cwd(), '.env');
+      let envContent = '';
+      if (fs.existsSync(envPath)) envContent = fs.readFileSync(envPath, 'utf8');
+      const envVars = server.config.parseEnvFile(envContent);
+      const mapping = {
+        corsOrigin: 'CORS_ORIGIN', defaultTimeoutMs: 'KEYPROXY_DEFAULT_TIMEOUT_MS',
+        cacheTtlSec: 'KEYPROXY_CACHE_TTL_SEC', cacheMaxEntries: 'KEYPROXY_CACHE_MAX_ENTRIES',
+        cbThreshold: 'KEYPROXY_CB_THRESHOLD', cbTimeoutSec: 'KEYPROXY_CB_TIMEOUT_SEC',
+        recoveryCooldownSec: 'KEYPROXY_RECOVERY_COOLDOWN_SEC',
+        logLevel: 'KEYPROXY_LOG_LEVEL', logBufferMax: 'KEYPROXY_LOG_BUFFER_MAX',
+        rateLimitWindowMs: 'KEYPROXY_RATE_LIMIT_WINDOW_MS', rateLimitMax: 'KEYPROXY_RATE_LIMIT_MAX'
+      };
+      for (const [dataKey, envKey] of Object.entries(mapping)) {
+        if (data[dataKey] !== undefined) envVars[envKey] = String(data[dataKey]);
       }
+      if (data.cacheEnabled !== undefined) envVars.KEYPROXY_CACHE_ENABLED = data.cacheEnabled ? 'true' : 'false';
+      if (data.recoveryEnabled !== undefined) envVars.KEYPROXY_RECOVERY_ENABLED = data.recoveryEnabled ? 'true' : 'false';
+      if (data.autoCheckKeys !== undefined) envVars.KEYPROXY_AUTO_CHECK_KEYS = data.autoCheckKeys ? 'true' : 'false';
+      server.writeEnvFile(envVars);
     }
 
-    if (data.cacheEnabled !== undefined) {
-      envVars.KEYPROXY_CACHE_ENABLED = data.cacheEnabled ? 'true' : 'false';
-    }
-    if (data.recoveryEnabled !== undefined) {
-      envVars.KEYPROXY_RECOVERY_ENABLED = data.recoveryEnabled ? 'true' : 'false';
-    }
-    if (data.autoCheckKeys !== undefined) {
-      envVars.KEYPROXY_AUTO_CHECK_KEYS = data.autoCheckKeys ? 'true' : 'false';
-    }
-
-    server.writeEnvFile(envVars);
     server.config.loadConfig();
     server.reinitializeClients();
 

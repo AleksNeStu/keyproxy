@@ -5,9 +5,37 @@ const GeminiClient = require('./src/providers/gemini');
 const OpenAIClient = require('./src/providers/openai');
 const ProxyServer = require('./src/server');
 const KeyVault = require('./src/core/keyVault');
+const SettingsManager = require('./src/core/settingsManager');
 
 function main() {
   try {
+    // Create SettingsManager before Config — it's the settings data source
+    const settingsManager = new SettingsManager();
+
+    // First-time migration: if settings.json doesn't exist, migrate from .env
+    if (settingsManager.needsMigration()) {
+      console.log('[INIT] Settings file not found, running first-time migration from .env...');
+      const localEnvPath = require('path').join(process.cwd(), '.env');
+      const fs = require('fs');
+      let envVars = {};
+      if (fs.existsSync(localEnvPath)) {
+        const Config = require('./src/core/config');
+        envVars = Config.prototype.parseEnvFile ? {} : {};
+        // Parse .env manually for migration
+        const content = fs.readFileSync(localEnvPath, 'utf8');
+        for (const line of content.split('\n')) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) continue;
+          const eqIdx = trimmed.indexOf('=');
+          if (eqIdx === -1) continue;
+          const key = trimmed.substring(0, eqIdx).trim();
+          const val = trimmed.substring(eqIdx + 1).trim().replace(/^["']|["']$/g, '');
+          envVars[key] = val;
+        }
+      }
+      settingsManager.runMigrationFromEnv(envVars);
+    }
+
     // Create KeyVault before Config — it's the key data source
     const vault = new KeyVault();
 
@@ -20,7 +48,7 @@ function main() {
       vault.runMigration(tempConfig, knownDefaults);
     }
 
-    const config = new Config({ keyVault: vault });
+    const config = new Config({ keyVault: vault, settingsManager });
     // Config constructor already called loadConfig(), which reads from vault
 
     // Migrate admin password from .env to hash file if needed
@@ -70,12 +98,14 @@ function main() {
     const server = new ProxyServer(config, geminiClient, openaiClient);
     server.exclusionManager = exclusionManager;
     server.keyVault = vault;
+    server.settingsManager = settingsManager;
     server.start();
 
     process.on('SIGINT', () => {
       console.log('\nShutting down server...');
       server.stop();
       vault.flushSync();
+      settingsManager.flushSync();
       process.exit(0);
     });
 

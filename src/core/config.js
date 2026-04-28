@@ -11,7 +11,8 @@ class Config {
     this.baseUrl = null;
     this.envVars = {}; // Stored merged configuration
     this.keySourceMap = {}; // Maps 'providerName:keyValue' → env var name
-    this.keyVault = options.keyVault || null; // Set via constructor or setKeyVault()
+    this.keyVault = options.keyVault || null;
+    this.settingsManager = options.settingsManager || null;
     this.loadConfig();
   }
 
@@ -58,6 +59,17 @@ class Config {
     // Set required fields
     this.port = parseInt(port);
     this.envVars = envVars; // Save for UI access
+
+    // Overlay settings from SettingsManager (JSON) onto envVars
+    if (this.settingsManager) {
+      const settingsEnv = this.settingsManager.toEnvDict();
+      for (const [key, value] of Object.entries(settingsEnv)) {
+        this.envVars[key] = value;
+      }
+      // Re-resolve port from settings if available
+      const settingsPort = this.settingsManager.get('general', 'port');
+      if (settingsPort) this.port = settingsPort;
+    }
 
     console.log(`[CONFIG] Port: ${this.port}`);
     console.log(`[CONFIG] Admin panel enabled`);
