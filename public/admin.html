@@ -1081,126 +1081,49 @@
                     </div>
                 </div>
 
-                <!-- Rotation Key Files -->
+                <!-- Import Sources -->
                 <div class="section">
-                    <div class="flex items-center justify-between mb-3">
-                        <h3 class="text-sm font-medium text-foreground">Rotation Key Files</h3>
-                        <div class="text-xs text-muted-foreground">
-                            Drag to reorder • Files lower in list override files higher
-                        </div>
-                    </div>
-                    <div class="border border-border rounded p-4 bg-muted/30">
-                        <!-- Loaded Files Indicator -->
-                        <div class="mb-3 pb-3 border-b border-border">
-                            <div class="flex items-center gap-2 text-sm">
-                                <span class="text-muted-foreground">Key files loaded:</span>
-                                <span id="configActiveFile" class="font-medium text-foreground">-</span>
-                            </div>
-                        </div>
-
-                        <!-- Env Files List with Priority -->
-                        <div id="configEnvFileList" class="space-y-2">
-                            <div class="text-center text-muted-foreground text-sm py-4">Loading rotation key files...</div>
-                        </div>
-
-                        <!-- Add New Env File -->
-                        <details class="mt-4">
-                            <summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">+ Add key file</summary>
-                            <div class="mt-2 flex items-center gap-2">
-                                <input type="text" id="configNewEnvName" class="input-field w-1/3 px-2 py-1.5 text-sm rounded" placeholder="Name (e.g. staging)">
-                                <input type="text" id="configNewEnvPath" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Full path to .env file">
-                                <button onclick="addConfigEnvFile()" class="btn btn-primary px-3 py-1.5 text-sm">Add</button>
-                            </div>
-                        </details>
-
-                        <p class="text-[11px] text-muted-foreground mt-3">
-                            Dotenv files containing API keys for rotation. All enabled files are loaded and merged — files lower in the list override keys from files higher.
-                            The local <code class="bg-muted px-1 rounded">.env</code> is for app settings only (PORT, ADMIN_PASSWORD, etc.).
-                        </p>
-                    </div>
-                </div>
-
-                <!-- Environment Sources (Manual Import) -->
-                <div class="section mt-6">
                     <div class="flex items-center justify-between mb-3">
                         <div>
                             <h3 class="text-sm font-medium text-foreground flex items-center gap-2">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
-                                Environment Sources
+                                Import Sources
                             </h3>
-                            <p class="text-[11px] text-muted-foreground mt-0.5">Register env files as secondary sources. Pull new keys on demand — these are NOT auto-loaded.</p>
+                            <p class="text-[11px] text-muted-foreground mt-0.5">Register .env files as key sources. Pull to import new keys into the vault.</p>
                         </div>
                     </div>
                     <div class="border border-border rounded p-4 bg-muted/30">
-                        <div id="envSourcesList" class="space-y-2">
-                            <div class="text-center text-muted-foreground text-sm py-4">Loading environment sources...</div>
+                        <div id="importSourcesList" class="space-y-2">
+                            <div class="text-center text-muted-foreground text-sm py-4">Loading import sources...</div>
                         </div>
 
                         <details class="mt-4">
-                            <summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">+ Add environment source</summary>
-                            <div class="mt-2 flex items-center gap-2">
-                                <input type="text" id="newEnvSourceName" class="input-field w-1/3 px-2 py-1.5 text-sm rounded" placeholder="Name (e.g. team-shared)">
-                                <input type="text" id="newEnvSourcePath" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Full path to .env file">
-                                <button onclick="browseEnvSourceFile()" class="btn btn-secondary px-2 py-1.5 text-sm" title="Browse...">...</button>
-                                <button onclick="addEnvSource()" class="btn btn-primary px-3 py-1.5 text-sm">Add</button>
-                            </div>
-                        </details>
-
-                        <div id="envSourcePreviewPanel" class="hidden mt-4 border border-border rounded p-3 bg-card">
-                            <h4 class="text-xs font-semibold text-foreground mb-2">New keys found:</h4>
-                            <div id="envSourcePreviewKeys" class="text-xs space-y-1 max-h-48 overflow-y-auto"></div>
-                            <div class="flex items-center gap-2 mt-3">
-                                <button onclick="confirmPullEnvSource()" class="btn btn-primary px-3 py-1.5 text-sm">Import Keys</button>
-                                <button onclick="cancelPullEnvSource()" class="btn btn-secondary px-3 py-1.5 text-sm">Cancel</button>
-                                <span id="envSourcePullStatus" class="text-xs"></span>
-                            </div>
-                        </div>
-
-                        <p class="text-[11px] text-muted-foreground mt-3">Environment sources are secondary — they are never loaded automatically. Click "Pull" to scan for new API keys that are not already in your active configuration.</p>
-                    </div>
-                </div>
-
-                <!-- Key Sync Exclusions -->
-                <div class="section mt-6">
-                    <div class="flex items-center justify-between mb-3">
-                        <div>
-                            <h3 class="text-sm font-medium text-foreground">Key Sync Exclusions</h3>
-                            <p class="text-[11px] text-muted-foreground mt-0.5">Exclude environment variable patterns from destination sync (Windows env, file sync)</p>
-                        </div>
-                    </div>
-                    <div class="border border-border rounded p-4 bg-muted/30">
-                        <!-- Patterns list -->
-                        <div id="exclusionPatternsList" class="space-y-2 mb-4">
-                            <div class="text-center text-muted-foreground text-sm py-4">Loading exclusion patterns...</div>
-                        </div>
-
-                        <!-- Add new pattern -->
-                        <details class="mb-3">
-                            <summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">+ Add exclusion pattern</summary>
+                            <summary class="text-xs text-muted-foreground cursor-pointer hover:text-foreground">+ Add import source</summary>
                             <div class="mt-2 space-y-2">
                                 <div class="flex items-center gap-2">
-                                    <input type="text" id="exclusionPatternInput" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Pattern (e.g. CLOUDFLARE_* or ^INTERNAL_.*$)">
-                                    <select id="exclusionTypeSelect" class="input-field px-2 py-1.5 text-sm rounded" style="min-width: 80px;">
-                                        <option value="auto">Auto</option>
-                                        <option value="glob">Glob</option>
-                                        <option value="regex">Regex</option>
-                                    </select>
-                                    <input type="text" id="exclusionDescInput" class="input-field w-1/4 px-2 py-1.5 text-sm rounded" placeholder="Description (optional)">
-                                    <button onclick="addExclusion()" class="btn btn-primary px-3 py-1.5 text-sm">Add</button>
+                                    <input type="text" id="newSourceName" class="input-field w-1/4 px-2 py-1.5 text-sm rounded" placeholder="Name (e.g. team-shared)">
+                                    <input type="text" id="newSourcePath" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Full path to .env file">
+                                    <button onclick="browseImportSource()" class="btn btn-secondary px-2 py-1.5 text-sm" title="Browse...">...</button>
+                                    <button onclick="addImportSource()" class="btn btn-primary px-3 py-1.5 text-sm">Add</button>
                                 </div>
-                                <p class="text-[11px] text-muted-foreground">Glob: use <code class="text-foreground">*</code> and <code class="text-foreground">?</code> wildcards (e.g. <code class="text-foreground">CLOUDFLARE_*</code>). Regex: full JavaScript regex (e.g. <code class="text-foreground">^INTERNAL_.*_SECRET$</code>).</p>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs text-muted-foreground whitespace-nowrap">Exclude:</span>
+                                    <input type="text" id="newSourceExcludes" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Patterns to skip (e.g. CLOUDFLARE_*, INTERNAL_*) — comma separated">
+                                </div>
                             </div>
                         </details>
 
-                        <!-- Test pattern -->
-                        <div class="pt-3 border-t border-border">
-                            <div class="flex items-center gap-2">
-                                <span class="text-xs text-muted-foreground">Test:</span>
-                                <input type="text" id="exclusionTestInput" class="input-field flex-1 px-2 py-1.5 text-sm rounded" placeholder="Enter env var name to test (e.g. CLOUDFLARE_API_KEY)">
-                                <button onclick="testExclusion()" class="btn btn-secondary px-3 py-1.5 text-sm">Test</button>
-                                <span id="exclusionTestResult" class="text-xs"></span>
+                        <div id="importPreviewPanel" class="hidden mt-4 border border-border rounded p-3 bg-card">
+                            <h4 class="text-xs font-semibold text-foreground mb-2">New keys found:</h4>
+                            <div id="importPreviewKeys" class="text-xs space-y-1 max-h-48 overflow-y-auto"></div>
+                            <div class="flex items-center gap-2 mt-3">
+                                <button onclick="confirmImportPull()" class="btn btn-primary px-3 py-1.5 text-sm">Import Keys</button>
+                                <button onclick="cancelImportPull()" class="btn btn-secondary px-3 py-1.5 text-sm">Cancel</button>
+                                <span id="importPullStatus" class="text-xs"></span>
                             </div>
                         </div>
+
+                        <p class="text-[11px] text-muted-foreground mt-3">Import sources register .env files. Click "Pull" to scan for new API keys and import them into the vault. Exclusion patterns filter out providers during import.</p>
                     </div>
                 </div>
 

@@ -366,6 +366,7 @@ class KeyVault {
       filePath: opts.filePath,
       enabled: opts.enabled !== false,
       priority: opts.priority || this.data.importSources.length + 1,
+      ksync_excludes: Array.isArray(opts.ksync_excludes) ? opts.ksync_excludes : [],
       lastPulledAt: null,
       lastPullStatus: 'never',
       createdAt: new Date().toISOString(),
@@ -374,6 +375,30 @@ class KeyVault {
     this._scheduleSave();
     console.log(`[VAULT] Added import source "${source.name}" (${source.filePath})`);
     return source;
+  }
+
+  /**
+   * Check if a provider name matches any exclusion pattern (glob).
+   * Reuses same glob→regex conversion as KeyExclusionManager.
+   */
+  _matchesExcludes(providerName, patterns) {
+    if (!patterns || patterns.length === 0) return false;
+    for (const pattern of patterns) {
+      const type = /^[A-Za-z0-9_\-*?]+$/.test(pattern) ? 'glob' : 'regex';
+      let regexStr;
+      if (type === 'glob') {
+        regexStr = '^' + pattern
+          .replace(/[-[\]{}()+.,\\^$|#]/g, '\\$&')
+          .replace(/\*/g, '.*')
+          .replace(/\?/g, '.') + '$';
+      } else {
+        regexStr = pattern;
+      }
+      try {
+        if (new RegExp(regexStr, 'i').test(providerName)) return true;
+      } catch {}
+    }
+    return false;
   }
 
   removeImportSource(id) {
@@ -401,10 +426,15 @@ class KeyVault {
     const parsed = this._parseEnvFile(source.filePath);
     if (parsed.error) return parsed;
 
-    const result = { newKeys: [], updatedKeys: [], unchangedKeys: [] };
+    const result = { newKeys: [], updatedKeys: [], unchangedKeys: [], excludedKeys: [] };
+    const excludes = source.ksync_excludes || [];
     for (const [providerName, keys] of Object.entries(parsed.providers)) {
       for (const kv of keys) {
         const val = typeof kv === 'object' ? kv.key : kv;
+        if (this._matchesExcludes(providerName, excludes)) {
+          result.excludedKeys.push({ providerName, keyValue: val });
+          continue;
+        }
         const existing = this.data.keys.find(
           k => k.providerName === providerName && k.keyValue === val && k.status !== 'deleted'
         );
@@ -436,7 +466,9 @@ class KeyVault {
 
     let imported = 0;
     let skipped = 0;
+    let excluded = 0;
     const errors = [];
+    const excludes = source.ksync_excludes || [];
 
     for (const [providerName, keys] of Object.entries(parsed.providers)) {
       // Ensure provider exists
@@ -447,6 +479,11 @@ class KeyVault {
       for (const kv of keys) {
         const val = typeof kv === 'object' ? kv.key : kv;
         const isDisabled = typeof kv === 'object' ? kv.disabled : false;
+
+        if (this._matchesExcludes(providerName, excludes)) {
+          excluded++;
+          continue;
+        }
 
         const existing = this.data.keys.find(
           k => k.providerName === providerName && k.keyValue === val && k.status !== 'deleted'
@@ -479,8 +516,8 @@ class KeyVault {
     source.lastPulledAt = new Date().toISOString();
     this._scheduleSave();
 
-    console.log(`[VAULT] Import from "${source.name}": ${imported} new, ${skipped} existing`);
-    return { imported, skipped, errors };
+    console.log(`[VAULT] Import from "${source.name}": ${imported} new, ${skipped} existing, ${excluded} excluded`);
+    return { imported, skipped, excluded, errors };
   }
 
   // --- Migration ---

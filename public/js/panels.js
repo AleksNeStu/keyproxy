@@ -662,81 +662,89 @@
         }
     });
 
-    // ─── Environment Sources (Manual Import) ────────────────────
-    let envSourcesData = [];
+    // ─── Import Sources ────────────────────────────────────────
+    let importSourcesData = [];
     let pendingPullSourceId = null;
 
-    async function loadEnvSources() {
+    async function loadImportSources() {
         try {
             const res = await fetch('/admin/api/env-sources', { headers: authHeaders() });
             if (!res.ok) return;
             const data = await res.json();
-            envSourcesData = data.sources || [];
-            renderEnvSources();
+            importSourcesData = data.sources || [];
+            renderImportSources();
         } catch (err) {
             console.error('Failed to load env sources:', err);
         }
     }
 
-    function renderEnvSources() {
-        const list = document.getElementById('envSourcesList');
-        if (!envSourcesData || envSourcesData.length === 0) {
-            list.innerHTML = '<div class="text-center text-muted-foreground text-sm py-4">No environment sources registered</div>';
+    function renderImportSources() {
+        const list = document.getElementById('importSourcesList');
+        if (!importSourcesData || importSourcesData.length === 0) {
+            list.innerHTML = '<div class="text-center text-muted-foreground text-sm py-4">No import sources registered. Add a .env file to import keys from.</div>';
             return;
         }
-        list.innerHTML = envSourcesData.map(source => {
+        list.innerHTML = importSourcesData.map(source => {
             const statusColor = source.lastPullStatus === 'success' ? 'text-green-400' :
                                source.lastPullStatus === 'never' ? 'text-muted-foreground' :
                                source.lastPullStatus === 'no-new-keys' ? 'text-blue-400' : 'text-red-400';
             const statusText = source.lastPullStatus === 'never' ? 'Never pulled' :
                               source.lastPulledAt ? `Pulled ${new Date(source.lastPulledAt).toLocaleString()}` :
                               source.lastPullStatus;
+            const excludes = (source.ksync_excludes || []);
+            const excludesBadge = excludes.length > 0
+                ? `<span class="px-1.5 py-0.5 text-[10px] bg-amber-500/20 text-amber-400 rounded-full">${excludes.length} exclude${excludes.length > 1 ? 's' : ''}</span>`
+                : '';
             return `
             <div class="flex items-center gap-3 p-2 rounded bg-card border border-border hover:border-primary/30 transition-colors">
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-foreground">${escapeHtml(source.name)}</span>
                         <span class="text-xs ${statusColor}">${statusText}</span>
+                        ${excludesBadge}
                     </div>
                     <div class="text-xs text-muted-foreground truncate" title="${escapeHtml(source.filePath)}">${escapeHtml(source.filePath)}</div>
                 </div>
-                <button onclick="previewPullEnvSource('${safeJsAttr(source.id)}')" class="btn btn-primary px-3 py-1 text-xs">Pull</button>
-                <button onclick="removeEnvSource('${safeJsAttr(source.id)}')" class="p-1.5 hover:bg-red-500/10 text-red-500 rounded transition-colors" title="Remove source">
+                <button onclick="previewImportPull('${safeJsAttr(source.id)}')" class="btn btn-primary px-3 py-1 text-xs">Pull</button>
+                <button onclick="removeImportSource('${safeJsAttr(source.id)}')" class="p-1.5 hover:bg-red-500/10 text-red-500 rounded transition-colors" title="Remove source">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                 </button>
             </div>`;
         }).join('');
     }
 
-    async function addEnvSource() {
-        const name = document.getElementById('newEnvSourceName').value.trim();
-        const filePath = document.getElementById('newEnvSourcePath').value.trim();
+    async function addImportSource() {
+        const name = document.getElementById('newSourceName').value.trim();
+        const filePath = document.getElementById('newSourcePath').value.trim();
+        const excludesRaw = document.getElementById('newSourceExcludes').value.trim();
         if (!name || !filePath) {
             showToast('Name and file path are required', 'error');
             return;
         }
+        const ksync_excludes = excludesRaw ? excludesRaw.split(',').map(s => s.trim()).filter(Boolean) : [];
         try {
             const res = await fetch('/admin/api/env-sources', {
                 method: 'POST',
                 headers: { ...authHeaders(), 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-                body: JSON.stringify({ name, filePath })
+                body: JSON.stringify({ name, filePath, ksync_excludes })
             });
             const data = await res.json();
             if (!res.ok) {
                 showToast(data.error || 'Failed to add source', 'error');
                 return;
             }
-            document.getElementById('newEnvSourceName').value = '';
-            document.getElementById('newEnvSourcePath').value = '';
+            document.getElementById('newSourceName').value = '';
+            document.getElementById('newSourcePath').value = '';
+            document.getElementById('newSourceExcludes').value = '';
             showSuccessToast(`Source "${name}" added`);
-            loadEnvSources();
+            loadImportSources();
         } catch (err) {
             showToast('Failed to add source', 'error');
         }
     }
 
-    async function removeEnvSource(id) {
-        if (!confirm('Remove this environment source? Imported keys will remain in config.')) return;
+    async function removeImportSource(id) {
+        if (!confirm('Remove this import source? Imported keys will remain in vault.')) return;
         try {
             const res = await fetch('/admin/api/env-sources', {
                 method: 'DELETE',
@@ -745,15 +753,15 @@
             });
             if (res.ok) {
                 showSuccessToast('Source removed');
-                loadEnvSources();
+                loadImportSources();
             }
         } catch (err) {
             showToast('Failed to remove source', 'error');
         }
     }
 
-    async function previewPullEnvSource(id) {
-        cancelPullEnvSource();
+    async function previewImportPull(id) {
+        cancelImportPull();
         try {
             const res = await fetch('/admin/api/env-sources/preview', {
                 method: 'POST',
@@ -767,15 +775,17 @@
             }
 
             if (Object.keys(data.newKeys || {}).length === 0) {
-                showSuccessToast('No new keys found in this source');
-                loadEnvSources();
+                showSuccessToast(data.totalExcluded > 0
+                    ? `No new keys (all ${data.totalExcluded} matched exclusion patterns)`
+                    : 'No new keys found in this source');
+                loadImportSources();
                 return;
             }
 
             pendingPullSourceId = id;
 
             // Build preview list
-            const keysDiv = document.getElementById('envSourcePreviewKeys');
+            const keysDiv = document.getElementById('importPreviewKeys');
             const keyEntries = Object.entries(data.newKeys);
             keysDiv.innerHTML = keyEntries.map(([key, value]) => {
             const _ek = escapeHtml(key); const _ev = escapeHtml(value);
@@ -791,16 +801,16 @@
                 </div>`;
             }).join('');
 
-            document.getElementById('envSourcePreviewPanel').classList.remove('hidden');
-            document.getElementById('envSourcePullStatus').textContent = `${data.totalNewKeys} new key(s) from ${data.totalNewProviders} provider(s)`;
+            document.getElementById('importPreviewPanel').classList.remove('hidden');
+            document.getElementById('importPullStatus').textContent = `${data.totalNewKeys} new key(s) from ${data.totalNewProviders} provider(s)` + (data.totalExcluded ? ` (${data.totalExcluded} excluded)` : '');
         } catch (err) {
             showToast('Preview failed', 'error');
         }
     }
 
-    async function confirmPullEnvSource() {
+    async function confirmImportPull() {
         if (!pendingPullSourceId) return;
-        const statusEl = document.getElementById('envSourcePullStatus');
+        const statusEl = document.getElementById('importPullStatus');
         statusEl.textContent = 'Importing...';
         try {
             const res = await fetch('/admin/api/env-sources/pull', {
@@ -813,32 +823,31 @@
                 statusEl.innerHTML = '<span class="text-red-400">' + escapeHtml(data.error || 'Pull failed') + '</span>';
                 return;
             }
-            cancelPullEnvSource();
+            cancelImportPull();
             if (data.message) {
                 showSuccessToast(data.message);
             } else {
                 showSuccessToast(`Imported ${data.imported.keys} key(s) from ${data.imported.providers} provider(s)`);
             }
-            loadEnvSources();
+            loadImportSources();
             loadConfiguration();
         } catch (err) {
             statusEl.innerHTML = '<span class="text-red-400">Network error</span>';
         }
     }
 
-    function cancelPullEnvSource() {
-        document.getElementById('envSourcePreviewPanel').classList.add('hidden');
-        document.getElementById('envSourcePullStatus').textContent = '';
+    function cancelImportPull() {
+        document.getElementById('importPreviewPanel').classList.add('hidden');
+        document.getElementById('importPullStatus').textContent = '';
         pendingPullSourceId = null;
     }
 
-    async function browseEnvSourceFile() {
+    async function browseImportSource() {
         try {
             const res = await fetch('/admin/api/fs-list?path=', { headers: authHeaders() });
             if (!res.ok) return;
             const data = await res.json();
-            // Simple prompt-based file selection (reuse existing pattern)
-            const input = document.getElementById('newEnvSourcePath');
+            const input = document.getElementById('newSourcePath');
             if (input.value) {
                 const browseRes = await fetch('/admin/api/fs-list?path=' + encodeURIComponent(input.value), { headers: authHeaders() });
                 if (browseRes.ok) {

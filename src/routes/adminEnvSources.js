@@ -31,6 +31,7 @@ async function handleAddEnvSource(server, req, res, body) {
     const source = server.keyVault.addImportSource({
       name: data.name.trim(),
       filePath: data.filePath.trim(),
+      ksync_excludes: Array.isArray(data.ksync_excludes) ? data.ksync_excludes : [],
     });
     server.keyVault.flushSync();
     sendJson(res, 200, { success: true, source });
@@ -94,6 +95,7 @@ async function handlePreviewEnvSource(server, req, res, body) {
       newKeys,
       totalNewKeys,
       totalNewProviders,
+      totalExcluded: (result.excludedKeys || []).length,
       existingKeys: result.unchangedKeys.map(k => k.keyId),
     });
   } catch (err) {
