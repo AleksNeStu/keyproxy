@@ -848,106 +848,71 @@
             } catch (e) { console.error('Failed to load general settings:', e); }
         }
 
-        async function saveGeneralSettings() {
-            const statusEl = document.getElementById('generalSettingsStatus');
-            statusEl.textContent = 'Saving...';
-            statusEl.className = 'text-xs text-muted-foreground';
-            try {
-                const data = {
-                    defaultTimeoutMs: parseInt(document.getElementById('settingTimeoutMs').value),
-                    corsOrigin: document.getElementById('settingCorsOrigin').value,
-                    rateLimitWindowMs: parseInt(document.getElementById('settingRateLimitWindow').value),
-                    rateLimitMax: parseInt(document.getElementById('settingRateLimitMax').value)
-                };
-                const res = await fetch('/admin/api/general-settings', {
-                    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const r = await res.json();
-                if (r.success) { statusEl.textContent = '✓ Saved'; statusEl.className = 'text-xs text-green-600'; }
-                else { statusEl.textContent = '✗ Failed'; statusEl.className = 'text-xs text-red-500'; }
-                setTimeout(() => { statusEl.textContent = ''; }, 3000);
-            } catch (e) { statusEl.textContent = '✗ Error'; statusEl.className = 'text-xs text-red-500'; }
+        // Unified auto-save for all settings (General + Performance + Logging)
+        let _autoSaveTimer = null;
+        function autoSaveSettings() {
+            if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+            _autoSaveTimer = setTimeout(async () => {
+                try {
+                    const data = {
+                        defaultTimeoutMs: parseInt(document.getElementById('settingTimeoutMs').value),
+                        corsOrigin: document.getElementById('settingCorsOrigin').value,
+                        rateLimitWindowMs: parseInt(document.getElementById('settingRateLimitWindow').value),
+                        rateLimitMax: parseInt(document.getElementById('settingRateLimitMax').value),
+                        cacheEnabled: document.getElementById('settingCacheEnabled').checked,
+                        cacheTtlSec: parseInt(document.getElementById('settingCacheTtl').value),
+                        cacheMaxEntries: parseInt(document.getElementById('settingCacheMax').value),
+                        cbThreshold: parseInt(document.getElementById('settingCbThreshold').value),
+                        cbTimeoutSec: parseInt(document.getElementById('settingCbTimeout').value),
+                        recoveryEnabled: document.getElementById('settingRecoveryEnabled').checked,
+                        recoveryCooldownSec: parseInt(document.getElementById('settingRecoveryCooldown').value),
+                        autoCheckKeys: document.getElementById('settingAutoCheckKeys').checked,
+                        logLevel: document.getElementById('settingLogLevel').value,
+                        logBufferMax: parseInt(document.getElementById('settingLogBufferMax').value)
+                    };
+                    const res = await fetch('/admin/api/general-settings', {
+                        method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+                        body: JSON.stringify(data)
+                    });
+                    const r = await res.json();
+                    if (r.success) showSuccessToast('Settings saved');
+                } catch (e) { console.error('Auto-save failed:', e); }
+            }, 500);
         }
 
-        async function savePerformanceSettings() {
-            const statusEl = document.getElementById('performanceSettingsStatus');
-            statusEl.textContent = 'Saving...';
-            statusEl.className = 'text-xs text-muted-foreground';
-            try {
-                const data = {
-                    cacheEnabled: document.getElementById('settingCacheEnabled').checked,
-                    cacheTtlSec: parseInt(document.getElementById('settingCacheTtl').value),
-                    cacheMaxEntries: parseInt(document.getElementById('settingCacheMax').value),
-                    cbThreshold: parseInt(document.getElementById('settingCbThreshold').value),
-                    cbTimeoutSec: parseInt(document.getElementById('settingCbTimeout').value),
-                    recoveryEnabled: document.getElementById('settingRecoveryEnabled').checked,
-                    recoveryCooldownSec: parseInt(document.getElementById('settingRecoveryCooldown').value),
-                    autoCheckKeys: document.getElementById('settingAutoCheckKeys').checked
-                };
-                const res = await fetch('/admin/api/general-settings', {
-                    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const r = await res.json();
-                if (r.success) { statusEl.textContent = '✓ Saved'; statusEl.className = 'text-xs text-green-600'; }
-                else { statusEl.textContent = '✗ Failed'; statusEl.className = 'text-xs text-red-500'; }
-                setTimeout(() => { statusEl.textContent = ''; }, 3000);
-            } catch (e) { statusEl.textContent = '✗ Error'; statusEl.className = 'text-xs text-red-500'; }
+        let _retryAutoSaveTimer = null;
+        function autoSaveRetrySettings() {
+            if (_retryAutoSaveTimer) clearTimeout(_retryAutoSaveTimer);
+            _retryAutoSaveTimer = setTimeout(async () => {
+                try {
+                    const global = {
+                        maxRetries: parseInt(document.getElementById('globalMaxRetries').value),
+                        retryDelayMs: parseInt(document.getElementById('globalRetryDelay').value),
+                        retryBackoff: parseFloat(document.getElementById('globalRetryBackoff').value)
+                    };
+                    const res = await fetch('/admin/api/retry-config', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ global, perProvider: {} })
+                    });
+                    const data = await res.json();
+                    if (data.success) { showSuccessToast('Retry settings saved'); await loadRetryConfig(); }
+                } catch (e) { console.error('Retry auto-save failed:', e); }
+            }, 500);
         }
 
-        async function saveLoggingSettings() {
-            const statusEl = document.getElementById('loggingSettingsStatus');
-            statusEl.textContent = 'Saving...';
-            statusEl.className = 'text-xs text-muted-foreground';
-            try {
-                const data = {
-                    logLevel: document.getElementById('settingLogLevel').value,
-                    logBufferMax: parseInt(document.getElementById('settingLogBufferMax').value)
-                };
-                const res = await fetch('/admin/api/general-settings', {
-                    method: 'POST', headers: { ...authHeaders(), 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
-                const r = await res.json();
-                if (r.success) { statusEl.textContent = '✓ Saved'; statusEl.className = 'text-xs text-green-600'; }
-                else { statusEl.textContent = '✗ Failed'; statusEl.className = 'text-xs text-red-500'; }
-                setTimeout(() => { statusEl.textContent = ''; }, 3000);
-            } catch (e) { statusEl.textContent = '✗ Error'; statusEl.className = 'text-xs text-red-500'; }
-        }
-
-        // Save global retry settings from Settings tab
-        async function saveGlobalRetrySettings() {
-            const statusEl = document.getElementById('globalRetryStatus');
-            statusEl.textContent = 'Saving...';
-            statusEl.className = 'text-xs text-muted-foreground';
-            
-            try {
-                const global = {
-                    maxRetries: parseInt(document.getElementById('globalMaxRetries').value),
-                    retryDelayMs: parseInt(document.getElementById('globalRetryDelay').value),
-                    retryBackoff: parseFloat(document.getElementById('globalRetryBackoff').value)
-                };
-                
-                const res = await fetch('/admin/api/retry-config', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ global, perProvider: {} })
-                });
-                
-                const data = await res.json();
-                if (data.success) {
-                    statusEl.textContent = '✓ Saved successfully';
-                    statusEl.className = 'text-xs text-green-600';
-                    await loadRetryConfig();
-                    setTimeout(() => { statusEl.textContent = ''; }, 3000);
-                } else {
-                    statusEl.textContent = '✗ Failed: ' + (data.error || 'Unknown');
-                    statusEl.className = 'text-xs text-red-600';
-                }
-            } catch (e) {
-                statusEl.textContent = '✗ Error: ' + e.message;
-                statusEl.className = 'text-xs text-red-600';
+        // Attach auto-save handlers to all settings inputs after loading
+        function attachSettingsAutoSave() {
+            const generalIds = ['settingTimeoutMs', 'settingCorsOrigin', 'settingRateLimitWindow', 'settingRateLimitMax',
+                'settingCacheEnabled', 'settingCacheTtl', 'settingCacheMax', 'settingCbThreshold', 'settingCbTimeout',
+                'settingRecoveryEnabled', 'settingRecoveryCooldown', 'settingAutoCheckKeys', 'settingLogLevel', 'settingLogBufferMax'];
+            for (const id of generalIds) {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('change', autoSaveSettings);
+            }
+            const retryIds = ['globalMaxRetries', 'globalRetryDelay', 'globalRetryBackoff'];
+            for (const id of retryIds) {
+                const el = document.getElementById(id);
+                if (el) el.addEventListener('change', autoSaveRetrySettings);
             }
         }
 
@@ -5221,6 +5186,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 loadFallbacks();
                 loadLbSettings();
                 loadGeneralSettings();
+                attachSettingsAutoSave();
                 updateGlobalSyncUI();
                 loadSyncExclusiveProviders();
                 loadRetryConfig();
