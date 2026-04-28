@@ -5,7 +5,7 @@ const Router = require('./router');
 // Route handler imports
 const { isAdminAuthenticated, handleAuthCheck, handleAdminLogin, handleAdminLogout, handleGetCsrfToken, handleGetLoginStatus, handleChangePassword, handleUpgradePassword } = require('./adminAuth');
 const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetGeneralSettings, handleUpdateGeneralSettings, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./adminEnv');
-const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm, handleUnfreezeKey, handleVaultGetKeys, handleVaultAddKey, handleVaultDeleteKey, handleVaultBanKey, handleVaultUnbanKey, handleVaultRestoreKey, handleVaultGetDeleted, handleVaultGetActiveKey, handleVaultGetAllActiveKeys } = require('./adminKeys');
+const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm, handleUnfreezeKey, handleVaultGetKeys, handleVaultAddKey, handleVaultDeleteKey, handleVaultBanKey, handleVaultUnbanKey, handleVaultRestoreKey, handleVaultGetDeleted, handleVaultGetActiveKey, handleVaultGetAllActiveKeys, handleVaultGetImportSources, handleVaultAddImportSource, handleVaultRemoveImportSource, handleVaultPreviewImport, handleVaultPullImport } = require('./adminKeys');
 const { handleToggleProvider, handleToggleSyncEnv, handleToggleGlobalSync, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey, handleTestAllKeys, handleGetKeySources, handleGetSyncExclusive, handleToggleSyncExclusive } = require('./adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./adminNotifications');
 const { handleGetStatus, handleGetAuditLog } = require('./adminStatus');
@@ -91,6 +91,18 @@ function createAuthenticatedRouter() {
   }});
   router.register({ method: 'GET', path: '/admin/api/vault/deleted', handler: ctx => handleVaultGetDeleted(ctx.server, ctx.res) });
   router.register({ method: 'GET', path: '/admin/api/vault/active-keys', handler: ctx => handleVaultGetAllActiveKeys(ctx.server, ctx.res) });
+
+  // ─── Vault import sources ────────────────────────────────────
+  router.register({ method: 'GET', path: '/admin/api/vault/import-sources', handler: ctx => handleVaultGetImportSources(ctx.server, ctx.res) });
+  router.register({ method: 'POST', path: '/admin/api/vault/import-sources', handler: ctx => handleVaultAddImportSource(ctx.server, ctx.req, ctx.res, ctx.body) });
+  router.register({ method: 'DELETE', path: '/admin/api/vault/import-sources', handler: ctx => handleVaultRemoveImportSource(ctx.server, ctx.req, ctx.res, ctx.body) });
+  router.register({ method: 'POST', path: '/admin/api/vault/import/', prefix: true, handler: ctx => {
+    const parts = ctx.path.split('/');
+    const sourceId = parts[parts.length - 2] || parts[parts.length - 1];
+    const action = parts[parts.length - 1];
+    if (action === 'preview') return handleVaultPreviewImport(ctx.server, ctx.req, ctx.res, sourceId);
+    return handleVaultPullImport(ctx.server, ctx.req, ctx.res, sourceId);
+  }});
   router.register({ method: 'GET', path: '/admin/api/vault/active-key/', prefix: true, handler: ctx => handleVaultGetActiveKey(ctx.server, ctx.res, ctx.path.split('/').pop()) });
 
   // ─── Provider management ────────────────────────────────────

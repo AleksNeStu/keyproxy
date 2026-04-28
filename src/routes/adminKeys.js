@@ -396,6 +396,78 @@ function handleVaultGetAllActiveKeys(server, res) {
   }
 }
 
+// ── Vault import source route handlers ──────────────────────────────────────
+
+function handleVaultGetImportSources(server, res) {
+  try {
+    if (!server.keyVault) { sendError(res, 404, 'Vault not available'); return; }
+    const sources = server.keyVault.getImportSources();
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ sources }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to list import sources: ' + error.message);
+  }
+}
+
+function handleVaultAddImportSource(server, req, res, body) {
+  try {
+    if (!server.keyVault) { sendError(res, 404, 'Vault not available'); return; }
+    const data = typeof body === 'string' ? JSON.parse(body) : body;
+    if (!data.filePath) { sendError(res, 400, 'filePath is required'); return; }
+    const source = server.keyVault.addImportSource(data);
+    server.keyVault.flushSync();
+    server.auditLog.log('vault_add_import_source', { sourceId: source.id, filePath: data.filePath });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true, source }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to add import source: ' + error.message);
+  }
+}
+
+function handleVaultRemoveImportSource(server, req, res, body) {
+  try {
+    if (!server.keyVault) { sendError(res, 404, 'Vault not available'); return; }
+    const data = typeof body === 'string' ? JSON.parse(body) : body;
+    if (!data.id) { sendError(res, 400, 'id is required'); return; }
+    const success = server.keyVault.removeImportSource(data.id);
+    if (!success) { sendError(res, 404, 'Source not found'); return; }
+    server.keyVault.flushSync();
+    server.auditLog.log('vault_remove_import_source', { sourceId: data.id });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ success: true }));
+  } catch (error) {
+    sendError(res, 500, 'Failed to remove import source: ' + error.message);
+  }
+}
+
+function handleVaultPreviewImport(server, req, res, sourceId) {
+  try {
+    if (!server.keyVault) { sendError(res, 404, 'Vault not available'); return; }
+    const result = server.keyVault.previewImport(sourceId);
+    if (result.error) { sendError(res, 400, result.error); return; }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+  } catch (error) {
+    sendError(res, 500, 'Preview failed: ' + error.message);
+  }
+}
+
+function handleVaultPullImport(server, req, res, sourceId) {
+  try {
+    if (!server.keyVault) { sendError(res, 404, 'Vault not available'); return; }
+    const result = server.keyVault.pullImport(sourceId);
+    if (result.error) { sendError(res, 400, result.error); return; }
+    server.keyVault.flushSync();
+    server.config.loadConfig();
+    server.reinitializeClients();
+    server.auditLog.log('vault_pull_import', { sourceId, imported: result.imported, skipped: result.skipped });
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+  } catch (error) {
+    sendError(res, 500, 'Import failed: ' + error.message);
+  }
+}
+
 module.exports = {
   handleToggleKey,
   handleReorderKeys,
@@ -414,4 +486,9 @@ module.exports = {
   handleVaultGetDeleted,
   handleVaultGetActiveKey,
   handleVaultGetAllActiveKeys,
+  handleVaultGetImportSources,
+  handleVaultAddImportSource,
+  handleVaultRemoveImportSource,
+  handleVaultPreviewImport,
+  handleVaultPullImport,
 };
