@@ -63,6 +63,11 @@ function createAuthenticatedRouter() {
   // ─── Logs ───────────────────────────────────────────────────
   router.register({ method: 'GET', path: '/admin/api/logs', handler: ctx => ctx.server.handleGetLogs(ctx.res) });
   router.register({ method: 'GET', path: '/admin/api/response/', prefix: true, handler: ctx => ctx.server.handleGetResponse(ctx.res, ctx.path) });
+  router.register({ method: 'GET', path: '/admin/api/provider-logs', handler: ctx => {
+    const url = new URL(ctx.req.url, 'http://localhost');
+    const query = Object.fromEntries(url.searchParams.entries());
+    ctx.server.handleGetProviderLogs(ctx.res, query);
+  }});
 
   // ─── Key management ─────────────────────────────────────────
   router.register({ method: 'POST', path: '/admin/api/reorder-keys', handler: ctx => handleReorderKeys(ctx.server, ctx.req, ctx.res, ctx.body) });

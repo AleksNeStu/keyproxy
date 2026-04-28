@@ -5017,6 +5017,62 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         
         // Logging functionality
 
+        function populateProviderLogSelect() {
+            const select = document.getElementById('providerLogSelect');
+            if (!select) return;
+            const current = select.value;
+            const providers = new Set();
+            for (const [key, value] of Object.entries(envVars)) {
+                if (key.endsWith('_API_KEYS') && value) {
+                    const name = key.replace('_API_KEYS', '').split('_').slice(1).join('_').toLowerCase();
+                    providers.add(name);
+                }
+            }
+            select.innerHTML = '<option value="">All Providers</option>';
+            for (const p of [...providers].sort()) {
+                select.innerHTML += `<option value="${p}">${p}</option>`;
+            }
+            if (current && providers.has(current)) select.value = current;
+        }
+
+        async function loadProviderLogs() {
+            const tbody = document.getElementById('providerLogsBody');
+            if (!tbody) return;
+            try {
+                const provider = document.getElementById('providerLogSelect')?.value || '';
+                const status = document.getElementById('providerLogStatus')?.value || '';
+                const params = new URLSearchParams();
+                if (provider) params.set('provider', provider);
+                if (status) params.set('status', status);
+                params.set('limit', '100');
+                const res = await fetch(`/admin/api/provider-logs?${params}`);
+                const data = await res.json();
+                const logs = data.logs || [];
+                if (logs.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted-foreground py-4">No logs found</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = logs.map(l => {
+                    const time = l.timestamp ? l.timestamp.substring(11, 23) : '--';
+                    const statusColor = !l.status ? '' : l.status < 300 ? 'text-green-400' : l.status < 400 ? 'text-blue-400' : l.status === 429 ? 'text-amber-400' : 'text-red-400';
+                    const latency = l.responseTime ? l.responseTime + 'ms' : '--';
+                    const key = l.keyUsed ? (l.keyUsed.length > 16 ? l.keyUsed.substring(0, 8) + '...' + l.keyUsed.slice(-4) : l.keyUsed) : '--';
+                    return `<tr class="hover:bg-muted/30">
+                        <td class="px-2 py-1.5 font-mono whitespace-nowrap">${time}</td>
+                        <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(l.provider || '--')}</td>
+                        <td class="px-2 py-1.5">${l.method || '--'}</td>
+                        <td class="px-2 py-1.5 font-mono truncate max-w-[200px]" title="${escapeHtml(l.endpoint || '')}">${escapeHtml((l.endpoint || '--').substring(0, 40))}</td>
+                        <td class="px-2 py-1.5 font-mono ${statusColor}">${l.status || '--'}</td>
+                        <td class="px-2 py-1.5 font-mono whitespace-nowrap">${latency}</td>
+                        <td class="px-2 py-1.5 font-mono text-muted-foreground">${escapeHtml(key)}</td>
+                        <td class="px-2 py-1.5 text-red-400 truncate max-w-[200px]" title="${escapeHtml(l.error || '')}">${escapeHtml((l.error || '').substring(0, 50))}</td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-red-400 py-4">Error: ${escapeHtml(e.message)}</td></tr>`;
+            }
+        }
+
         async function handleRefreshLogs(button) {
             // Add spinning animation to reload button
             if (button) {
@@ -5326,6 +5382,8 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             // Load logs if logs tab is selected
             if (tabName === 'logs') {
                 refreshLogs();
+                populateProviderLogSelect();
+                loadProviderLogs();
             }
             // Load health data if management tab is selected
             if (tabName === 'management') {

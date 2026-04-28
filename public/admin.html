@@ -673,10 +673,52 @@
 
                 <div class="space-y-4">
 
-                    <!-- Logs Display -->
+                    <!-- Provider Log Viewer -->
                     <div class="section">
                         <div class="flex items-center justify-between mb-3">
-                            <h3 class="text-sm font-medium text-foreground">Recent API Requests</h3>
+                            <h3 class="text-sm font-medium text-foreground">Provider Logs</h3>
+                            <div class="flex items-center gap-2">
+                                <select id="providerLogSelect" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
+                                    <option value="">All Providers</option>
+                                </select>
+                                <select id="providerLogStatus" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
+                                    <option value="">All Status</option>
+                                    <option value="success">Success (&lt;400)</option>
+                                    <option value="error">Error (≥400)</option>
+                                    <option value="429">429 Rate Limited</option>
+                                    <option value="401">401 Unauthorized</option>
+                                    <option value="402">402 Payment Required</option>
+                                    <option value="403">403 Forbidden</option>
+                                </select>
+                                <button onclick="loadProviderLogs()" class="btn btn-secondary px-2 py-1 text-xs font-medium">Refresh</button>
+                            </div>
+                        </div>
+                        <div class="border border-border rounded overflow-hidden">
+                            <table class="w-full text-xs">
+                                <thead class="bg-muted/50">
+                                    <tr>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Time</th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Provider</th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Method</th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Endpoint</th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Status</th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Latency</th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Key</th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Error</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="providerLogsBody" class="divide-y divide-border">
+                                    <tr><td colspan="8" class="text-center text-muted-foreground py-4">Loading...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                        <p class="text-[10px] text-muted-foreground mt-1">Showing up to 100 entries from in-memory buffer</p>
+                    </div>
+
+                    <!-- Raw Logs Display -->
+                    <div class="section">
+                        <div class="flex items-center justify-between mb-3">
+                            <h3 class="text-sm font-medium text-foreground">Raw Log Output</h3>
                             <button onclick="handleRefreshLogs(this)" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Refresh logs">
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
@@ -684,7 +726,7 @@
                                 Reload
                             </button>
                         </div>
-                        <p class="text-xs text-muted-foreground mb-3">Last 100 entries kept in memory • Lost on server restart</p>
+                        <p class="text-xs text-muted-foreground mb-3">Last 100 entries kept in memory</p>
                         <div class="bg-gray-900 border border-border rounded">
                             <div id="logsContainer" class="text-green-400 p-3 font-mono text-xs h-80 overflow-y-auto whitespace-pre-wrap"></div>
                         </div>

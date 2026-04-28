@@ -540,6 +540,30 @@ class ProxyServer {
     }
   }
 
+  handleGetProviderLogs(res, query = {}) {
+    try {
+      let logs = this.logBuffer.slice();
+      if (query.provider) {
+        const p = query.provider.toLowerCase();
+        logs = logs.filter(l => (l.provider || '').toLowerCase() === p);
+      }
+      if (query.status) {
+        const statusFilter = query.status;
+        if (statusFilter === 'error') logs = logs.filter(l => l.status >= 400);
+        else if (statusFilter === 'success') logs = logs.filter(l => l.status && l.status < 400);
+        else if (statusFilter === '429') logs = logs.filter(l => l.status === 429);
+        else { const code = parseInt(statusFilter); if (!isNaN(code)) logs = logs.filter(l => l.status === code); }
+      }
+      logs.reverse();
+      const limit = Math.min(parseInt(query.limit) || 100, 500);
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ logs: logs.slice(0, limit), total: logs.length }));
+    } catch (error) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Failed to get provider logs', logs: [] }));
+    }
+  }
+
   async handleGetResponse(res, urlPath) {
     try {
       const testId = urlPath.split('/').pop();
