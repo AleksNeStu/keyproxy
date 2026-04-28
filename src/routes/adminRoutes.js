@@ -5,7 +5,7 @@ const Router = require('./router');
 // Route handler imports
 const { isAdminAuthenticated, handleAuthCheck, handleAdminLogin, handleAdminLogout, handleGetCsrfToken, handleGetLoginStatus, handleChangePassword, handleUpgradePassword } = require('./adminAuth');
 const { handleGetEnvVars, handleGetEnvFile, handleUpdateEnvVars, handleUpdateSettings, handleReloadConfig, handleGetRetryConfig, handleUpdateRetryConfig, handleGetGeneralSettings, handleUpdateGeneralSettings, handleGetEnvFiles, handleAddEnvFile, handleRemoveEnvFile, handleSwitchEnv, handleReorderEnvFiles, handleToggleEnvFileDisabled, handleSelectEnv } = require('./adminEnv');
-const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm, handleUnfreezeKey } = require('./adminKeys');
+const { handleToggleKey, handleReorderKeys, handleGetKeyUsage, handleGetKeyHistory, handleResetKeyHistory, handleTestKeyRecovery, handleGetRpm, handleUnfreezeKey, handleVaultGetKeys, handleVaultAddKey, handleVaultDeleteKey, handleVaultBanKey, handleVaultUnbanKey, handleVaultRestoreKey, handleVaultGetDeleted, handleVaultGetActiveKey } = require('./adminKeys');
 const { handleToggleProvider, handleToggleSyncEnv, handleToggleGlobalSync, handleGetHealth, handleHealthCheckAll, handleHealthReset, handleGetRecoveryStatus, handleRecoveryScan, handleRecoveryProbe, handleTestApiKey, handleTestAllKeys, handleGetKeySources, handleGetSyncExclusive, handleToggleSyncExclusive } = require('./adminProviders');
 const { handleGetNotifications, handleUpdateNotifications, handleTestNotification, handleGetTelegramSettings, handleUpdateTelegramSettings } = require('./adminNotifications');
 const { handleGetStatus, handleGetAuditLog } = require('./adminStatus');
@@ -73,6 +73,24 @@ function createAuthenticatedRouter() {
   router.register({ method: 'POST', path: '/admin/api/key-test', handler: ctx => handleTestKeyRecovery(ctx.server, ctx.req, ctx.res, ctx.body) });
   router.register({ method: 'POST', path: '/admin/api/unfreeze-key', handler: ctx => handleUnfreezeKey(ctx.server, ctx.req, ctx.res, ctx.body) });
   router.register({ method: 'POST', path: '/admin/api/toggle-key', handler: ctx => handleToggleKey(ctx.server, ctx.req, ctx.res, ctx.body) });
+
+  // ─── Vault key management ──────────────────────────────────
+  router.register({ method: 'GET', path: '/admin/api/vault/keys', handler: ctx => handleVaultGetKeys(ctx.server, ctx.res) });
+  router.register({ method: 'GET', path: '/admin/api/vault/keys/', prefix: true, handler: ctx => handleVaultGetKeys(ctx.server, ctx.res, ctx.path.split('/').pop()) });
+  router.register({ method: 'POST', path: '/admin/api/vault/keys', handler: ctx => handleVaultAddKey(ctx.server, ctx.req, ctx.res, ctx.body) });
+  router.register({ method: 'DELETE', path: '/admin/api/vault/keys/', prefix: true, handler: ctx => handleVaultDeleteKey(ctx.server, ctx.res, ctx.path.split('/').pop()) });
+  router.register({ method: 'POST', path: '/admin/api/vault/keys/', prefix: true, handler: ctx => {
+    const parts = ctx.path.split('/');
+    const keyId = parts[parts.length - 2];
+    const action = parts[parts.length - 1];
+    if (action === 'ban') return handleVaultBanKey(ctx.server, ctx.req, ctx.res, ctx.body, keyId);
+    if (action === 'unban') return handleVaultUnbanKey(ctx.server, ctx.res, keyId);
+    if (action === 'restore') return handleVaultRestoreKey(ctx.server, ctx.res, keyId);
+    ctx.res.writeHead(400, { 'Content-Type': 'application/json' });
+    ctx.res.end(JSON.stringify({ error: 'Unknown vault key action' }));
+  }});
+  router.register({ method: 'GET', path: '/admin/api/vault/deleted', handler: ctx => handleVaultGetDeleted(ctx.server, ctx.res) });
+  router.register({ method: 'GET', path: '/admin/api/vault/active-key/', prefix: true, handler: ctx => handleVaultGetActiveKey(ctx.server, ctx.res, ctx.path.split('/').pop()) });
 
   // ─── Provider management ────────────────────────────────────
   router.register({ method: 'POST', path: '/admin/api/toggle-provider', handler: ctx => handleToggleProvider(ctx.server, ctx.req, ctx.res, ctx.body) });
