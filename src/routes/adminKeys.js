@@ -378,6 +378,24 @@ function handleVaultGetActiveKey(server, res, providerName) {
   }
 }
 
+/**
+ * GET /admin/api/vault/active-keys — get all currently active keys (provider → masked key).
+ */
+function handleVaultGetAllActiveKeys(server, res) {
+  try {
+    const result = {};
+    if (server.activeKeyMap) {
+      for (const [provider, key] of server.activeKeyMap.entries()) {
+        result[provider] = key;
+      }
+    }
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(result));
+  } catch (error) {
+    sendError(res, 500, 'Failed to get active keys: ' + error.message);
+  }
+}
+
 module.exports = {
   handleToggleKey,
   handleReorderKeys,
@@ -395,4 +413,5 @@ module.exports = {
   handleVaultRestoreKey,
   handleVaultGetDeleted,
   handleVaultGetActiveKey,
+  handleVaultGetAllActiveKeys,
 };

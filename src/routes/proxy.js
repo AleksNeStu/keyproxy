@@ -163,6 +163,9 @@ async function getProviderClient(server, providerName, provider, legacy = false)
     keyRotator.onRotation = (provName, statusCode) => {
       server.metrics.incCounter('keyproxy_key_rotations_total', { provider: provName });
     };
+    keyRotator.onActiveKeyChange = (provName, fullKey) => {
+      server.activeKeyMap.set(provName, fullKey);
+    };
     // Sync provider keys into history (add fresh entries, remove stale ones)
     const allKeys = provider.allKeys ? provider.allKeys.map(k => k.key) : enabledKeys;
     server.historyManager.syncProviderKeys(providerName, allKeys);

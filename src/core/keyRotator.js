@@ -15,6 +15,7 @@ class KeyRotator {
     this.keyWeights = new Map(); // Per-key weight for weighted-random
     this.keyFirstSeen = new Map(); // Track when key was first seen (for TTL)
     this.onRotation = null; // Callback: (providerName, statusCode) => void
+    this.onActiveKeyChange = null; // Callback: (providerName, fullKey) => void
     // Initialize usage counts and default weights for all keys
     for (const key of this.apiKeys) {
       this.keyUsageCount.set(key, 0);
@@ -33,13 +34,18 @@ class KeyRotator {
    * @param {string} key 
    */
   async syncIfChanged(key) {
-    if (!this.systemEnvName || !key) return;
+    if (!key) return;
     if (key === this.activeKey) return;
 
+    this.activeKey = key;
+    if (this.onActiveKeyChange) {
+      this.onActiveKeyChange(this.providerName, key);
+    }
+
+    if (!this.systemEnvName) return;
     const DestinationManager = require('../destinations/manager');
     try {
       await DestinationManager.sync(this.systemEnvName, key);
-      this.activeKey = key;
     } catch (error) {
       console.error(`[${this.apiType.toUpperCase()}-ROTATOR] Sync failed:`, error.message);
     }

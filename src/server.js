@@ -34,6 +34,7 @@ class ProxyServer {
     this.geminiClient = geminiClient;
     this.openaiClient = openaiClient;
     this.providerClients = new Map(); // Map of provider_name -> client instance
+    this.activeKeyMap = new Map(); // Map of provider_name -> currently active full key
     this.server = null;
     this.adminSessionToken = null;
     this.csrfToken = null; // CSRF token for authenticated session
@@ -801,6 +802,7 @@ class ProxyServer {
     // Reinitialize legacy clients for backward compatibility
     if (this.config.hasGeminiKeys()) {
       const geminiKeyRotator = new this.KeyRotator(this.config.getGeminiApiKeys(), 'gemini', null, this.historyManager);
+      geminiKeyRotator.onActiveKeyChange = (provName, fullKey) => { this.activeKeyMap.set(provName, fullKey); };
       this.geminiClient = new this.GeminiClient(geminiKeyRotator, this.config.getGeminiBaseUrl(), 'gemini', this.config.getRetryConfig('gemini'));
       console.log('[SERVER] Legacy Gemini client reinitialized');
     } else {
@@ -810,6 +812,7 @@ class ProxyServer {
 
     if (this.config.hasOpenaiKeys()) {
       const openaiKeyRotator = new this.KeyRotator(this.config.getOpenaiApiKeys(), 'openai', null, this.historyManager);
+      openaiKeyRotator.onActiveKeyChange = (provName, fullKey) => { this.activeKeyMap.set(provName, fullKey); };
       this.openaiClient = new this.OpenAIClient(openaiKeyRotator, this.config.getOpenaiBaseUrl(), 'openai', this.config.getRetryConfig('openai'));
       console.log('[SERVER] Legacy OpenAI client reinitialized');
     } else {

@@ -1004,6 +1004,14 @@
                     fetch('/admin/api/telegram').catch(() => ({ ok: false })),
                     fetch('/admin/api/key-history').catch(() => ({ ok: false }))
                 ]);
+
+                // Fetch active keys from vault for all providers
+                try {
+                    const activeRes = await fetch('/admin/api/vault/active-keys');
+                    if (activeRes.ok) {
+                        window._activeKeyMap = await activeRes.json();
+                    }
+                } catch (_) {}
                 
                 if (!envResponse.ok) {
                     throw new Error(`Failed to load environment: ${envResponse.status} ${envResponse.statusText}`);
@@ -2232,6 +2240,10 @@
                                     const envSourceMap = window._keySourceMap || {};
                                     const envSourceName = envSourceMap[provider.name + ':' + keyVal] || '';
 
+                                    // Check if this is the currently active key in rotation
+                                    const activeKeyForProvider = (window._activeKeyMap || {})[provider.name];
+                                    const isInUse = activeKeyForProvider && activeKeyForProvider === keyVal;
+
                                     // Last check time display
                                     let lastCheckDisplay = '';
                                     if (lastCheckTime) {
@@ -2246,6 +2258,7 @@
                                         <!-- Status dot -->
                                         <span class="key-status-dot ${dotClass}" title="${keyStatus}"></span>
                                         ${badgeHtml}
+                                        ${isInUse ? '<span class="inline-flex items-center gap-1 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30" title="Currently in-use by KeyRotator"><span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>IN USE</span>' : ''}
                                         <!-- Reorder arrows -->
                                         <div class="flex flex-col">
                                             <button onclick="moveKey('${_ja}', '${_jn}', ${keyIndex}, 'up')"
