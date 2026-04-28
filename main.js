@@ -4,10 +4,24 @@ const KeyRotator = require('./src/core/keyRotator');
 const GeminiClient = require('./src/providers/gemini');
 const OpenAIClient = require('./src/providers/openai');
 const ProxyServer = require('./src/server');
+const KeyVault = require('./src/core/keyVault');
 
 function main() {
   try {
-    const config = new Config();
+    // Create KeyVault before Config — it's the key data source
+    const vault = new KeyVault();
+
+    // First-time migration: if vault is empty, do a preliminary Config load from env,
+    // migrate to vault, then let Config read from vault.
+    if (vault.needsMigration()) {
+      console.log('[INIT] Vault is empty, running first-time migration from .env files...');
+      const tempConfig = new Config(); // Load from env for migration source
+      const knownDefaults = tempConfig.knownDefaults || {};
+      vault.runMigration(tempConfig, knownDefaults);
+    }
+
+    const config = new Config({ keyVault: vault });
+    // Config constructor already called loadConfig(), which reads from vault
 
     // Migrate admin password from .env to hash file if needed
     const envPassword = config.envVars.ADMIN_PASSWORD;
@@ -58,11 +72,13 @@ function main() {
     const server = new ProxyServer(config, geminiClient, openaiClient);
     server.exclusionManager = exclusionManager;
     server.envSourceManager = envSourceManager;
+    server.keyVault = vault;
     server.start();
 
     process.on('SIGINT', () => {
       console.log('\nShutting down server...');
       server.stop();
+      vault.flushSync();
       process.exit(0);
     });
 

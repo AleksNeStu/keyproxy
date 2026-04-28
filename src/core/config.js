@@ -3,7 +3,7 @@ const path = require('path');
 const { maskApiKey } = require('./utils');
 
 class Config {
-  constructor() {
+  constructor(options = {}) {
     this.port = null;
     this.providers = new Map(); // Map of provider_name -> { apiType, keys, baseUrl }
     this.geminiApiKeys = [];
@@ -11,7 +11,13 @@ class Config {
     this.baseUrl = null;
     this.envVars = {}; // Stored merged configuration
     this.keySourceMap = {}; // Maps 'providerName:keyValue' → env var name
+    this.keyVault = options.keyVault || null; // Set via constructor or setKeyVault()
     this.loadConfig();
+  }
+
+  /** Attach KeyVault as alternative data source. */
+  setKeyVault(vault) {
+    this.keyVault = vault;
   }
 
   getEffectiveEnvVars() {
@@ -60,9 +66,13 @@ class Config {
     this.providers.clear();
     this.keySourceMap = {};
 
-    // Parse providers from accumulated envVars
-    this.parseProviders(envVars);
-    this.parseBackwardCompatibility(envVars);
+    // Load providers from vault if available, otherwise from env vars
+    if (this.keyVault && !this.keyVault.needsMigration()) {
+      this.loadProvidersFromVault();
+    } else {
+      this.parseProviders(envVars);
+      this.parseBackwardCompatibility(envVars);
+    }
 
     console.log(`[CONFIG] Found ${this.providers.size} providers configured`);
 
@@ -86,14 +96,16 @@ class Config {
       zhipuai: { type: 'openai', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', keyPattern: '(ZHIPUAI|GLM)', category: 'ai' },
       siliconflow: { type: 'openai', baseUrl: 'https://api.siliconflow.cn/v1', category: 'ai' },
       // MCP / Search / Content Providers
-      brave: { type: 'openai', baseUrl: 'https://api.search.brave.com', authHeader: 'X-Subscription-Token', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
-      exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([401, 402]) },
+      // freezeOnStatusCodes: permanent key disable (credits that don't refresh)
+      // 401 on other providers just triggers rotation (try next key)
+      brave: { type: 'openai', baseUrl: 'https://api.search.brave.com', authHeader: 'X-Subscription-Token', authPrefix: '', category: 'mcp' },
+      exa: { type: 'openai', baseUrl: 'https://api.exa.ai', authHeader: 'x-api-key', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([402]) },
       jina: { type: 'openai', baseUrl: 'https://api.jina.ai', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
       firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
-      context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
-      onref: { type: 'openai', baseUrl: 'https://api.ref.tools', keyPattern: 'REF', authHeader: 'x-ref-api-key', authPrefix: '', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
-      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
-      searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
+      context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      onref: { type: 'openai', baseUrl: 'https://api.ref.tools', keyPattern: 'REF', authHeader: 'x-ref-api-key', authPrefix: '', category: 'mcp' },
+      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1', category: 'mcp' },
     };
 
     // Discovery container: { name: { type, keys: [], baseUrl } }
@@ -408,6 +420,40 @@ class Config {
         baseUrl: baseUrl
       });
     }
+  }
+
+  /**
+   * Load providers and keys from KeyVault instead of env parsing.
+   * Produces the same data structure as parseProviders() for compatibility.
+   */
+  loadProvidersFromVault() {
+    const vaultProviders = this.keyVault.getProviders();
+    for (const [name, provConfig] of Object.entries(vaultProviders)) {
+      const keyData = this.keyVault.getKeysForConfig(name);
+      if (keyData.enabledKeys.length === 0) continue;
+
+      const provider = {
+        apiType: provConfig.apiType || 'openai',
+        keys: keyData.enabledKeys,
+        allKeys: keyData.allKeys,
+        baseUrl: provConfig.baseUrl || '',
+        accessKey: provConfig.accessKey || null,
+        defaultModel: provConfig.defaultModel || null,
+        allowedModels: provConfig.allowedModels || [],
+        disabled: provConfig.disabled || false,
+        syncEnv: provConfig.syncEnv || false,
+        authHeader: provConfig.authHeader || null,
+        authPrefix: provConfig.authPrefix !== undefined ? provConfig.authPrefix : null,
+      };
+
+      // Restore freezeOnStatusCodes as Set
+      if (provConfig.freezeOnStatusCodes && provConfig.freezeOnStatusCodes.length > 0) {
+        provider.freezeOnStatusCodes = new Set(provConfig.freezeOnStatusCodes);
+      }
+
+      this.providers.set(name, provider);
+    }
+    console.log(`[CONFIG] Loaded ${this.providers.size} providers from vault`);
   }
 
   getPort() {
