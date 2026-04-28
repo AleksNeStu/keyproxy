@@ -250,6 +250,44 @@ class ProxyServer {
       return;
     }
 
+    // Serve uploaded images (no body read needed)
+    if (req.url.startsWith('/uploads/') && req.method === 'GET') {
+      const { serveUpload } = require('./routes/adminImages');
+      serveUpload(this, req, res);
+      return;
+    }
+
+    // Image upload — multipart, must bypass readRequestBody
+    if (req.url === '/admin/api/images/upload' && req.method === 'POST') {
+      const { handleUploadImage } = require('./routes/adminImages');
+      // Auth check
+      if (!isAdminAuthenticated(this, req)) {
+        sendError(res, 401, 'Authentication required');
+        return;
+      }
+      // CSRF check (same pattern as handleAdminRequest)
+      const headerToken = req.headers['x-csrf-token'] || req.headers['X-CSRF-Token'];
+      const sessionToken = this.csrfToken;
+      if (!sessionToken || !headerToken) {
+        sendError(res, 403, 'Invalid CSRF token');
+        return;
+      }
+      try {
+        const sessionBuffer = Buffer.from(sessionToken, 'hex');
+        const headerBuffer = Buffer.from(headerToken, 'hex');
+        if (sessionBuffer.length !== headerBuffer.length || !crypto.timingSafeEqual(sessionBuffer, headerBuffer)) {
+          sendError(res, 403, 'Invalid CSRF token');
+          return;
+        }
+      } catch {
+        sendError(res, 403, 'Invalid CSRF token');
+        return;
+      }
+      this.csrfToken = refreshCsrfToken(this);
+      handleUploadImage(this, req, res);
+      return;
+    }
+
     const body = await readRequestBody(req);
 
     // Serve MCP intercept module (no cache - development files)

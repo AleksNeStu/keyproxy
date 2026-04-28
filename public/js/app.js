@@ -5108,7 +5108,8 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             analytics: 'analytics',
             virtualkeys: 'virtual-keys',
             budgets: 'budgets',
-            settings: 'settings'
+            settings: 'settings',
+            images: 'images'
         };
         const HASH_TO_TAB = Object.fromEntries(Object.entries(TAB_HASHES).map(([k, v]) => [v, k]));
 
@@ -5192,8 +5193,150 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 loadRetryConfig();
                 loadProviderConfig();
             }
+            // Load images if images tab is selected
+            if (tabName === 'images') {
+                loadImages();
+            }
         }
-        
+
+        // ─── Image Gallery ─────────────────────────────────────────
+
+        async function loadImages() {
+            try {
+                const resp = await fetch('/admin/api/images', { credentials: 'include' });
+                if (!resp.ok) return;
+                const data = await resp.json();
+                renderImageGallery(data.images || []);
+            } catch (e) {
+                console.error('Failed to load images:', e);
+            }
+        }
+
+        function renderImageGallery(images) {
+            const gallery = document.getElementById('imageGallery');
+            const empty = document.getElementById('imageEmptyState');
+            if (!gallery) return;
+
+            if (images.length === 0) {
+                gallery.innerHTML = '';
+                if (empty) empty.classList.remove('hidden');
+                return;
+            }
+            if (empty) empty.classList.add('hidden');
+
+            gallery.innerHTML = images.map(img => `
+                <div class="group relative border border-border rounded-lg overflow-hidden bg-card" data-image-id="${img.id}">
+                    <div class="aspect-square bg-muted flex items-center justify-center overflow-hidden">
+                        <img src="${img.url}" alt="${img.originalName || img.filename}"
+                             class="w-full h-full object-cover"
+                             loading="lazy"
+                             onerror="this.parentElement.innerHTML='<svg class=\\'w-8 h-8 text-muted-foreground\\' fill=\\'none\\' stroke=\\'currentColor\\' viewBox=\\'0 0 24 24\\'><path stroke-linecap=\\'round\\' stroke-linejoin=\\'round\\' stroke-width=\\'2\\' d=\\'M12 9v2m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z\\'/></svg>'">
+                    </div>
+                    <div class="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                        <div class="flex gap-2">
+                            <button onclick="copyImageUrl('${img.url}')" class="p-2 bg-background rounded-full shadow hover:bg-primary hover:text-primary-foreground transition-colors" title="Copy URL">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
+                            </button>
+                            <button onclick="deleteImage('${img.id}')" class="p-2 bg-background rounded-full shadow hover:bg-destructive hover:text-destructive-foreground transition-colors" title="Delete">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-2">
+                        <p class="text-xs text-foreground truncate" title="${img.originalName || img.filename}">${img.originalName || img.filename}</p>
+                        <p class="text-[10px] text-muted-foreground">${formatFileSize(img.size)}</p>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatFileSize(bytes) {
+            if (!bytes) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function copyImageUrl(url) {
+            const fullUrl = window.location.origin + url;
+            navigator.clipboard.writeText(fullUrl).then(() => {
+                showNotification('URL copied to clipboard', 'success');
+            }).catch(() => {
+                const input = document.createElement('input');
+                input.value = fullUrl;
+                document.body.appendChild(input);
+                input.select();
+                document.execCommand('copy');
+                document.body.removeChild(input);
+                showNotification('URL copied to clipboard', 'success');
+            });
+        }
+
+        async function deleteImage(imageId) {
+            if (!confirm('Delete this image?')) return;
+            try {
+                const resp = await fetch(`/admin/api/images/${imageId}`, {
+                    method: 'DELETE',
+                    headers: { 'X-CSRF-Token': csrfToken },
+                    credentials: 'include'
+                });
+                if (resp.ok) {
+                    const card = document.querySelector(`[data-image-id="${imageId}"]`);
+                    if (card) card.remove();
+                    showNotification('Image deleted', 'success');
+                    const gallery = document.getElementById('imageGallery');
+                    if (gallery && gallery.children.length === 0) {
+                        document.getElementById('imageEmptyState')?.classList.remove('hidden');
+                    }
+                }
+            } catch (e) {
+                showNotification('Failed to delete image', 'error');
+            }
+        }
+
+        function handleImageDrop(event) {
+            const files = event.dataTransfer.files;
+            if (files.length) handleImageUpload(files);
+        }
+
+        async function handleImageUpload(files) {
+            if (!files || files.length === 0) return;
+
+            const progress = document.getElementById('imageUploadProgress');
+            const status = document.getElementById('imageUploadStatus');
+            if (progress) progress.classList.remove('hidden');
+
+            let uploaded = 0;
+            for (const file of files) {
+                if (status) status.textContent = `Uploading ${uploaded + 1}/${files.length}: ${file.name}`;
+                try {
+                    const formData = new FormData();
+                    formData.append('image', file);
+                    const resp = await fetch('/admin/api/images/upload', {
+                        method: 'POST',
+                        headers: { 'X-CSRF-Token': csrfToken },
+                        credentials: 'include',
+                        body: formData
+                    });
+                    if (!resp.ok) {
+                        const err = await resp.json().catch(() => ({ error: 'Upload failed' }));
+                        showNotification(err.error || 'Upload failed', 'error');
+                    }
+                    uploaded++;
+                } catch (e) {
+                    showNotification(`Failed to upload ${file.name}`, 'error');
+                }
+            }
+
+            if (progress) progress.classList.add('hidden');
+            document.getElementById('imageFileInput').value = '';
+            if (uploaded > 0) {
+                showNotification(`${uploaded} image(s) uploaded`, 'success');
+                loadImages();
+            }
+        }
+
         // Health monitoring
         let healthRefreshTimer = null;
 
