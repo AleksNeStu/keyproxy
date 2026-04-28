@@ -44,10 +44,8 @@ function main() {
     const KeyExclusionManager = require('./src/core/exclusions');
     const exclusionManager = new KeyExclusionManager();
 
-    // Initialize Environment Source Manager
-    const EnvSourceManager = require('./src/core/envSources');
-    const envSourceManager = new EnvSourceManager();
-    destMgr.setExclusionManager(exclusionManager);
+    // Initialize Environment Source Manager (legacy, kept for migration only)
+    // Import sources are now managed by KeyVault
 
     // Initialize legacy clients for backward compatibility
     let geminiClient = null;
@@ -71,7 +69,6 @@ function main() {
 
     const server = new ProxyServer(config, geminiClient, openaiClient);
     server.exclusionManager = exclusionManager;
-    server.envSourceManager = envSourceManager;
     server.keyVault = vault;
     server.start();
 
