@@ -50,6 +50,8 @@ class ProxyServer {
     this.logFlushTimer = null;
     this.logFlushDelay = 5000; // 5 second debounce
     this.logFilePath = path.join(process.cwd(), 'logs.jsonl');
+    this.logFileMaxBytes = (parseInt(process.env.KEYPROXY_LOG_FILE_MAX_MB) || 10) * 1024 * 1024;
+    this._loadLogsFromFile();
 
     // Rate limiting for login
     this.failedLoginAttempts = 0;
@@ -637,6 +639,25 @@ class ProxyServer {
     this.logFlushTimer = setTimeout(() => this.flushLogs(), this.logFlushDelay);
   }
 
+  _loadLogsFromFile() {
+    try {
+      if (!fs.existsSync(this.logFilePath)) return;
+      const content = fs.readFileSync(this.logFilePath, 'utf8').trim();
+      if (!content) return;
+      const lines = content.split('\n');
+      const entries = [];
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        try { entries.push(JSON.parse(line)); } catch {}
+      }
+      const recent = entries.slice(-100);
+      this.logBuffer = recent;
+      console.log(`[LOG] Loaded ${recent.length} entries from ${path.basename(this.logFilePath)}`);
+    } catch (err) {
+      console.log(`[LOG] Could not load log file: ${err.message}`);
+    }
+  }
+
   flushLogs(sync = false) {
     if (this.pendingLogEntries.length === 0) return;
 
@@ -648,6 +669,17 @@ class ProxyServer {
     }
 
     const lines = entries.map(e => JSON.stringify(e)).join('\n') + '\n';
+
+    // Rotate log file if it exceeds max size
+    try {
+      const stat = fs.statSync(this.logFilePath);
+      if (stat.size > this.logFileMaxBytes) {
+        const backup = this.logFilePath + '.1';
+        try { fs.unlinkSync(backup); } catch {}
+        fs.renameSync(this.logFilePath, backup);
+        console.log(`[LOG] Rotated log file (${(stat.size / 1024 / 1024).toFixed(1)}MB)`);
+      }
+    } catch {}
 
     if (sync) {
       try {
