@@ -47,7 +47,7 @@ class BaseProvider {
     let lastResponse = null;
     const failedKeys = [];
 
-    const rotationStatusCodes = customStatusCodes || new Set([429]);
+    const rotationStatusCodes = customStatusCodes || new Set([401, 429]);
     const { maxRetries, retryDelayMs, retryBackoff } = this.retryConfig;
 
     let apiKey;

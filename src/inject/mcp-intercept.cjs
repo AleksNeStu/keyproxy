@@ -18,7 +18,7 @@
 'use strict';
 
 const PROXY_URL = (process.env.KEYPROXY_URL || 'http://localhost:8990').replace(/\/+$/, '');
-const STATUS_CODES = process.env.KEYPROXY_STATUS_CODES || '429,402,403';
+const STATUS_CODES = process.env.KEYPROXY_STATUS_CODES || '401,429,402,403';
 
 // Default route mapping: API host → KeyProxy provider name
 const DEFAULT_ROUTES = {
