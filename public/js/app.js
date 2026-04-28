@@ -1048,6 +1048,8 @@
                 
                 // Load unified status after environment is loaded
                 loadUnifiedStatus();
+                // Load vault banned/deleted key sections
+                loadVaultKeySections();
             } catch (error) {
                 console.error('[LOAD] Failed to load environment:', error);
                 showError('envError', 'Failed to load environment variables: ' + error.message);
@@ -2397,6 +2399,105 @@
             const clearBtn = document.getElementById('providerSearchClear');
             if (clearBtn) clearBtn.classList.add('hidden');
             applyProviderFilter();
+        }
+
+        // ── Vault banned & deleted keys UI ──────────────────────────
+
+        async function loadVaultKeySections() {
+            try {
+                const vaultRes = await fetch('/admin/api/vault/keys');
+                if (!vaultRes.ok) return;
+                const allKeys = await vaultRes.json();
+
+                const banned = allKeys.filter(k => k.status === 'banned');
+                const bannedSection = document.getElementById('bannedKeysSection');
+                const bannedContainer = document.getElementById('bannedKeysContainer');
+                const bannedCount = document.getElementById('bannedKeysCount');
+                if (banned.length > 0 && bannedSection && bannedContainer) {
+                    bannedSection.style.display = '';
+                    bannedCount.textContent = `(${banned.length})`;
+                    bannedContainer.innerHTML = banned.map(k => {
+                        const masked = k.keyValue.length > 16 ? k.keyValue.substring(0, 8) + '...' + k.keyValue.slice(-4) : k.keyValue;
+                        const banDate = k.bannedAt ? new Date(k.bannedAt).toLocaleString() : 'unknown';
+                        return `<div class="flex items-center space-x-2" style="border-left:3px solid #ef4444;padding-left:8px;border-radius:4px;opacity:0.7">
+                            <span class="key-badge badge-failed">BANNED</span>
+                            <span class="text-xs text-muted-foreground">${escapeHtml(k.providerName)}</span>
+                            <code class="text-xs font-mono bg-muted px-2 py-0.5 rounded">${masked}</code>
+                            <span class="text-[10px] text-muted-foreground">${escapeHtml(k.banReason || '')} &middot; ${banDate}</span>
+                            <button onclick="vaultUnbanKey('${k.id}')" class="btn btn-secondary px-2 py-1 text-xs font-medium">Unban</button>
+                        </div>`;
+                    }).join('');
+                } else if (bannedSection) {
+                    bannedSection.style.display = 'none';
+                }
+
+                const deletedRes = await fetch('/admin/api/vault/deleted');
+                const deleted = deletedRes.ok ? await deletedRes.json() : [];
+                const deletedSection = document.getElementById('deletedKeysSection');
+                const deletedContainer = document.getElementById('deletedKeysContainer');
+                const deletedCount = document.getElementById('deletedKeysCount');
+                if (deleted.length > 0 && deletedSection && deletedContainer) {
+                    deletedSection.style.display = '';
+                    deletedCount.textContent = `(${deleted.length})`;
+                    deletedContainer.innerHTML = deleted.map(k => {
+                        const masked = k.keyValue.length > 16 ? k.keyValue.substring(0, 8) + '...' + k.keyValue.slice(-4) : k.keyValue;
+                        const delDate = k.deletedAt ? new Date(k.deletedAt).toLocaleString() : 'unknown';
+                        return `<div class="flex items-center space-x-2" style="border-left:3px solid #6b7280;padding-left:8px;border-radius:4px;opacity:0.5">
+                            <span class="key-badge" style="background:rgba(107,114,128,0.15);color:#9ca3af;border:1px solid rgba(107,114,128,0.3)">DELETED</span>
+                            <span class="text-xs text-muted-foreground">${escapeHtml(k.providerName)}</span>
+                            <code class="text-xs font-mono bg-muted px-2 py-0.5 rounded">${masked}</code>
+                            <span class="text-[10px] text-muted-foreground">${delDate}</span>
+                            <button onclick="vaultRestoreKey('${k.id}')" class="btn btn-secondary px-2 py-1 text-xs font-medium">Restore</button>
+                            <button onclick="vaultPermaDeleteKey('${k.id}')" class="btn btn-destructive px-2 py-1 text-xs font-medium">Permanent Delete</button>
+                        </div>`;
+                    }).join('');
+                } else if (deletedSection) {
+                    deletedSection.style.display = 'none';
+                }
+            } catch (e) {
+                console.error('[VAULT] Failed to load key sections:', e);
+            }
+        }
+
+        async function vaultUnbanKey(keyId) {
+            try {
+                const res = await fetch(`/admin/api/vault/keys/${keyId}/unban`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                const data = await res.json();
+                if (data.success) {
+                    showSuccessToast('Key unbanned successfully');
+                    loadVaultKeySections();
+                } else {
+                    showErrorToast(data.error || 'Failed to unban key');
+                }
+            } catch (e) { showErrorToast('Unban failed: ' + e.message); }
+        }
+
+        async function vaultRestoreKey(keyId) {
+            try {
+                const res = await fetch(`/admin/api/vault/keys/${keyId}/restore`, { method: 'POST', headers: { 'Content-Type': 'application/json' } });
+                const data = await res.json();
+                if (data.success) {
+                    showSuccessToast('Key restored successfully');
+                    loadVaultKeySections();
+                    loadEnvVars();
+                } else {
+                    showErrorToast(data.error || 'Failed to restore key');
+                }
+            } catch (e) { showErrorToast('Restore failed: ' + e.message); }
+        }
+
+        async function vaultPermaDeleteKey(keyId) {
+            if (!confirm('Permanently delete this key? This cannot be undone.')) return;
+            try {
+                const res = await fetch(`/admin/api/vault/keys/${keyId}`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' } });
+                const data = await res.json();
+                if (data.success) {
+                    showSuccessToast('Key permanently deleted');
+                    loadVaultKeySections();
+                } else {
+                    showErrorToast(data.error || 'Failed to delete key');
+                }
+            } catch (e) { showErrorToast('Delete failed: ' + e.message); }
         }
 
         function filterByCategory(cat) {
