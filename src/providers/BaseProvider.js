@@ -52,7 +52,9 @@ class BaseProvider {
 
     let apiKey;
     let attempt = 0;
-    while ((apiKey = requestContext.getNextKey()) !== null && attempt < maxRetries) {
+    while (attempt < maxRetries) {
+      apiKey = requestContext.getNextKey();
+      if (apiKey === null) break;
       attempt++;
       const maskedKey = maskApiKey(apiKey);
 

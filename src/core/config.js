@@ -118,7 +118,7 @@ class Config {
       firecrawl: { type: 'openai', baseUrl: 'https://api.firecrawl.dev', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([401]) },
       context7: { type: 'openai', baseUrl: 'https://context7.com/api', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
       onref: { type: 'openai', baseUrl: 'https://api.ref.tools', keyPattern: 'REF', authHeader: 'x-ref-api-key', authPrefix: '', category: 'mcp' },
-      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp' },
+      tavily: { type: 'openai', baseUrl: 'https://api.tavily.com', keyPattern: 'TAVILY', authHeader: 'Authorization', authPrefix: 'Bearer', category: 'mcp', freezeOnStatusCodes: new Set([402]) },
       searchapi: { type: 'openai', baseUrl: 'https://www.searchapi.io/api/v1', category: 'mcp' },
     };
 
