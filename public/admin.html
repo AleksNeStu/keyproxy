@@ -323,19 +323,6 @@
                             </svg>
                             <span class="text-sm">Settings</span>
                         </button>
-                        <button
-                            onclick="showTab('images')"
-                            class="tab-btn py-3 px-2 border-b-2 border-transparent text-muted-foreground hover:text-foreground hover:border-border transition-colors flex items-center space-x-2"
-                            data-tab="images"
-                            role="tab"
-                            aria-selected="false"
-                            aria-controls="images"
-                        >
-                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                            </svg>
-                            <span class="text-sm">Images</span>
-                        </button>
                     </nav>
                     
                     <!-- Header Notifications Area (placeholder for positioning) -->
@@ -1678,54 +1665,6 @@
                             <p id="noProvidersConfig" class="text-xs text-muted-foreground text-center py-4 hidden">No providers configured yet.</p>
                         </div>
                     </div>
-                </div>
-            </div>
-
-            <!-- Images Tab -->
-            <div id="images" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-images">
-                <div class="section-header">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-lg font-semibold text-foreground">Image Gallery</h2>
-                            <p class="text-sm text-muted-foreground">Upload and manage images. Use uploaded images via direct URL.</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Upload area -->
-                <div class="mt-4 border-2 border-dashed border-border rounded-lg p-8 text-center hover:border-primary/50 transition-colors cursor-pointer"
-                     id="imageDropZone"
-                     onclick="document.getElementById('imageFileInput').click()"
-                     ondragover="event.preventDefault(); this.classList.add('border-primary', 'bg-primary/5')"
-                     ondragleave="this.classList.remove('border-primary', 'bg-primary/5')"
-                     ondrop="event.preventDefault(); this.classList.remove('border-primary', 'bg-primary/5'); handleImageDrop(event)">
-                    <svg class="w-10 h-10 mx-auto text-muted-foreground mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                    </svg>
-                    <p class="text-sm text-muted-foreground">Drop images here or click to upload</p>
-                    <p class="text-xs text-muted-foreground mt-1">JPEG, PNG, GIF, WebP, SVG — max 10 MB</p>
-                    <input type="file" id="imageFileInput" class="hidden" accept="image/*" multiple onchange="handleImageUpload(this.files)">
-                </div>
-
-                <!-- Upload progress -->
-                <div id="imageUploadProgress" class="hidden mt-3">
-                    <div class="flex items-center gap-2 text-sm text-muted-foreground">
-                        <svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <span id="imageUploadStatus">Uploading...</span>
-                    </div>
-                </div>
-
-                <!-- Image grid -->
-                <div id="imageGallery" class="mt-6 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                    <!-- Images will be rendered here -->
-                </div>
-
-                <!-- Empty state -->
-                <div id="imageEmptyState" class="hidden mt-8 text-center">
-                    <p class="text-sm text-muted-foreground">No images uploaded yet.</p>
                 </div>
             </div>
 

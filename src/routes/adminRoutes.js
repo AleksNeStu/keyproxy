@@ -14,7 +14,6 @@ const { handleFetchModels, handleSaveModels } = require('./adminModels');
 const { handleGetExclusions, handleAddExclusion, handleRemoveExclusion, handleToggleExclusion, handleTestExclusion } = require('./adminExclusions');
 const { handleGetEnvSources, handleAddEnvSource, handleRemoveEnvSource, handlePreviewEnvSource, handlePullEnvSource } = require('./adminEnvSources');
 const { handleGetAgentContext } = require('./adminMcp');
-const { handleListImages, handleUploadImage, handleDeleteImage } = require('./adminImages');
 
 /**
  * Pre-auth routes: run before authentication/CSRF gate.
@@ -234,10 +233,6 @@ function createAuthenticatedRouter() {
 
   // ─── Agent context ──────────────────────────────────────────
   router.register({ method: 'GET', path: '/admin/api/agent-context', handler: ctx => handleGetAgentContext(ctx.server, ctx.res, ctx.params) });
-
-  // ─── Images ─────────────────────────────────────────────────
-  router.register({ method: 'GET', path: '/admin/api/images', handler: ctx => handleListImages(ctx.server, ctx.res) });
-  router.register({ method: 'DELETE', path: '/admin/api/images/', prefix: true, handler: ctx => handleDeleteImage(ctx.server, ctx.res, ctx.path.split('/').pop()) });
 
   return router;
 }
