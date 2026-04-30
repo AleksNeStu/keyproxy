@@ -1,3 +1,23 @@
+// Global timestamp prefix for all console output
+const origLog = console.log;
+console.log = (...args) => {
+  const t = new Date().toTimeString().slice(0, 8);
+  if (typeof args[0] === 'string') {
+    origLog(`${t} ${args[0]}`, ...args.slice(1));
+  } else {
+    origLog(t, ...args);
+  }
+};
+const origErr = console.error;
+console.error = (...args) => {
+  const t = new Date().toTimeString().slice(0, 8);
+  if (typeof args[0] === 'string') {
+    origErr(`${t} ${args[0]}`, ...args.slice(1));
+  } else {
+    origErr(t, ...args);
+  }
+};
+
 const Config = require('./src/core/config');
 const Auth = require('./src/core/auth');
 const KeyRotator = require('./src/core/keyRotator');

@@ -7,4 +7,18 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-module.exports = { maskApiKey, sleep };
+function ts() {
+  const d = new Date();
+  return d.toTimeString().slice(0, 8);
+}
+
+function fmtMs(ms) {
+  return ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`;
+}
+
+function fmtBytes(bytes) {
+  if (bytes < 1024) return `${bytes}B`;
+  return `${(bytes / 1024).toFixed(1)}KB`;
+}
+
+module.exports = { maskApiKey, sleep, ts, fmtMs, fmtBytes };

@@ -7,6 +7,21 @@
 const { URL } = require('url');
 const crypto = require('crypto');
 const { sendError, sendResponse, isStreamingRequest } = require('./httpHelpers');
+const { ts, fmtMs, fmtBytes, maskApiKey } = require('../core/utils');
+
+function keyLabel(keyInfo) {
+  if (!keyInfo?.actualKey) return 'key?';
+  if (keyInfo.keyIndex != null) return `key#${keyInfo.keyIndex + 1}`;
+  return maskApiKey(keyInfo.actualKey);
+}
+
+function fmtSummary(method, path, provider, keyInfo, status, latency, extra) {
+  const arrow = status < 400 ? '→' : '✗';
+  const key = keyLabel(keyInfo);
+  const lat = fmtMs(latency);
+  const suffix = extra ? ` ${extra}` : '';
+  return `${arrow} ${method} ${path} [${provider}, ${key}] ${status} ${lat}${suffix}`;
+}
 
 /**
  * Determine if a response status should trigger fallback routing.
@@ -385,7 +400,7 @@ async function handleProxyRequest(server, req, res, body) {
 
   if (!routeInfo) {
     console.log(`[REQ-${requestId}] Invalid path: ${req.url}`);
-    console.log(`[REQ-${requestId}] Response: 400 Bad Request - Invalid API path`);
+    console.log(fmtSummary(req.method, req.url, '?', null, 400, Date.now() - startTime));
 
     if (isApiCall) {
       const responseTime = Date.now() - startTime;
@@ -585,6 +600,7 @@ async function handleProxyRequest(server, req, res, body) {
           server.metrics.observeHistogram('keyproxy_request_duration_seconds', { provider: fbResult.provider }, fbResponseTime / 1000);
         }
         server.logApiResponse(requestId, fbResponse, body);
+        console.log(fmtSummary(req.method, apiPath, fbResult.provider, fbKeyInfo, fbResponse.statusCode, fbResponseTime, 'via fallback'));
         sendResponse(res, fbResponse);
         return;
       }
@@ -599,6 +615,7 @@ async function handleProxyRequest(server, req, res, body) {
     }
 
     sendError(res, statusCode, `${statusText}: ${error.message}`);
+    console.log(fmtSummary(req.method, apiPath, providerName, null, statusCode, Date.now() - startTime));
     return;
   } finally {
     delete client._baseUrlOverride;
@@ -681,6 +698,7 @@ async function handleProxyRequest(server, req, res, body) {
         recordBudgetSpend(server, keyInfo?.actualKey, body, streamedData, apiType);
       }
       console.log(`[REQ-${requestId}] Streaming response completed`);
+        console.log(fmtSummary(req.method, apiPath, providerName, keyInfo, response.statusCode, Date.now() - startTime, `streamed ${fmtBytes(capturedSize)}`));
     });
 
     response.stream.on('error', (err) => {
@@ -750,12 +768,14 @@ async function handleProxyRequest(server, req, res, body) {
         if (keyInfo?.actualKey) server.rpmTracker.record(keyInfo.actualKey);
         recordBudgetSpend(server, fbKeyInfo?.actualKey, body, fbResponse.data, apiType);
         server.logApiResponse(requestId, fbResponse, body);
+        console.log(fmtSummary(req.method, apiPath, fbResult.provider, fbKeyInfo, fbResponse.statusCode, fbResponseTime, 'via fallback'));
         sendResponse(res, fbResponse);
         return;
       }
     }
 
     server.logApiResponse(requestId, response, body);
+    console.log(fmtSummary(req.method, apiPath, providerName, keyInfo, response.statusCode, Date.now() - startTime));
 
     // Cache successful non-streaming responses
     if (!streaming && response.statusCode < 400 && server.responseCache.enabled) {
