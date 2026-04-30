@@ -4859,6 +4859,26 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             } catch (e) {
                 tbody.innerHTML = `<tr><td colspan="8" class="text-center text-red-400 py-4">Error: ${escapeHtml(e.message)}</td></tr>`;
             }
+
+            // Re-apply active search filter after table rebuild
+            const searchInput = document.getElementById('logSearchInput');
+            if (searchInput && searchInput.value) filterProviderLogs(searchInput.value);
+        }
+
+        function filterProviderLogs(query) {
+            const q = query.trim().toLowerCase();
+            const rows = document.querySelectorAll('#providerLogsBody tr');
+            const clearBtn = document.getElementById('logSearchClear');
+            if (clearBtn) clearBtn.classList.toggle('hidden', !q);
+            rows.forEach(row => {
+                row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none';
+            });
+        }
+
+        function clearLogSearch() {
+            const input = document.getElementById('logSearchInput');
+            if (input) input.value = '';
+            filterProviderLogs('');
         }
 
         async function handleRefreshLogs(button) {
@@ -4920,26 +4940,28 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     const uniqueLogs = [...seenRequests.values()].reverse();
 
                     // New JSON format - create formatted display
-                    processedLogs = uniqueLogs.map(log => {
+                    processedLogs = uniqueLogs.map((log, idx) => {
+                        let content;
                         if (typeof log === 'string') {
                             // Legacy string format - display as is with view button if possible
                             const testMatch = log.match(/\[TEST-([a-zA-Z0-9]+)\]/);
                             const reqMatch = log.match(/\[REQ-([a-zA-Z0-9]+)\]/);
                             if (testMatch) {
                                 const testId = testMatch[1];
-                                return log + ` <button onclick="viewResponse('${testId}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
+                                content = log + ` <button onclick="viewResponse('${testId}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
                             } else if (reqMatch) {
                                 const requestId = reqMatch[1];
-                                return log + ` <button onclick="viewResponse('${requestId}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
+                                content = log + ` <button onclick="viewResponse('${requestId}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
+                            } else {
+                                content = escapeHtml(log);
                             }
-                            return log;
                         } else {
                             // New JSON format - create structured display
                             const timestamp = new Date(log.timestamp).toLocaleTimeString();
                             const status = log.status ? `(${log.status})` : '';
                             const responseTime = log.responseTime ? `${log.responseTime}ms` : '';
-                            const error = log.error ? ` ERROR: ${log.error}` : '';
-                            
+                            const error = log.error ? ` ERROR: ${escapeHtml(log.error)}` : '';
+
                             // Color coding based on status
                             let statusColor = 'text-green-400';
                             if (log.status >= 400) {
@@ -4947,34 +4969,34 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                             } else if (log.status >= 300) {
                                 statusColor = 'text-yellow-400';
                             }
-                            
+
                             // Key usage info - make it more prominent
                             let keyInfoHtml = '';
                             if (log.keyUsed) {
-                                keyInfoHtml += ` <span class="text-green-400 font-semibold" title="Key used successfully">✓ key:${log.keyUsed}</span>`;
+                                keyInfoHtml += ` <span class="text-green-400 font-semibold" title="Key used successfully">✓ key:${escapeHtml(log.keyUsed)}</span>`;
                             }
                             if (log.failedKeys && log.failedKeys.length > 0) {
                                 const failedList = log.failedKeys.map(fk => {
                                     const statusText = fk.status ? `HTTP ${fk.status}` : (fk.reason || 'error');
-                                    return `${fk.key} (${statusText})`;
+                                    return `${escapeHtml(fk.key)} (${statusText})`;
                                 }).join(', ');
                                 keyInfoHtml += ` <span class="text-red-400 font-semibold" title="Keys that failed before success">✗ FAILED: ${failedList}</span>`;
                             }
-                            
+
                             // If no successful key but we have failed keys, highlight the issue
                             if (!log.keyUsed && log.failedKeys && log.failedKeys.length > 0) {
-                                keyInfoHtml = ` <span class="text-red-500 font-bold bg-red-900/30 px-2 py-1 rounded" title="All keys failed">⚠ ALL KEYS FAILED: ${log.failedKeys.map(fk => `${fk.key}(${fk.status || 'err'})`).join(', ')}</span>`;
+                                keyInfoHtml = ` <span class="text-red-500 font-bold bg-red-900/30 px-2 py-1 rounded" title="All keys failed">⚠ ALL KEYS FAILED: ${log.failedKeys.map(fk => `${escapeHtml(fk.key)}(${fk.status || 'err'})`).join(', ')}</span>`;
                             }
 
-                            const logLine = `<span class="text-gray-400">${timestamp}</span> <span class="text-blue-400">[${log.requestId}]</span> <span class="text-white">${log.method} ${log.endpoint}</span> <span class="text-cyan-400">(${log.provider})</span> <span class="${statusColor}">${status}</span> <span class="text-gray-400">${responseTime}</span>${keyInfoHtml}<span class="text-red-400">${error}</span>`;
-                            
+                            content = `<span class="text-gray-400">${timestamp}</span> <span class="text-blue-400">[${escapeHtml(log.requestId || '')}]</span> <span class="text-white">${escapeHtml(log.method || '')} ${escapeHtml(log.endpoint || '')}</span> <span class="text-cyan-400">(${escapeHtml(log.provider || '')})</span> <span class="${statusColor}">${status}</span> <span class="text-gray-400">${responseTime}</span>${keyInfoHtml}<span class="text-red-400">${error}</span>`;
+
                             // Add view button if we have detailed response data
                             if (log.requestId && log.requestId !== 'unknown') {
-                                return logLine + ` <button onclick="viewResponse('${log.requestId}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
+                                content += ` <button onclick="viewResponse('${escapeHtml(log.requestId)}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
                             }
-                            return logLine;
                         }
-                    }).join('\n');
+                        return `<div class="log-line"><span class="log-line-num">${idx + 1}</span><span class="log-line-content">${content}</span></div>`;
+                    }).join('');
                 } else {
                     // Legacy string format - deduplicate based on request ID
                     const seenIds = new Set();
@@ -4993,30 +5015,54 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     
                     // Legacy string format - reverse so latest is first
                     uniqueLogs.reverse();
-                    processedLogs = uniqueLogs.map(log => {
+                    processedLogs = uniqueLogs.map((log, idx) => {
+                        let content;
                         const testMatch = log.match(/\[TEST-([a-zA-Z0-9]+)\]/);
                         if (testMatch) {
                             const testId = testMatch[1];
-                            return log + ` <button onclick="viewResponse('${testId}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
+                            content = escapeHtml(log) + ` <button onclick="viewResponse('${testId}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
+                        } else {
+                            const reqMatch = log.match(/\[REQ-([a-zA-Z0-9]+)\]/);
+                            if (reqMatch) {
+                                const requestId = reqMatch[1];
+                                content = escapeHtml(log) + ` <button onclick="viewResponse('${requestId}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
+                            } else {
+                                content = escapeHtml(log);
+                            }
                         }
-                        
-                        const reqMatch = log.match(/\[REQ-([a-zA-Z0-9]+)\]/);
-                        if (reqMatch) {
-                            const requestId = reqMatch[1];
-                            return log + ` <button onclick="viewResponse('${requestId}')" class="ml-2 text-blue-400 hover:text-blue-300 underline cursor-pointer text-xs">View Details</button>`;
-                        }
-                        
-                        return log;
-                    }).join('\n');
+                        return `<div class="log-line"><span class="log-line-num">${idx + 1}</span><span class="log-line-content">${content}</span></div>`;
+                    }).join('');
                 }
                 
-                logsContainer.innerHTML = escapeHtml(processedLogs) || 'No logs available';
+                logsContainer.innerHTML = processedLogs || 'No logs available';
 
                 // Latest logs are already at top, scroll to top
                 logsContainer.scrollTop = 0;
             } catch (error) {
                 document.getElementById('logsContainer').textContent = 'Failed to load logs: ' + sanitizeError(error);
             }
+        }
+
+        function copyRawLogs() {
+            const container = document.getElementById('logsContainer');
+            if (!container) return;
+            const text = container.innerText;
+            navigator.clipboard.writeText(text).then(() => {
+                const btn = document.querySelector('[onclick="copyRawLogs()"]');
+                if (btn) {
+                    const original = btn.innerHTML;
+                    btn.innerHTML = '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg> Copied!';
+                    setTimeout(() => { btn.innerHTML = original; }, 1500);
+                }
+            }).catch(() => {
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.cssText = 'position:fixed;opacity:0';
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            });
         }
 
         async function viewResponse(testId) {
@@ -5454,7 +5500,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     document.getElementById('adminPanel').classList.remove('hidden');
 
                     // Always load base data
-                    loadEnvVars();
+                    await loadEnvVars();
                     loadRetryConfig();
 
                     // Restore tab from URL hash or show default

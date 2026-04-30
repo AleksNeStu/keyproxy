@@ -185,7 +185,7 @@
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div class="flex justify-between items-center py-3">
                     <div class="flex items-center space-x-3">
-                        <div class="h-7 w-7 bg-primary text-primary-foreground rounded-lg flex items-center justify-center">
+                        <div class="h-7 w-7 rounded-lg flex items-center justify-center" style="background-color: var(--primary); color: var(--primary-foreground)">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
                             </svg>
@@ -691,6 +691,13 @@
                                     <option value="403">403 Forbidden</option>
                                 </select>
                                 <button onclick="loadProviderLogs()" class="btn btn-secondary px-2 py-1 text-xs font-medium">Refresh</button>
+                                <div class="relative">
+                                    <input type="text" id="logSearchInput" placeholder="Search logs..." oninput="filterProviderLogs(this.value)" class="input-field pl-7 pr-7 py-1 text-xs rounded w-40">
+                                    <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                    </svg>
+                                    <button id="logSearchClear" onclick="clearLogSearch()" class="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hidden" title="Clear">&times;</button>
+                                </div>
                             </div>
                         </div>
                         <div class="border border-border rounded overflow-hidden">
@@ -719,12 +726,20 @@
                     <div class="section">
                         <div class="flex items-center justify-between mb-3">
                             <h3 class="text-sm font-medium text-foreground">Raw Log Output</h3>
-                            <button onclick="handleRefreshLogs(this)" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Refresh logs">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
-                                </svg>
-                                Reload
-                            </button>
+                            <div class="flex items-center gap-2">
+                                <button onclick="copyRawLogs()" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Copy raw logs">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                                    </svg>
+                                    Copy
+                                </button>
+                                <button onclick="handleRefreshLogs(this)" class="btn btn-secondary px-3 py-1.5 text-xs font-medium flex items-center gap-1.5" title="Refresh logs">
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                    </svg>
+                                    Reload
+                                </button>
+                            </div>
                         </div>
                         <p class="text-xs text-muted-foreground mb-3">Last 100 entries kept in memory</p>
                         <div class="bg-gray-900 border border-border rounded">

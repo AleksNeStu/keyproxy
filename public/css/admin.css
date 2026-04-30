@@ -547,3 +547,7 @@
         /* Per-key test button result state */
         .key-test-pass { color: var(--success); }
         .key-test-fail { color: var(--destructive); }
+
+        /* Raw log line numbers */
+        .log-line { display: flex; align-items: flex-start; min-height: 1.4em; }
+        .log-line-num { color: #6b7280; min-width: 2.5rem; text-align: right; padding-right: 0.75rem; user-select: none; flex-shrink: 0; border-right: 1px solid #374151; margin-right: 0.75rem; }
