@@ -4829,15 +4829,17 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             try {
                 const provider = document.getElementById('providerLogSelect')?.value || '';
                 const status = document.getElementById('providerLogStatus')?.value || '';
+                const method = document.getElementById('providerLogMethod')?.value || '';
                 const params = new URLSearchParams();
                 if (provider) params.set('provider', provider);
                 if (status) params.set('status', status);
+                if (method) params.set('method', method);
                 params.set('limit', '100');
                 const res = await fetch(`/admin/api/provider-logs?${params}`);
                 const data = await res.json();
                 const logs = data.logs || [];
                 if (logs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted-foreground py-4">No logs found</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted-foreground py-4">No logs found</td></tr>';
                     return;
                 }
                 tbody.innerHTML = logs.map(l => {
@@ -4854,10 +4856,11 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                         <td class="px-2 py-1.5 font-mono whitespace-nowrap">${latency}</td>
                         <td class="px-2 py-1.5 font-mono text-muted-foreground">${escapeHtml(key)}</td>
                         <td class="px-2 py-1.5 text-red-400 truncate max-w-[200px]" title="${escapeHtml(l.error || '')}">${escapeHtml((l.error || '').substring(0, 50))}</td>
+                        <td class="px-2 py-1.5 text-center">${l.requestId ? `<a href="#" onclick="viewResponse('${l.requestId}');return false;" class="text-blue-400 hover:text-blue-300 text-xs underline">View</a>` : ''}</td>
                     </tr>`;
                 }).join('');
             } catch (e) {
-                tbody.innerHTML = `<tr><td colspan="8" class="text-center text-red-400 py-4">Error: ${escapeHtml(e.message)}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="9" class="text-center text-red-400 py-4">Error: ${escapeHtml(e.message)}</td></tr>`;
             }
 
             // Re-apply active search filter after table rebuild

@@ -556,6 +556,10 @@ class ProxyServer {
         else if (statusFilter === '429') logs = logs.filter(l => l.status === 429);
         else { const code = parseInt(statusFilter); if (!isNaN(code)) logs = logs.filter(l => l.status === code); }
       }
+      if (query.method) {
+        const m = query.method.toUpperCase();
+        logs = logs.filter(l => (l.method || '').toUpperCase() === m);
+      }
       logs.reverse();
       const limit = Math.min(parseInt(query.limit) || 100, 500);
       res.writeHead(200, { 'Content-Type': 'application/json' });

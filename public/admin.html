@@ -681,6 +681,15 @@
                                 <select id="providerLogSelect" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
                                     <option value="">All Providers</option>
                                 </select>
+                                <select id="providerLogMethod" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
+                                    <option value="">All Methods</option>
+                                    <option value="GET">GET</option>
+                                    <option value="POST">POST</option>
+                                    <option value="OPTIONS">OPTIONS</option>
+                                    <option value="PUT">PUT</option>
+                                    <option value="DELETE">DELETE</option>
+                                    <option value="PATCH">PATCH</option>
+                                </select>
                                 <select id="providerLogStatus" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
                                     <option value="">All Status</option>
                                     <option value="success">Success (&lt;400)</option>
@@ -712,10 +721,11 @@
                                         <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Latency</th>
                                         <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Key</th>
                                         <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Error</th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium w-16">Details</th>
                                     </tr>
                                 </thead>
                                 <tbody id="providerLogsBody" class="divide-y divide-border">
-                                    <tr><td colspan="8" class="text-center text-muted-foreground py-4">Loading...</td></tr>
+                                    <tr><td colspan="9" class="text-center text-muted-foreground py-4">Loading...</td></tr>
                                 </tbody>
                             </table>
                         </div>
