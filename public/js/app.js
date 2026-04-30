@@ -4,6 +4,20 @@
             const s = String(str);
             return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
         }
+        // Sanitize error messages to prevent internal detail leakage
+        function sanitizeError(err) {
+            const raw = err?.message || err?.error || String(err || '');
+            const msg = raw.substring(0, 200);
+            return msg
+                .replace(/[A-Z]:\[^\s]*/g, '[path]')
+                .replace(/\/[a-z]+\/[^\s]*/g, '[path]')
+                .replace(/\/home\/[^\s]*/g, '[path]')
+                .replace(/\/var\/[^\s]*/g, '[path]')
+                .replace(/\/etc\/[^\s]*/g, '[path]')
+                .replace(/\/usr\/[^\s]*/g, '[path]')
+                .replace(/\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/g, '[ip]');
+        }
+
         // Escape for use inside onclick="func('...')" — HTML attr + JS string literal
         function safeJsAttr(str) {
             if (str == null) return '';
@@ -70,6 +84,8 @@
         let notificationTimeouts = new Map();
         
         function showToast(message, type = 'info', duration = 4000) {
+            // Sanitize error messages to prevent internal detail leakage
+            message = sanitizeError(message);
             const timestamp = new Date();
             const id = ++notificationId;
             
@@ -617,7 +633,6 @@
                     // Store CSRF token from login response
                     if (data.csrfToken) {
                         csrfToken = data.csrfToken;
-                        localStorage.setItem('keyproxy_csrf_token', data.csrfToken);
                     }
 
                     document.body.classList.add('authenticated');
@@ -648,7 +663,7 @@
                     errorDiv.classList.remove('hidden');
                 }
             } catch (error) {
-                errorDiv.textContent = 'Login failed: ' + error.message;
+                errorDiv.textContent = 'Login failed: ' + sanitizeError(error);
                 errorDiv.classList.remove('hidden');
             }
         }
@@ -811,15 +826,16 @@
                         const indicator = isOverride 
                             ? '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300">custom</span>'
                             : '<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400">using global</span>';
+                        const _rn = escapeHtml(name);
                         container.innerHTML += `
                             <div class="grid grid-cols-4 gap-2 items-center ${isOverride ? 'bg-blue-50 dark:bg-blue-900/10 rounded px-2 py-1.5' : 'px-2 py-1'}">
                                 <div class="flex items-center gap-1.5">
-                                    <span class="text-xs font-mono font-medium text-foreground truncate">${name}</span>
+                                    <span class="text-xs font-mono font-medium text-foreground truncate">${_rn}</span>
                                     ${indicator}
                                 </div>
-                                <input type="number" min="1" max="20" placeholder="${data.global.maxRetries}" value="${isOverride ? config.maxRetries : ''}" class="retry-prov-input px-2 py-1 text-xs border border-border rounded bg-background text-foreground" data-provider="${name}" data-field="maxRetries" title="Leave empty to use global: ${data.global.maxRetries}">
-                                <input type="number" min="100" max="30000" step="100" placeholder="${data.global.retryDelayMs}" value="${isOverride ? config.retryDelayMs : ''}" class="retry-prov-input px-2 py-1 text-xs border border-border rounded bg-background text-foreground" data-provider="${name}" data-field="retryDelayMs" title="Leave empty to use global: ${data.global.retryDelayMs}ms">
-                                <input type="number" min="1" max="10" step="0.5" placeholder="${data.global.retryBackoff}" value="${isOverride ? config.retryBackoff : ''}" class="retry-prov-input px-2 py-1 text-xs border border-border rounded bg-background text-foreground" data-provider="${name}" data-field="retryBackoff" title="Leave empty to use global: ${data.global.retryBackoff}">
+                                <input type="number" min="1" max="20" placeholder="${data.global.maxRetries}" value="${isOverride ? config.maxRetries : ''}" class="retry-prov-input px-2 py-1 text-xs border border-border rounded bg-background text-foreground" data-provider="${_rn}" data-field="maxRetries" title="Leave empty to use global: ${data.global.maxRetries}">
+                                <input type="number" min="100" max="30000" step="100" placeholder="${data.global.retryDelayMs}" value="${isOverride ? config.retryDelayMs : ''}" class="retry-prov-input px-2 py-1 text-xs border border-border rounded bg-background text-foreground" data-provider="${_rn}" data-field="retryDelayMs" title="Leave empty to use global: ${data.global.retryDelayMs}ms">
+                                <input type="number" min="1" max="10" step="0.5" placeholder="${data.global.retryBackoff}" value="${isOverride ? config.retryBackoff : ''}" class="retry-prov-input px-2 py-1 text-xs border border-border rounded bg-background text-foreground" data-provider="${_rn}" data-field="retryBackoff" title="Leave empty to use global: ${data.global.retryBackoff}">
                             </div>`;
                     }
                 }
@@ -1405,7 +1421,7 @@
                     result.innerHTML = '<span class="text-green-400 font-medium">ALLOWED</span>';
                 }
             } catch (err) {
-                result.textContent = 'Error: ' + err.message;
+                result.textContent = 'Error: ' + sanitizeError(err);
             }
         }
 
@@ -2192,9 +2208,9 @@
                         return `<div class="flex items-center space-x-2" style="border-left:3px solid #ef4444;padding-left:8px;border-radius:4px;opacity:0.7">
                             <span class="key-badge badge-failed">BANNED</span>
                             <span class="text-xs text-muted-foreground">${escapeHtml(k.providerName)}</span>
-                            <code class="text-xs font-mono bg-muted px-2 py-0.5 rounded">${masked}</code>
+                            <code class="text-xs font-mono bg-muted px-2 py-0.5 rounded">${escapeHtml(masked)}</code>
                             <span class="text-[10px] text-muted-foreground">${escapeHtml(k.banReason || '')} &middot; ${banDate}</span>
-                            <button onclick="vaultUnbanKey('${k.id}')" class="btn btn-secondary px-2 py-1 text-xs font-medium">Unban</button>
+                            <button onclick="vaultUnbanKey('${escapeHtml(k.id)}')" class="btn btn-secondary px-2 py-1 text-xs font-medium">Unban</button>
                         </div>`;
                     }).join('');
                 } else if (bannedSection) {
@@ -2215,10 +2231,10 @@
                         return `<div class="flex items-center space-x-2" style="border-left:3px solid #6b7280;padding-left:8px;border-radius:4px;opacity:0.5">
                             <span class="key-badge" style="background:rgba(107,114,128,0.15);color:#9ca3af;border:1px solid rgba(107,114,128,0.3)">DELETED</span>
                             <span class="text-xs text-muted-foreground">${escapeHtml(k.providerName)}</span>
-                            <code class="text-xs font-mono bg-muted px-2 py-0.5 rounded">${masked}</code>
+                            <code class="text-xs font-mono bg-muted px-2 py-0.5 rounded">${escapeHtml(masked)}</code>
                             <span class="text-[10px] text-muted-foreground">${delDate}</span>
-                            <button onclick="vaultRestoreKey('${k.id}')" class="btn btn-secondary px-2 py-1 text-xs font-medium">Restore</button>
-                            <button onclick="vaultPermaDeleteKey('${k.id}')" class="btn btn-destructive px-2 py-1 text-xs font-medium">Permanent Delete</button>
+                            <button onclick="vaultRestoreKey('${escapeHtml(k.id)}')" class="btn btn-secondary px-2 py-1 text-xs font-medium">Restore</button>
+                            <button onclick="vaultPermaDeleteKey('${escapeHtml(k.id)}')" class="btn btn-destructive px-2 py-1 text-xs font-medium">Permanent Delete</button>
                         </div>`;
                     }).join('');
                 } else if (deletedSection) {
@@ -2512,10 +2528,10 @@
                 return `
                 <label class="flex items-center gap-2 p-1.5 rounded hover:bg-muted/50 cursor-pointer">
                     <input type="checkbox" ${isExcluded ? 'checked' : ''}
-                           onchange="toggleSyncExclusive('${p.name}', this.checked)"
+                           onchange="toggleSyncExclusive('${escapeHtml(p.name)}', this.checked)"
                            class="rounded border-border text-red-500 focus:ring-red-500">
-                    <span class="text-sm text-foreground">${p.name}</span>
-                    <span class="text-xs text-muted-foreground">${p.apiType}</span>
+                    <span class="text-sm text-foreground">${escapeHtml(p.name)}</span>
+                    <span class="text-xs text-muted-foreground">${escapeHtml(p.apiType)}</span>
                     ${isExcluded ? '<span class="ml-auto text-xs text-red-400">Excluded</span>' : ''}
                 </label>`;
             }).join('');
@@ -3454,7 +3470,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         async function deleteProvider(apiType, providerName) {
             const providerPrefix = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_`;
 
-            // Delete all environment variables that start with the provider prefix
+            // Snapshot keys to delete (but don't mutate envVars until API succeeds)
             const keysToDelete = [];
             for (const key in envVars) {
                 if (key.startsWith(providerPrefix)) {
@@ -3462,24 +3478,24 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 }
             }
 
-            // Remove all matching keys from envVars
-            keysToDelete.forEach(key => {
-                console.log(`Deleting env var: ${key}`);
-                delete envVars[key];
-            });
+            // Build new envVars without the provider keys
+            const newEnvVars = { ...envVars };
+            keysToDelete.forEach(key => delete newEnvVars[key]);
 
             try {
                 const response = await fetch('/admin/api/env', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(envVars)
+                    body: JSON.stringify(newEnvVars)
                 });
 
                 if (response.ok) {
+                    envVars = newEnvVars;
                     renderEnvVars();
                     showSuccessToast(`🗑️ Provider '${providerName}' deleted successfully (${keysToDelete.length} settings removed)`);
                 } else {
-                    showErrorToast('Failed to delete provider');
+                    const err = await response.json().catch(() => ({}));
+                    showErrorToast('Failed to delete provider: ' + (err.error || response.statusText));
                 }
             } catch (error) {
                 showErrorToast(`Failed to delete provider: ${error.message}`);
@@ -4557,35 +4573,37 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             const keysVar = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_API_KEYS`;
             const keys = envVars[keysVar] ? envVars[keysVar].split(',') : [];
 
-            keys.splice(keyIndex, 1);
+            const newKeys = [...keys];
+            newKeys.splice(keyIndex, 1);
 
-            if (keys.length === 0) {
-                // If no keys left, delete the entire provider using the same logic as deleteProvider
+            // Build new envVars without mutating original
+            const newEnvVars = { ...envVars };
+            if (newKeys.length === 0) {
+                // If no keys left, delete the entire provider
                 const providerPrefix = `${apiType.toUpperCase()}_${providerName.toUpperCase()}_`;
-
-                // Delete all environment variables that start with the provider prefix
-                for (const key in envVars) {
+                for (const key in newEnvVars) {
                     if (key.startsWith(providerPrefix)) {
-                        console.log(`Deleting env var: ${key}`);
-                        delete envVars[key];
+                        delete newEnvVars[key];
                     }
                 }
             } else {
-                envVars[keysVar] = keys.filter(k => k.trim()).join(',');
+                newEnvVars[keysVar] = newKeys.filter(k => k.trim()).join(',');
             }
 
             try {
                 const response = await fetch('/admin/api/env', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(envVars)
+                    body: JSON.stringify(newEnvVars)
                 });
                 
                 if (response.ok) {
+                    envVars = newEnvVars;
                     renderEnvVars();
                     showSuccessToast(`🗑️ API key deleted from provider '${providerName}'`);
                 } else {
-                    showErrorToast('Failed to delete API key');
+                    const err = await response.json().catch(() => ({}));
+                    showErrorToast('Failed to delete API key: ' + (err.error || response.statusText));
                 }
             } catch (error) {
                 showErrorToast(`Failed to delete API key: ${error.message}`);
@@ -4800,7 +4818,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             }
             select.innerHTML = '<option value="">All Providers</option>';
             for (const p of [...providers].sort()) {
-                select.innerHTML += `<option value="${p}">${p}</option>`;
+                select.innerHTML += `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`;
             }
             if (current && providers.has(current)) select.value = current;
         }
@@ -4997,7 +5015,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 // Latest logs are already at top, scroll to top
                 logsContainer.scrollTop = 0;
             } catch (error) {
-                document.getElementById('logsContainer').textContent = 'Failed to load logs: ' + error.message;
+                document.getElementById('logsContainer').textContent = 'Failed to load logs: ' + sanitizeError(error);
             }
         }
 
@@ -5063,7 +5081,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 // Show dialog
                 document.getElementById('responseDialog').classList.remove('hidden');
             } catch (error) {
-                alert('Failed to load response: ' + error.message);
+                alert('Failed to load response: ' + sanitizeError(error));
             }
         }
 
@@ -5349,24 +5367,26 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     disabled: 'bg-gray-500/20 text-gray-400 border-gray-500/30',
                     unknown: 'bg-gray-500/20 text-gray-400 border-gray-500/30'
                 };
-                return `<span class="px-2 py-0.5 rounded text-xs border ${colors[status] || colors.unknown}">${status}</span>`;
+                return `<span class="px-2 py-0.5 rounded text-xs border ${colors[status] || colors.unknown}">${escapeHtml(status)}</span>`;
             };
 
             providers.forEach(p => {
                 const row = document.createElement('tr');
                 row.className = 'border-b border-border/50 hover:bg-muted/30';
+                const _hn = escapeHtml(p.name);
+                const _ha = escapeHtml(p.apiType);
                 row.innerHTML = `
-                    <td class="py-2 pr-3 font-medium"><a href="javascript:void(0)" onclick="navigateToProviderKeys('${p.apiType}', '${p.name}')" class="text-primary hover:underline cursor-pointer">${p.name}</a></td>
+                    <td class="py-2 pr-3 font-medium"><a href="javascript:void(0)" onclick="navigateToProviderKeys('${_ha}', '${_hn}')" class="text-primary hover:underline cursor-pointer">${_hn}</a></td>
                     <td class="py-2 pr-3">${statusBadge(p.status)}</td>
-                    <td class="py-2 pr-3" id="cb-${p.name}">${statusBadge('unknown')}</td>
-                    <td class="py-2 pr-3 text-xs text-muted-foreground">${p.apiType}</td>
+                    <td class="py-2 pr-3" id="cb-${_hn}">${statusBadge('unknown')}</td>
+                    <td class="py-2 pr-3 text-xs text-muted-foreground">${_ha}</td>
                     <td class="py-2 pr-3 text-xs"><span class="text-green-400">${p.enabledKeys}</span>/<span class="text-muted-foreground">${p.totalKeys}</span>${p.exhaustedKeys ? ` <span class="text-red-400">(-${p.exhaustedKeys})</span>` : ''}</td>
                     <td class="py-2 pr-3 text-xs text-muted-foreground">${p.totalRequests}</td>
                     <td class="py-2 pr-3 text-xs text-muted-foreground">${p.avgResponseTime ? p.avgResponseTime + 'ms' : '-'}</td>
                     <td class="py-2 pr-3 text-xs text-muted-foreground" title="${p.lastCheckTime ? new Date(p.lastCheckTime).toLocaleString() : 'Never'}">${formatRelativeTime(p.lastCheckTime)}</td>
-                    <td class="py-2 pr-3 text-xs text-red-400">${p.lastError || '-'}</td>
+                    <td class="py-2 pr-3 text-xs text-red-400">${escapeHtml(p.lastError || '')}</td>
                     <td class="py-2 text-xs">
-                        <button id="reset-btn-${p.name}" onclick="resetProviderHealth('${p.name}', this)" class="text-muted-foreground hover:text-foreground" title="Reset key history, circuit breaker, and force re-check">Reset</button>
+                        <button id="reset-btn-${_hn}" onclick="resetProviderHealth('${_hn}', this)" class="text-muted-foreground hover:text-foreground" title="Reset key history, circuit breaker, and force re-check">Reset</button>
                     </td>
                 `;
                 tbody.appendChild(row);
@@ -5385,7 +5405,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
         // Utility functions
         function showError(elementId, message) {
             const errorDiv = document.getElementById(elementId);
-            errorDiv.textContent = message;
+            errorDiv.textContent = sanitizeError(message);
             errorDiv.classList.remove('hidden');
             setTimeout(() => errorDiv.classList.add('hidden'), 5000);
         }

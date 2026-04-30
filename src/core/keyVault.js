@@ -73,13 +73,18 @@ class KeyVault {
 
   _flush() {
     if (!this.dirty) return;
-    this.dirty = false;
+    const dataToSave = JSON.stringify(this.data, null, 2);
     this._writing = true;
     const dir = path.dirname(this.filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2), (err) => {
+    fs.writeFile(this.filePath, dataToSave, (err) => {
       this._writing = false;
-      if (err) console.log(`[VAULT] Write failed: ${err.message}`);
+      if (err) {
+        console.log(`[VAULT] Write failed: ${err.message}`);
+        // Don't clear dirty — will retry on next schedule
+      } else {
+        this.dirty = false;
+      }
       if (this.dirty) this._scheduleSave();
     });
   }
@@ -91,6 +96,16 @@ class KeyVault {
     }
     this.dirty = true;
     this.data.metadata.lastModifiedAt = new Date().toISOString();
+    // Wait for any pending async _flush to finish before writing synchronously
+    if (this._writing) {
+      const deadline = Date.now() + 2000;
+      while (this._writing && Date.now() < deadline) {
+        // Busy-wait: _flush callback sets _writing = false on next tick
+      }
+      if (this._writing) {
+        console.log('[VAULT] flushSync: async write still in progress after 2s, writing anyway');
+      }
+    }
     try {
       const dir = path.dirname(this.filePath);
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
@@ -263,6 +278,14 @@ class KeyVault {
 
   reorderKeys(providerName, orderedIds) {
     const providerKeys = this.data.keys.filter(k => k.providerName === providerName && k.status !== 'deleted');
+    const existingIds = new Set(providerKeys.map(k => k.id));
+
+    // Validate all IDs exist
+    const invalidIds = orderedIds.filter(id => !existingIds.has(id));
+    if (invalidIds.length > 0) {
+      return { error: `Unknown key IDs: ${invalidIds.join(', ')}` };
+    }
+
     const otherKeys = this.data.keys.filter(k => k.providerName !== providerName || k.status === 'deleted');
 
     const reordered = [];

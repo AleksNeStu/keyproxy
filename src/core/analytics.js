@@ -10,6 +10,7 @@ class AnalyticsTracker {
     this.saveTimer = null;
     this.saveDelay = 10000; // 10s debounce
     this.dirty = false;
+    this._writing = false;
     this._load();
   }
 
@@ -36,13 +37,18 @@ class AnalyticsTracker {
 
   _flush() {
     if (!this.dirty) return;
-    this.dirty = false;
+    const dataToSave = JSON.stringify(this.data, null, 2);
     this._writing = true;
     const dir = path.dirname(this.filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    fs.writeFile(this.filePath, JSON.stringify(this.data, null, 2), (err) => {
+    fs.writeFile(this.filePath, dataToSave, (err) => {
       this._writing = false;
-      if (err) console.log(`[ANALYTICS] Write failed: ${err.message}`);
+      if (err) {
+        console.log(`[ANALYTICS] Write failed: ${err.message}`);
+        // Don't clear dirty — will retry on next schedule
+      } else {
+        this.dirty = false;
+      }
       if (this.dirty) this._scheduleSave();
     });
   }

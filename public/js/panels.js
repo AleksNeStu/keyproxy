@@ -1,6 +1,30 @@
     // CSRF Token Management
     let csrfToken = null;
 
+    // Timer tracking for cleanup on page unload
+    const activeTimers = [];
+    const _origSetInterval = window.setInterval.bind(window);
+    const _origSetTimeout = window.setTimeout.bind(window);
+    const _origClearInterval = window.clearInterval.bind(window);
+    const _origClearTimeout = window.clearTimeout.bind(window);
+    window.setInterval = function(fn, delay, ...args) {
+        const id = _origSetInterval(fn, delay, ...args);
+        activeTimers.push({ id, type: 'interval' });
+        return id;
+    };
+    window.setTimeout = function(fn, delay, ...args) {
+        const id = _origSetTimeout(fn, delay, ...args);
+        activeTimers.push({ id, type: 'timeout' });
+        return id;
+    };
+    window.addEventListener('beforeunload', () => {
+        activeTimers.forEach(t => {
+            if (t.type === 'interval') _origClearInterval(t.id);
+            else _origClearTimeout(t.id);
+        });
+        activeTimers.length = 0;
+    });
+
     /**
      * Fetch CSRF token from server
      */
@@ -10,7 +34,6 @@
             if (response.ok) {
                 const data = await response.json();
                 csrfToken = data.csrfToken;
-                localStorage.setItem('keyproxy_csrf_token', csrfToken);
                 return csrfToken;
             }
         } catch (error) {
@@ -23,9 +46,6 @@
      * Get current CSRF token from memory or localStorage
      */
     function getCsrfToken() {
-        if (!csrfToken) {
-            csrfToken = localStorage.getItem('keyproxy_csrf_token');
-        }
         return csrfToken;
     }
 
@@ -34,7 +54,6 @@
      */
     function clearCsrfToken() {
         csrfToken = null;
-        localStorage.removeItem('keyproxy_csrf_token');
     }
 
     /**
@@ -116,7 +135,7 @@
                 document.getElementById('passwordChangeStatus').className = 'text-xs text-red-400';
             }
         } catch (err) {
-            document.getElementById('passwordChangeStatus').textContent = 'Error: ' + err.message;
+            document.getElementById('passwordChangeStatus').textContent = 'Error: ' + sanitizeError(err);
             document.getElementById('passwordChangeStatus').className = 'text-xs text-red-400';
         }
     }
@@ -157,7 +176,7 @@
             }
             setTimeout(() => { status.textContent = ''; }, 3000);
         } catch (err) {
-            status.textContent = 'Error: ' + err.message;
+            status.textContent = 'Error: ' + sanitizeError(err);
             status.className = 'text-xs text-red-400';
         }
     }
@@ -176,7 +195,7 @@
             status.textContent = data.success ? 'Test sent!' : 'Test failed';
             status.className = data.success ? 'text-xs text-green-400' : 'text-xs text-red-400';
         } catch (err) {
-            status.textContent = 'Error: ' + err.message;
+            status.textContent = 'Error: ' + sanitizeError(err);
             status.className = 'text-xs text-red-400';
         }
         setTimeout(() => { status.textContent = ''; }, 3000);
@@ -372,7 +391,7 @@
                 status.className = 'text-xs text-red-400';
             }
         } catch (err) {
-            status.textContent = 'Error: ' + err.message;
+            status.textContent = 'Error: ' + sanitizeError(err);
             status.className = 'text-xs text-red-400';
         }
     }
@@ -571,9 +590,10 @@
                 const td = document.getElementById('cb-' + name);
                 if (!td) continue;
                 const color = cbColors[state.state] || cbColors.closed;
-                let html = `<span class="px-2 py-0.5 rounded text-xs border ${color}">${state.state}</span>`;
+                const _cbn = escapeHtml(name);
+                let html = `<span class="px-2 py-0.5 rounded text-xs border ${color}">${escapeHtml(state.state)}</span>`;
                 if (state.state === 'open') {
-                    html += ` <button onclick="forceCloseCircuit('${name}')" class="text-xs text-blue-400 hover:text-blue-300 ml-1">force-close</button>`;
+                    html += ` <button onclick="forceCloseCircuit('${_cbn}')" class="text-xs text-blue-400 hover:text-blue-300 ml-1">force-close</button>`;
                 } else if (state.state === 'closed' && state.failures > 0) {
                     html += ` <span class="text-xs text-muted-foreground">(${state.failures}/${state.threshold})</span>`;
                 }
@@ -619,7 +639,7 @@
             status.textContent = 'Exported!';
             status.className = 'text-xs text-green-400';
         } catch (err) {
-            status.textContent = 'Export failed: ' + err.message;
+            status.textContent = 'Export failed: ' + sanitizeError(err);
             status.className = 'text-xs text-red-400';
         }
         setTimeout(() => { status.textContent = ''; }, 4000);
@@ -648,7 +668,7 @@
                 status.className = 'text-xs text-red-400';
             }
         } catch (err) {
-            status.textContent = 'Import failed: ' + err.message;
+            status.textContent = 'Import failed: ' + sanitizeError(err);
             status.className = 'text-xs text-red-400';
         }
         event.target.value = '';
@@ -700,7 +720,7 @@
                 <div class="flex-1 min-w-0">
                     <div class="flex items-center gap-2">
                         <span class="text-sm font-medium text-foreground">${escapeHtml(source.name)}</span>
-                        <span class="text-xs ${statusColor}">${statusText}</span>
+                        <span class="text-xs ${statusColor}">${escapeHtml(statusText)}</span>
                         ${excludesBadge}
                     </div>
                     <div class="text-xs text-muted-foreground truncate" title="${escapeHtml(source.filePath)}">${escapeHtml(source.filePath)}</div>
@@ -1012,7 +1032,7 @@
         div.innerHTML = `
             <div class="flex items-center gap-3 overflow-hidden">
                 ${icon}
-                <span class="text-xs truncate ${isParent ? 'italic text-muted-foreground' : 'text-foreground'}">${name}</span>
+                <span class="text-xs truncate ${isParent ? 'italic text-muted-foreground' : 'text-foreground'}">${escapeHtml(name)}</span>
             </div>
             ${!isDir && size !== undefined ? `<span class="text-[10px] text-muted-foreground whitespace-nowrap opacity-0 group-hover:opacity-100">${formatBytes(size)}</span>` : ''}
         `;
@@ -2014,7 +2034,7 @@
             closeSetBudgetModal();
             loadBudgets();
         } catch (err) {
-            showBudgetStatus('Error: ' + err.message, 'error');
+            showBudgetStatus('Error: ' + sanitizeError(err), 'error');
         }
     }
 

@@ -43,6 +43,9 @@ const KNOWN_KEYS = {
   'REF_API_KEY': 'onref',
 };
 for (const [envVar] of Object.entries(KNOWN_KEYS)) {
+  if (process.env[envVar] && process.env[envVar] !== 'placeholder') {
+    console.log(`[KEYPROXY-INTERCEPT] Warning: overwriting ${envVar}`);
+  }
   if (!process.env[envVar]) {
     process.env[envVar] = 'placeholder';
   }

@@ -33,8 +33,8 @@ class BudgetTracker {
     }
   }
 
-  _dayKey() { return new Date().toISOString().slice(0, 10); }
-  _monthKey() { return new Date().toISOString().slice(0, 7); }
+  _dayKey() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; }
+  _monthKey() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`; }
 
   /**
    * Set budget for a key.

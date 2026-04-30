@@ -831,6 +831,7 @@ class Config {
 
   writeLocalEnv(vars) {
     const localEnvPath = path.join(process.cwd(), '.env');
+    const tmpPath = localEnvPath + '.tmp';
     const lines = [];
     const addedKeys = new Set();
 
@@ -863,7 +864,21 @@ class Config {
       }
     }
 
-    fs.writeFileSync(localEnvPath, lines.join('\n'), 'utf8');
+    const content = lines.join('\n');
+    try {
+      // Atomic write: write to temp file first, then rename
+      fs.writeFileSync(tmpPath, content, 'utf8');
+      fs.renameSync(tmpPath, localEnvPath);
+    } catch (err) {
+      // Fallback: direct write if rename fails (e.g. cross-device)
+      try { fs.unlinkSync(tmpPath); } catch {}
+      try {
+        fs.writeFileSync(localEnvPath, content, 'utf8');
+        console.log(`[CONFIG] Atomic rename failed, used direct write: ${err.message}`);
+      } catch (writeErr) {
+        console.log(`[CONFIG] Failed to write .env: ${writeErr.message}`);
+      }
+    }
   }
 }
 

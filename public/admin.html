@@ -84,7 +84,6 @@
                     // Store CSRF token from login response
                     if (data.csrfToken) {
                         csrfToken = data.csrfToken;
-                        localStorage.setItem('keyproxy_csrf_token', data.csrfToken);
                     }
 
                     document.body.classList.add('authenticated');
@@ -115,7 +114,8 @@
                     errorDiv.classList.remove('hidden');
                 }
             } catch (error) {
-                errorDiv.textContent = 'Login failed: ' + error.message;
+                const msg = (error.message || String(error)).substring(0, 200).replace(/[A-Z]:\\[^\s]*/g, '[path]').replace(/\/[a-z]+\/[^\s]*/g, '[path]');
+                errorDiv.textContent = 'Login failed: ' + msg;
                 errorDiv.classList.remove('hidden');
             }
         }
