@@ -705,15 +705,15 @@ class ProxyServer {
     }
   }
 
-  logApiResponse(requestId, response, requestBody = null) {
+  logApiResponse(requestId, response, requestBody = null, { method, endpoint, apiType } = {}) {
     const contentLength = response.headers['content-length'] || (response.data ? response.data.length : 0);
     const contentType = response.headers['content-type'] || 'unknown';
 
     // Store response data for viewing
     this.storeResponseData(requestId, {
-      method: 'API_CALL',
-      endpoint: 'proxied_request',
-      apiType: 'LLM_API',
+      method: method || 'API_CALL',
+      endpoint: endpoint || 'proxied_request',
+      apiType: (apiType || 'LLM_API').toUpperCase(),
       status: response.statusCode,
       statusText: getStatusText(response.statusCode),
       contentType: contentType,

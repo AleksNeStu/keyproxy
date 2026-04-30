@@ -5072,23 +5072,42 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     alert('Response data not found');
                     return;
                 }
-                
+
                 const data = await response.json();
-                
+
                 // Update dialog content
-                document.getElementById('responseInfo').textContent = 
-                    `${data.method} ${data.endpoint} (${data.apiType}) → ${data.status} ${data.statusText} | ${data.contentType}`;
-                
-                // Format JSON response
+                const method = data.method || 'UNKNOWN';
+                const endpoint = data.endpoint || 'unknown';
+                const apiType = data.apiType || 'API';
+                const status = data.status || '?';
+                const statusText = data.statusText || '';
+                const contentType = data.contentType || 'unknown';
+                document.getElementById('responseInfo').textContent =
+                    `${method} ${endpoint} (${apiType}) → ${status} ${statusText} | ${contentType}`;
+
+                // Format response data
                 let formattedResponse;
-                try {
-                    const jsonData = JSON.parse(data.responseData);
-                    formattedResponse = JSON.stringify(jsonData, null, 2);
-                } catch (e) {
-                    // Not JSON, show as plain text
-                    formattedResponse = data.responseData;
+                const raw = data.responseData;
+
+                if (raw == null || raw === '') {
+                    formattedResponse = '(empty response)';
+                } else if (status >= 300 && status < 400) {
+                    // Redirect responses — show clear explanation
+                    formattedResponse = `↩ Redirect ${status} ${statusText}\n\n${typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2)}`;
+                } else {
+                    try {
+                        const jsonData = typeof raw === 'string' ? JSON.parse(raw) : raw;
+                        formattedResponse = JSON.stringify(jsonData, null, 2);
+                    } catch (e) {
+                        formattedResponse = typeof raw === 'string' ? raw : JSON.stringify(raw);
+                    }
                 }
-                
+
+                // Truncate very large responses for display
+                if (formattedResponse && formattedResponse.length > 50000) {
+                    formattedResponse = formattedResponse.substring(0, 50000) + '\n\n... (truncated)';
+                }
+
                 document.getElementById('responseContent').textContent = formattedResponse;
                 
                 // Handle request body tab

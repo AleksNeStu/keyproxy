@@ -608,7 +608,7 @@ async function handleProxyRequest(server, req, res, body) {
           server.logApiRequest(requestId, req.method, apiPath, fbResult.provider, fbResponse.statusCode, fbResponseTime, null, clientIp, fbKeyInfo);
           server.metrics.observeHistogram('keyproxy_request_duration_seconds', { provider: fbResult.provider }, fbResponseTime / 1000);
         }
-        server.logApiResponse(requestId, fbResponse, body);
+        server.logApiResponse(requestId, fbResponse, body, { method: req.method, endpoint: apiPath, apiType });
         console.log(fmtSummary(req.method, apiPath, fbResult.provider, fbKeyInfo, fbResponse.statusCode, fbResponseTime, 'via fallback'));
         sendResponse(res, fbResponse);
         return;
@@ -777,14 +777,14 @@ async function handleProxyRequest(server, req, res, body) {
         });
         if (keyInfo?.actualKey) server.rpmTracker.record(keyInfo.actualKey);
         recordBudgetSpend(server, fbKeyInfo?.actualKey, body, fbResponse.data, apiType);
-        server.logApiResponse(requestId, fbResponse, body);
+        server.logApiResponse(requestId, fbResponse, body, { method: req.method, endpoint: apiPath, apiType });
         console.log(fmtSummary(req.method, apiPath, fbResult.provider, fbKeyInfo, fbResponse.statusCode, fbResponseTime, 'via fallback'));
         sendResponse(res, fbResponse);
         return;
       }
     }
 
-    server.logApiResponse(requestId, response, body);
+    server.logApiResponse(requestId, response, body, { method: req.method, endpoint: apiPath, apiType });
     console.log(fmtSummary(req.method, apiPath, providerName, keyInfo, response.statusCode, Date.now() - startTime));
 
     // Cache successful non-streaming responses
