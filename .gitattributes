@@ -42,7 +42,25 @@ docker-compose*.yml text eol=lf
 .gitmodules    text eol=lf
 
 # Binary: never touch
-*.png binary  *.jpg binary  *.gif binary  *.ico binary  *.svg binary
-*.pdf binary  *.woff binary *.woff2 binary *.ttf binary *.eot binary
-*.zip binary  *.gz binary   *.tar binary  *.exe binary  *.dll binary
-*.so binary   *.pyd binary  *.sqlite3 binary *.db binary *.node binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.svg binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+*.ttf binary
+*.eot binary
+*.otf binary
+*.zip binary
+*.tar binary
+*.gz binary
+*.exe binary
+*.dll binary
+*.so binary
+*.pyd binary
+*.sqlite3 binary
+*.db binary
+*.node binary
