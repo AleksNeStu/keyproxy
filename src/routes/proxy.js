@@ -20,7 +20,7 @@ function fmtSummary(method, path, provider, keyInfo, status, latency, extra) {
   const key = keyLabel(keyInfo);
   const lat = fmtMs(latency);
   const suffix = extra ? ` ${extra}` : '';
-  return `${arrow} ${method} ${path} [${provider}, ${key}] ${status} ${lat}${suffix}`;
+  return `${ts()} ${arrow} ${method} ${path} [${provider}, ${key}] ${status} ${lat}${suffix}`;
 }
 
 /**
@@ -52,7 +52,7 @@ async function tryFallbackChain(server, currentProvider, req, apiPath, body, hea
     const fbProvider = server.config.getProvider(fallback.provider);
     if (!fbProvider || fbProvider.disabled) break;
 
-    console.log(`[REQ-${requestId}] Attempting fallback ${fallbackCount + 1}: ${provider} → ${fallback.provider}`);
+    console.log(`${ts()} [REQ-${requestId}] Attempting fallback ${fallbackCount + 1}: ${provider} → ${fallback.provider}`);
     try {
       const fbClient = await getProviderClient(server, fallback.provider, fbProvider, false);
       if (!fbClient) break;
@@ -61,15 +61,15 @@ async function tryFallbackChain(server, currentProvider, req, apiPath, body, hea
       const fbResponse = await fbClient.makeRequest(req.method, apiPath, fbBody, headers, customStatusCodes, streaming);
 
       if (fbResponse.statusCode < 400) {
-        console.log(`[REQ-${requestId}] Fallback ${fallbackCount + 1} succeeded via ${fallback.provider} (${fbResponse.statusCode})`);
+        console.log(`${ts()} [REQ-${requestId}] Fallback ${fallbackCount + 1} succeeded via ${fallback.provider} (${fbResponse.statusCode})`);
         return { success: true, response: fbResponse, provider: fallback.provider, fallbackCount: fallbackCount + 1 };
       }
 
-      console.log(`[REQ-${requestId}] Fallback ${fallback.provider} returned ${fbResponse.statusCode}, trying next in chain`);
+      console.log(`${ts()} [REQ-${requestId}] Fallback ${fallback.provider} returned ${fbResponse.statusCode}, trying next in chain`);
       provider = fallback.provider;
       fallbackCount++;
     } catch (fbErr) {
-      console.log(`[REQ-${requestId}] Fallback ${fallback.provider} failed: ${fbErr.message}`);
+      console.log(`${ts()} [REQ-${requestId}] Fallback ${fallback.provider} failed: ${fbErr.message}`);
       provider = fallback.provider;
       fallbackCount++;
     }
@@ -394,12 +394,12 @@ async function handleProxyRequest(server, req, res, body) {
   res._requestId = requestId;
 
   const isApiCall = parseRoute(server, req.url) !== null;
-  console.log(`[REQ-${requestId}] ${req.method} ${req.url} from ${clientIp}`);
+  console.log(`${ts()} [REQ-${requestId}] ${req.method} ${req.url} from ${clientIp}`);
 
   const routeInfo = parseRoute(server, req.url);
 
   if (!routeInfo) {
-    console.log(`[REQ-${requestId}] Invalid path: ${req.url}`);
+    console.log(`${ts()} [REQ-${requestId}] Invalid path: ${req.url}`);
     console.log(fmtSummary(req.method, req.url, '?', null, 400, Date.now() - startTime));
 
     if (isApiCall) {
@@ -418,12 +418,14 @@ async function handleProxyRequest(server, req, res, body) {
   if (vkToken) {
     const vkConfig = server.virtualKeyManager.validate(vkToken);
     if (!vkConfig) {
-      console.log(`[REQ-${requestId}] Virtual key rejected`);
+      console.log(`${ts()} [REQ-${requestId}] Virtual key rejected`);
+      console.log(fmtSummary(req.method, req.url, providerName, null, 401, Date.now() - startTime));
       sendError(res, 401, 'Invalid or expired virtual key');
       return;
     }
     if (vkConfig.allowedProviders.length > 0 && !vkConfig.allowedProviders.includes(providerName)) {
-      console.log(`[REQ-${requestId}] Virtual key not authorized for provider '${providerName}'`);
+      console.log(`${ts()} [REQ-${requestId}] Virtual key not authorized for provider '${providerName}'`);
+      console.log(fmtSummary(req.method, req.url, providerName, null, 403, Date.now() - startTime));
       sendError(res, 403, `Virtual key not authorized for '${providerName}'`);
       return;
     }
@@ -431,22 +433,24 @@ async function handleProxyRequest(server, req, res, body) {
       try {
         const parsed = typeof body === 'string' ? JSON.parse(body) : body;
         if (parsed.model && !vkConfig.allowedModels.some(m => parsed.model.includes(m) || m.includes(parsed.model))) {
+          console.log(fmtSummary(req.method, apiPath, providerName, null, 403, Date.now() - startTime));
           sendError(res, 403, `Virtual key not authorized for model '${parsed.model}'`);
           return;
         }
       } catch {}
     }
     req._virtualKey = vkConfig;
-    console.log(`[REQ-${requestId}] Virtual key '${vkConfig.name}' authenticated`);
+    console.log(`${ts()} [REQ-${requestId}] Virtual key '${vkConfig.name}' authenticated`);
   }
 
   // Check if provider is disabled
   if (provider && provider.disabled) {
-    console.log(`[REQ-${requestId}] Provider '${providerName}' is disabled`);
+    console.log(`${ts()} [REQ-${requestId}] Provider '${providerName}' is disabled`);
     if (isApiCall) {
       const responseTime = Date.now() - startTime;
       server.logApiRequest(requestId, req.method, apiPath, providerName, 503, responseTime, `Provider '${providerName}' is disabled`, clientIp);
     }
+    console.log(fmtSummary(req.method, apiPath, providerName, null, 503, Date.now() - startTime));
     sendError(res, 503, `Provider '${providerName}' is currently disabled`);
     return;
   }
@@ -461,11 +465,12 @@ async function handleProxyRequest(server, req, res, body) {
           requestedModel === m || requestedModel.startsWith(m + '-') || m.startsWith(requestedModel + '-')
         );
         if (!isAllowed) {
-          console.log(`[REQ-${requestId}] Model '${requestedModel}' not in allowed list for '${providerName}'`);
+          console.log(`${ts()} [REQ-${requestId}] Model '${requestedModel}' not in allowed list for '${providerName}'`);
           if (isApiCall) {
             const responseTime = Date.now() - startTime;
             server.logApiRequest(requestId, req.method, apiPath, providerName, 403, responseTime, `Model '${requestedModel}' not allowed`, clientIp);
           }
+          console.log(fmtSummary(req.method, apiPath, providerName, null, 403, Date.now() - startTime));
           sendError(res, 403, `Model '${requestedModel}' is not allowed for provider '${providerName}'. Allowed models: ${provider.allowedModels.join(', ')}`);
           return;
         }
@@ -473,7 +478,7 @@ async function handleProxyRequest(server, req, res, body) {
     } catch {}
   }
 
-  console.log(`[REQ-${requestId}] Proxying to provider '${providerName}' (${apiType.toUpperCase()}): ${apiPath}`);
+  console.log(`${ts()} [REQ-${requestId}] Proxying to provider '${providerName}' (${apiType.toUpperCase()}): ${apiPath}`);
 
   // Get the appropriate header based on API type
   const authHeader = apiType === 'gemini'
@@ -485,13 +490,14 @@ async function handleProxyRequest(server, req, res, body) {
 
   // Validate ACCESS_KEY for this provider
   if (!validateAccessKey(server, providerName, authHeader)) {
-    console.log(`[REQ-${requestId}] Response: 401 Unauthorized - Invalid or missing ACCESS_KEY for provider '${providerName}'`);
+    console.log(`${ts()} [REQ-${requestId}] Response: 401 Unauthorized - Invalid or missing ACCESS_KEY for provider '${providerName}'`);
 
     if (isApiCall) {
       const responseTime = Date.now() - startTime;
       server.logApiRequest(requestId, req.method, apiPath, providerName, 401, responseTime, 'Invalid or missing ACCESS_KEY', clientIp);
     }
 
+    console.log(fmtSummary(req.method, apiPath, providerName, null, 401, Date.now() - startTime));
     sendError(res, 401, `Invalid or missing ACCESS_KEY for provider '${providerName}'`);
     return;
   }
@@ -514,7 +520,8 @@ async function handleProxyRequest(server, req, res, body) {
   // Circuit breaker check
   const cbCheck = server.circuitBreaker.check(providerName);
   if (!cbCheck.allowed) {
-    console.log(`[REQ-${requestId}] Circuit breaker OPEN for '${providerName}' - returning 503`);
+    console.log(`${ts()} [REQ-${requestId}] Circuit breaker OPEN for '${providerName}' - returning 503`);
+    console.log(fmtSummary(req.method, apiPath, providerName, null, 503, Date.now() - startTime));
     sendError(res, 503, `Provider '${providerName}' circuit breaker is open. Retry later.`);
     return;
   }
@@ -522,43 +529,45 @@ async function handleProxyRequest(server, req, res, body) {
   // Get or create client for this provider
   const client = await getProviderClient(server, providerName, provider, legacy);
   if (!client) {
-    console.log(`[REQ-${requestId}] Response: 503 Service Unavailable - Provider '${providerName}' not configured`);
+    console.log(`${ts()} [REQ-${requestId}] Response: 503 Service Unavailable - Provider '${providerName}' not configured`);
 
     if (isApiCall) {
       const responseTime = Date.now() - startTime;
       server.logApiRequest(requestId, req.method, apiPath, providerName, 503, responseTime, `Provider '${providerName}' not configured`, clientIp);
     }
 
+    console.log(fmtSummary(req.method, apiPath, providerName, null, 503, Date.now() - startTime));
     sendError(res, 503, `Provider '${providerName}' not configured`);
     return;
   }
 
   // Pass custom status codes to client if provided
   if (customStatusCodes) {
-    console.log(`[REQ-${requestId}] Using custom status codes for rotation: ${Array.from(customStatusCodes).join(', ')}`);
+    console.log(`${ts()} [REQ-${requestId}] Using custom status codes for rotation: ${Array.from(customStatusCodes).join(', ')}`);
   }
 
   // Detect streaming request
   const streaming = isStreamingRequest(body);
   if (streaming) {
-    console.log(`[REQ-${requestId}] Streaming request detected`);
+    console.log(`${ts()} [REQ-${requestId}] Streaming request detected`);
   }
 
   // Cache lookup (non-streaming, GET/POST only)
   if (!streaming && (req.method === 'POST' || req.method === 'GET') && server.responseCache.enabled) {
     const cached = server.responseCache.get(providerName, req.method, apiPath, body);
     if (cached) {
-      console.log(`[REQ-${requestId}] Cache HIT for ${providerName}`);
+      console.log(`${ts()} [REQ-${requestId}] Cache HIT for ${providerName}`);
       const responseTime = Date.now() - startTime;
       server.logApiRequest(requestId, req.method, apiPath, providerName, cached.statusCode, responseTime, null, clientIp);
       server.metrics.incCounter('keyproxy_requests_total', { provider: providerName, status: String(cached.statusCode) });
       server.metrics.incCounter('keyproxy_cache_hits_total', { provider: providerName });
+      console.log(fmtSummary(req.method, apiPath, providerName, null, cached.statusCode, responseTime, 'cache'));
       const cacheHeaders = { ...cached.headers, 'X-Cache': 'HIT', 'X-Cache-Age': Math.round((Date.now() - cached.cachedAt) / 1000) + 's' };
       res.writeHead(cached.statusCode, cacheHeaders);
       res.end(cached.data);
       return;
     }
-    console.log(`[REQ-${requestId}] Cache MISS for ${providerName}`);
+    console.log(`${ts()} [REQ-${requestId}] Cache MISS for ${providerName}`);
   }
 
   // Apply X-KeyProxy-Original-Host override for injection routing
@@ -574,7 +583,7 @@ async function handleProxyRequest(server, req, res, body) {
     const statusCode = isTimeout ? 504 : 502;
     const statusText = isTimeout ? 'Gateway Timeout' : 'Bad Gateway';
 
-    console.log(`[REQ-${requestId}] ${statusText}: ${error.message}`);
+    console.log(`${ts()} [REQ-${requestId}] ${statusText}: ${error.message}`);
 
     // Record failure in circuit breaker
     server.circuitBreaker.recordFailure(providerName);
@@ -697,12 +706,13 @@ async function handleProxyRequest(server, req, res, body) {
         if (keyInfo?.actualKey) server.rpmTracker.record(keyInfo.actualKey);
         recordBudgetSpend(server, keyInfo?.actualKey, body, streamedData, apiType);
       }
-      console.log(`[REQ-${requestId}] Streaming response completed`);
+      console.log(`${ts()} [REQ-${requestId}] Streaming response completed`);
         console.log(fmtSummary(req.method, apiPath, providerName, keyInfo, response.statusCode, Date.now() - startTime, `streamed ${fmtBytes(capturedSize)}`));
     });
 
     response.stream.on('error', (err) => {
-      console.log(`[REQ-${requestId}] Streaming error: ${err.message}`);
+      console.log(`${ts()} [REQ-${requestId}] Streaming error: ${err.message}`);
+      console.log(fmtSummary(req.method, apiPath, providerName, keyInfo, 502, Date.now() - startTime, `stream err: ${err.message}`));
       server.circuitBreaker.recordFailure(providerName);
       if (!res.headersSent) {
         sendError(res, 502, 'Streaming error');
@@ -750,7 +760,7 @@ async function handleProxyRequest(server, req, res, body) {
     if (!fallbackAttempted && shouldTriggerFallback(response.statusCode)) {
       fallbackAttempted = true;
       const triggerReason = response.statusCode === 429 ? 'rate limit' : `server error ${response.statusCode}`;
-      console.log(`[REQ-${requestId}] Triggering fallback due to ${triggerReason} from ${providerName}`);
+      console.log(`${ts()} [REQ-${requestId}] Triggering fallback due to ${triggerReason} from ${providerName}`);
 
       const fbResult = await tryFallbackChain(server, providerName, req, apiPath, body, headers, customStatusCodes, streaming, requestId);
       if (fbResult.success && fbResult.response) {
