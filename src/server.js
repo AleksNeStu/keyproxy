@@ -626,7 +626,7 @@ class ProxyServer {
     };
 
     // Enhanced console logging with key information
-    let consoleMsg = `[${new Date().toISOString().replace('T', ' ').substring(0, 19)}] [${requestId}] ${method} /${provider}${endpoint}`;
+    let consoleMsg = `[${requestId}] ${method} /${provider}${endpoint}`;
     
     if (status) {
       const statusColor = status < 400 ? '✓' : '✗';

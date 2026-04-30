@@ -1,7 +1,12 @@
 // Global timestamp prefix for all console output
+function tsPrefix() {
+  const d = new Date();
+  const pad = n => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
 const origLog = console.log;
 console.log = (...args) => {
-  const t = new Date().toTimeString().slice(0, 8);
+  const t = tsPrefix();
   if (typeof args[0] === 'string') {
     origLog(`${t} ${args[0]}`, ...args.slice(1));
   } else {
@@ -10,7 +15,7 @@ console.log = (...args) => {
 };
 const origErr = console.error;
 console.error = (...args) => {
-  const t = new Date().toTimeString().slice(0, 8);
+  const t = tsPrefix();
   if (typeof args[0] === 'string') {
     origErr(`${t} ${args[0]}`, ...args.slice(1));
   } else {
