@@ -4844,34 +4844,79 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 const res = await fetch(`/admin/api/provider-logs?${params}`);
                 const data = await res.json();
                 const logs = data.logs || [];
-                if (logs.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted-foreground py-4">No logs found</td></tr>';
-                    return;
-                }
-                tbody.innerHTML = logs.map(l => {
-                    const time = formatLogTimestamp(l.timestamp);
-                    const statusColor = !l.status ? '' : l.status < 300 ? 'text-green-400' : l.status < 400 ? 'text-blue-400' : l.status === 429 ? 'text-amber-400' : 'text-red-400';
-                    const latency = l.responseTime ? l.responseTime + 'ms' : '--';
-                    const key = l.keyUsed ? (l.keyUsed.length > 16 ? l.keyUsed.substring(0, 8) + '...' + l.keyUsed.slice(-4) : l.keyUsed) : '--';
-                    return `<tr class="hover:bg-muted/30">
-                        <td class="px-2 py-1.5 font-mono whitespace-nowrap">${time}</td>
-                        <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(l.provider || '--')}</td>
-                        <td class="px-2 py-1.5">${l.method || '--'}</td>
-                        <td class="px-2 py-1.5 font-mono truncate max-w-[200px]" title="${escapeHtml(l.endpoint || '')}">${escapeHtml((l.endpoint || '--').substring(0, 40))}</td>
-                        <td class="px-2 py-1.5 font-mono ${statusColor}">${l.status || '--'}</td>
-                        <td class="px-2 py-1.5 font-mono whitespace-nowrap">${latency}</td>
-                        <td class="px-2 py-1.5 font-mono text-muted-foreground">${escapeHtml(key)}</td>
-                        <td class="px-2 py-1.5 text-red-400 truncate max-w-[200px]" title="${escapeHtml(l.error || '')}">${escapeHtml((l.error || '').substring(0, 50))}</td>
-                        <td class="px-2 py-1.5 text-center">${l.requestId ? `<a href="#" onclick="viewResponse('${l.requestId}');return false;" class="text-blue-400 hover:text-blue-300 text-xs underline">View</a>` : ''}</td>
-                    </tr>`;
-                }).join('');
+                _lastProviderLogs = logs;
+                _sortColumn = '';
+                document.querySelectorAll('[id^="sort-"]').forEach(el => el.textContent = '');
+                renderProviderLogs(logs);
             } catch (e) {
+                _lastProviderLogs = [];
                 tbody.innerHTML = `<tr><td colspan="9" class="text-center text-red-400 py-4">Error: ${escapeHtml(e.message)}</td></tr>`;
             }
 
             // Re-apply active search filter after table rebuild
             const searchInput = document.getElementById('logSearchInput');
             if (searchInput && searchInput.value) filterProviderLogs(searchInput.value);
+        }
+
+        let _lastProviderLogs = [];
+        let _sortColumn = '';
+        let _sortAsc = true;
+
+        function sortProviderLogs(col) {
+            if (_lastProviderLogs.length === 0) return;
+            if (_sortColumn === col) {
+                _sortAsc = !_sortAsc;
+            } else {
+                _sortColumn = col;
+                _sortAsc = true;
+            }
+            // Update sort indicators
+            document.querySelectorAll('[id^="sort-"]').forEach(el => el.textContent = '');
+            const indicator = document.getElementById('sort-' + col);
+            if (indicator) indicator.textContent = _sortAsc ? ' ▲' : ' ▼';
+
+            const sorted = [..._lastProviderLogs].sort((a, b) => {
+                let va, vb;
+                switch (col) {
+                    case 'time': va = a.timestamp || ''; vb = b.timestamp || ''; break;
+                    case 'provider': va = (a.provider || '').toLowerCase(); vb = (b.provider || '').toLowerCase(); break;
+                    case 'method': va = (a.method || '').toLowerCase(); vb = (b.method || '').toLowerCase(); break;
+                    case 'endpoint': va = (a.endpoint || '').toLowerCase(); vb = (b.endpoint || '').toLowerCase(); break;
+                    case 'status': va = a.status || 0; vb = b.status || 0; break;
+                    case 'latency': va = a.responseTime || 0; vb = b.responseTime || 0; break;
+                    default: return 0;
+                }
+                if (va < vb) return _sortAsc ? -1 : 1;
+                if (va > vb) return _sortAsc ? 1 : -1;
+                return 0;
+            });
+            renderProviderLogs(sorted);
+        }
+
+        function renderProviderLogs(logs) {
+            const tbody = document.getElementById('providerLogsBody');
+            if (!tbody) return;
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted-foreground py-4">No logs found</td></tr>';
+                return;
+            }
+            tbody.innerHTML = logs.map(l => {
+                const time = formatLogTimestamp(l.timestamp);
+                const statusColor = !l.status ? '' : l.status < 300 ? 'text-green-400' : l.status < 400 ? 'text-blue-400' : l.status === 429 ? 'text-amber-400' : 'text-red-400';
+                const latency = l.responseTime ? l.responseTime + 'ms' : '--';
+                const key = l.keyUsed ? (l.keyUsed.length > 16 ? l.keyUsed.substring(0, 8) + '...' + l.keyUsed.slice(-4) : l.keyUsed) : '--';
+                return `<tr class="hover:bg-muted/30">
+                    <td class="px-2 py-1.5 font-mono whitespace-nowrap">${time}</td>
+                    <td class="px-2 py-1.5 whitespace-nowrap">${escapeHtml(l.provider || '--')}</td>
+                    <td class="px-2 py-1.5">${l.method || '--'}</td>
+                    <td class="px-2 py-1.5 font-mono truncate max-w-[200px]" title="${escapeHtml(l.endpoint || '')}">${escapeHtml((l.endpoint || '--').substring(0, 40))}</td>
+                    <td class="px-2 py-1.5 font-mono ${statusColor}">${l.status || '--'}</td>
+                    <td class="px-2 py-1.5 font-mono whitespace-nowrap">${latency}</td>
+                    <td class="px-2 py-1.5 font-mono text-muted-foreground">${escapeHtml(key)}</td>
+                    <td class="px-2 py-1.5 text-red-400 truncate max-w-[200px]" title="${escapeHtml(l.error || '')}">${escapeHtml((l.error || '').substring(0, 50))}</td>
+                    <td class="px-2 py-1.5 text-center">${l.requestId ? `<a href="#" onclick="viewResponse('${l.requestId}');return false;" class="text-blue-400 hover:text-blue-300 text-xs underline">View</a>` : ''}</td>
+                </tr>`;
+            }).join('');
         }
 
         async function clearProviderLogs() {

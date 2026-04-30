@@ -720,12 +720,12 @@
                             <table class="w-full text-xs">
                                 <thead class="bg-muted/50">
                                     <tr>
-                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Time</th>
-                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Provider</th>
-                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Method</th>
-                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Endpoint</th>
-                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Status</th>
-                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Latency</th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium cursor-pointer select-none hover:text-foreground" onclick="sortProviderLogs('time')" title="Sort by time">Time <span id="sort-time"></span></th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium cursor-pointer select-none hover:text-foreground" onclick="sortProviderLogs('provider')" title="Sort by provider">Provider <span id="sort-provider"></span></th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium cursor-pointer select-none hover:text-foreground" onclick="sortProviderLogs('method')" title="Sort by method">Method <span id="sort-method"></span></th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium cursor-pointer select-none hover:text-foreground" onclick="sortProviderLogs('endpoint')" title="Sort by endpoint">Endpoint <span id="sort-endpoint"></span></th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium cursor-pointer select-none hover:text-foreground" onclick="sortProviderLogs('status')" title="Sort by status">Status <span id="sort-status"></span></th>
+                                        <th class="text-left px-2 py-1.5 text-muted-foreground font-medium cursor-pointer select-none hover:text-foreground" onclick="sortProviderLogs('latency')" title="Sort by latency">Latency <span id="sort-latency"></span></th>
                                         <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Key</th>
                                         <th class="text-left px-2 py-1.5 text-muted-foreground font-medium">Error</th>
                                         <th class="text-left px-2 py-1.5 text-muted-foreground font-medium w-16">Details</th>
