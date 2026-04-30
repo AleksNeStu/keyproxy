@@ -675,38 +675,45 @@
 
                     <!-- Provider Log Viewer -->
                     <div class="section">
-                        <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center justify-between mb-2">
                             <h3 class="text-sm font-medium text-foreground">Provider Logs</h3>
                             <div class="flex items-center gap-2">
-                                <select id="providerLogSelect" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
-                                    <option value="">All Providers</option>
-                                </select>
-                                <select id="providerLogMethod" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
-                                    <option value="">All Methods</option>
-                                    <option value="GET">GET</option>
-                                    <option value="POST">POST</option>
-                                    <option value="OPTIONS">OPTIONS</option>
-                                    <option value="PUT">PUT</option>
-                                    <option value="DELETE">DELETE</option>
-                                    <option value="PATCH">PATCH</option>
-                                </select>
-                                <select id="providerLogStatus" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
-                                    <option value="">All Status</option>
-                                    <option value="success">Success (&lt;400)</option>
-                                    <option value="error">Error (≥400)</option>
-                                    <option value="429">429 Rate Limited</option>
-                                    <option value="401">401 Unauthorized</option>
-                                    <option value="402">402 Payment Required</option>
-                                    <option value="403">403 Forbidden</option>
-                                </select>
                                 <button onclick="loadProviderLogs()" class="btn btn-secondary px-2 py-1 text-xs font-medium">Refresh</button>
-                                <div class="relative">
-                                    <input type="text" id="logSearchInput" placeholder="Search logs..." oninput="filterProviderLogs(this.value)" class="input-field pl-7 pr-7 py-1 text-xs rounded w-40">
-                                    <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-                                    </svg>
-                                    <button id="logSearchClear" onclick="clearLogSearch()" class="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hidden" title="Clear">&times;</button>
-                                </div>
+                                <button onclick="clearProviderLogs()" class="btn btn-secondary px-2 py-1 text-xs font-medium">Clear</button>
+                                <button onclick="exportProviderLogs()" class="btn btn-secondary px-2 py-1 text-xs font-medium">Export</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-2 mb-2 flex-wrap">
+                            <select id="providerLogSelect" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
+                                <option value="">All Providers</option>
+                            </select>
+                            <select id="providerLogMethod" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
+                                <option value="">All Methods</option>
+                                <option value="GET">GET</option>
+                                <option value="POST">POST</option>
+                                <option value="OPTIONS">OPTIONS</option>
+                                <option value="PUT">PUT</option>
+                                <option value="DELETE">DELETE</option>
+                                <option value="PATCH">PATCH</option>
+                            </select>
+                            <select id="providerLogStatus" onchange="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded">
+                                <option value="">All Status</option>
+                                <option value="success">Success (&lt;400)</option>
+                                <option value="error">Error (≥400)</option>
+                                <option value="429">429 Rate Limited</option>
+                                <option value="401">401 Unauthorized</option>
+                                <option value="402">402 Payment Required</option>
+                                <option value="403">403 Forbidden</option>
+                            </select>
+                            <input type="text" id="logEndpointFilter" placeholder="Endpoint..." oninput="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded w-32">
+                            <input type="number" id="logLatencyMin" placeholder="Min ms" oninput="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded w-20">
+                            <input type="number" id="logLatencyMax" placeholder="Max ms" oninput="loadProviderLogs()" class="input-field px-2 py-1 text-xs rounded w-20">
+                            <div class="relative">
+                                <input type="text" id="logSearchInput" placeholder="Search..." oninput="filterProviderLogs(this.value)" class="input-field pl-7 pr-7 py-1 text-xs rounded w-32">
+                                <svg class="absolute left-2 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                                </svg>
+                                <button id="logSearchClear" onclick="clearLogSearch()" class="absolute right-1.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground hidden" title="Clear">&times;</button>
                             </div>
                         </div>
                         <div class="border border-border rounded overflow-hidden">

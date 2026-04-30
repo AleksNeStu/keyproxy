@@ -560,6 +560,18 @@ class ProxyServer {
         const m = query.method.toUpperCase();
         logs = logs.filter(l => (l.method || '').toUpperCase() === m);
       }
+      if (query.endpoint) {
+        const ep = query.endpoint.toLowerCase();
+        logs = logs.filter(l => (l.endpoint || '').toLowerCase().includes(ep));
+      }
+      if (query.latencyMin) {
+        const min = parseInt(query.latencyMin);
+        if (!isNaN(min)) logs = logs.filter(l => l.responseTime != null && l.responseTime >= min);
+      }
+      if (query.latencyMax) {
+        const max = parseInt(query.latencyMax);
+        if (!isNaN(max)) logs = logs.filter(l => l.responseTime != null && l.responseTime <= max);
+      }
       logs.reverse();
       const limit = Math.min(parseInt(query.limit) || 100, 500);
       res.writeHead(200, { 'Content-Type': 'application/json' });
@@ -568,6 +580,17 @@ class ProxyServer {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: 'Failed to get provider logs', logs: [] }));
     }
+  }
+
+  handleClearProviderLogs(res) {
+    this.logBuffer = [];
+    this.logFlushBuffer = [];
+    // Also clear the log file
+    try {
+      fs.writeFileSync(this.logFilePath, '');
+    } catch {}
+    res.writeHead(200, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ ok: true }));
   }
 
   async handleGetResponse(res, urlPath) {
@@ -603,7 +626,7 @@ class ProxyServer {
     };
 
     // Enhanced console logging with key information
-    let consoleMsg = `[${new Date().toISOString().substring(11, 23)}] [${requestId}] ${method} /${provider}${endpoint}`;
+    let consoleMsg = `[${new Date().toISOString().replace('T', ' ').substring(0, 19)}] [${requestId}] ${method} /${provider}${endpoint}`;
     
     if (status) {
       const statusColor = status < 400 ? '✓' : '✗';

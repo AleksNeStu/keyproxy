@@ -4830,10 +4830,16 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 const provider = document.getElementById('providerLogSelect')?.value || '';
                 const status = document.getElementById('providerLogStatus')?.value || '';
                 const method = document.getElementById('providerLogMethod')?.value || '';
+                const endpoint = document.getElementById('logEndpointFilter')?.value || '';
+                const latencyMin = document.getElementById('logLatencyMin')?.value || '';
+                const latencyMax = document.getElementById('logLatencyMax')?.value || '';
                 const params = new URLSearchParams();
                 if (provider) params.set('provider', provider);
                 if (status) params.set('status', status);
                 if (method) params.set('method', method);
+                if (endpoint) params.set('endpoint', endpoint);
+                if (latencyMin) params.set('latencyMin', latencyMin);
+                if (latencyMax) params.set('latencyMax', latencyMax);
                 params.set('limit', '100');
                 const res = await fetch(`/admin/api/provider-logs?${params}`);
                 const data = await res.json();
@@ -4843,7 +4849,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     return;
                 }
                 tbody.innerHTML = logs.map(l => {
-                    const time = l.timestamp ? l.timestamp.substring(11, 23) : '--';
+                    const time = formatLogTimestamp(l.timestamp);
                     const statusColor = !l.status ? '' : l.status < 300 ? 'text-green-400' : l.status < 400 ? 'text-blue-400' : l.status === 429 ? 'text-amber-400' : 'text-red-400';
                     const latency = l.responseTime ? l.responseTime + 'ms' : '--';
                     const key = l.keyUsed ? (l.keyUsed.length > 16 ? l.keyUsed.substring(0, 8) + '...' + l.keyUsed.slice(-4) : l.keyUsed) : '--';
@@ -4866,6 +4872,46 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             // Re-apply active search filter after table rebuild
             const searchInput = document.getElementById('logSearchInput');
             if (searchInput && searchInput.value) filterProviderLogs(searchInput.value);
+        }
+
+        async function clearProviderLogs() {
+            if (!confirm('Clear all provider logs? This cannot be undone.')) return;
+            try {
+                const res = await fetch('/admin/api/provider-logs/clear', { method: 'POST' });
+                if (res.ok) {
+                    loadProviderLogs();
+                } else {
+                    alert('Failed to clear logs');
+                }
+            } catch (e) {
+                alert('Error: ' + sanitizeError(e));
+            }
+        }
+
+        function exportProviderLogs() {
+            const rows = document.querySelectorAll('#providerLogsBody tr');
+            if (rows.length === 0 || (rows.length === 1 && rows[0].querySelector('td[colspan]'))) {
+                alert('No logs to export');
+                return;
+            }
+            const headers = ['Time','Provider','Method','Endpoint','Status','Latency','Key','Error'];
+            const csvRows = [headers.join(',')];
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 8) return;
+                const vals = [];
+                for (let i = 0; i < 8; i++) {
+                    vals.push('"' + (cells[i]?.textContent || '').replace(/"/g, '""').trim() + '"');
+                }
+                csvRows.push(vals.join(','));
+            });
+            const blob = new Blob([csvRows.join('\n')], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `provider-logs-${new Date().toISOString().replace(/[:.]/g, '-')}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
         }
 
         function filterProviderLogs(query) {
@@ -4960,7 +5006,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                             }
                         } else {
                             // New JSON format - create structured display
-                            const timestamp = new Date(log.timestamp).toLocaleTimeString();
+                            const timestamp = formatLogTimestamp(log.timestamp);
                             const status = log.status ? `(${log.status})` : '';
                             const responseTime = log.responseTime ? `${log.responseTime}ms` : '';
                             const error = log.error ? ` ERROR: ${escapeHtml(log.error)}` : '';
@@ -5068,11 +5114,24 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
             });
         }
 
+        function formatLogTimestamp(isoStr) {
+            if (!isoStr) return '--';
+            const d = new Date(isoStr);
+            const pad = n => String(n).padStart(2, '0');
+            return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+        }
+
         async function viewResponse(testId) {
             try {
+                // Show dialog immediately
+                document.getElementById('responseInfo').textContent = 'Loading...';
+                document.getElementById('responseContent').textContent = 'Loading response data...';
+                document.getElementById('responseDialog').classList.remove('hidden');
+
                 const response = await fetch(`/admin/api/response/${testId}`);
                 if (!response.ok) {
-                    alert('Response data not found');
+                    document.getElementById('responseInfo').textContent = `Request ${testId}`;
+                    document.getElementById('responseContent').textContent = '(response data expired — only last 100 responses are kept)';
                     return;
                 }
 
@@ -5095,7 +5154,6 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 if (raw == null || raw === '') {
                     formattedResponse = '(empty response)';
                 } else if (status >= 300 && status < 400) {
-                    // Redirect responses — show clear explanation
                     formattedResponse = `↩ Redirect ${status} ${statusText}\n\n${typeof raw === 'string' ? raw : JSON.stringify(raw, null, 2)}`;
                 } else {
                     try {
@@ -5106,7 +5164,6 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                     }
                 }
 
-                // Truncate very large responses for display
                 if (formattedResponse && formattedResponse.length > 50000) {
                     formattedResponse = formattedResponse.substring(0, 50000) + '\n\n... (truncated)';
                 }
@@ -5145,9 +5202,6 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 
                 // Start with response tab active
                 switchResponseTab('response');
-                
-                // Show dialog
-                document.getElementById('responseDialog').classList.remove('hidden');
             } catch (error) {
                 alert('Failed to load response: ' + sanitizeError(error));
             }

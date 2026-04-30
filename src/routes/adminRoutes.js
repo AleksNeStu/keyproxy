@@ -68,6 +68,9 @@ function createAuthenticatedRouter() {
     const query = Object.fromEntries(url.searchParams.entries());
     ctx.server.handleGetProviderLogs(ctx.res, query);
   }});
+  router.register({ method: 'POST', path: '/admin/api/provider-logs/clear', handler: ctx => {
+    ctx.server.handleClearProviderLogs(ctx.res);
+  }});
 
   // ─── Key management ─────────────────────────────────────────
   router.register({ method: 'POST', path: '/admin/api/reorder-keys', handler: ctx => handleReorderKeys(ctx.server, ctx.req, ctx.res, ctx.body) });
