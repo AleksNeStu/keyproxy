@@ -551,3 +551,52 @@
         /* Raw log line numbers */
         .log-line { display: flex; align-items: flex-start; min-height: 1.4em; }
         .log-line-num { color: #6b7280; min-width: 3rem; text-align: right; padding-right: 0.75rem; user-select: none; flex-shrink: 0; border-right: 1px solid #374151; margin-right: 0.75rem; }
+
+        /* Collapsible settings sections */
+        details.settings-section {
+            border: 1px solid var(--border);
+            border-radius: 0.5rem;
+            margin-bottom: 0.75rem;
+            overflow: hidden;
+            background: var(--card);
+        }
+        details.settings-section > summary {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1rem;
+            cursor: pointer;
+            user-select: none;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--foreground);
+            background: var(--card);
+            transition: background 0.15s;
+            list-style: none;
+        }
+        details.settings-section > summary::-webkit-details-marker { display: none; }
+        details.settings-section > summary .chevron {
+            display: inline-block;
+            width: 0;
+            height: 0;
+            border-left: 5px solid var(--muted-foreground);
+            border-top: 4px solid transparent;
+            border-bottom: 4px solid transparent;
+            transition: transform 0.2s;
+            flex-shrink: 0;
+        }
+        details.settings-section[open] > summary .chevron {
+            transform: rotate(90deg);
+        }
+        details.settings-section > summary:hover {
+            background: var(--muted);
+        }
+        details.settings-section > summary .summary-subtitle {
+            font-weight: 400;
+            font-size: 0.6875rem;
+            color: var(--muted-foreground);
+            margin-left: 0.25rem;
+        }
+        details.settings-section .section-body {
+            padding: 0 1rem 1rem;
+        }

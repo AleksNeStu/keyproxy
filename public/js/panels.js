@@ -182,7 +182,8 @@
     }
 
     async function testNotification(channel) {
-        const status = document.getElementById('notificationStatus');
+        const statusId = channel === 'slack' ? 'slackTestStatus' : 'telegramTestStatus';
+        const status = document.getElementById(statusId) || document.getElementById('notificationStatus');
         status.textContent = 'Testing...';
         status.className = 'text-xs text-amber-400';
         try {
@@ -426,15 +427,245 @@
         }
     }
 
+    function getProviderNames() {
+        const names = new Set();
+        for (const [key, value] of Object.entries(envVars)) {
+            if (key.endsWith('_API_KEYS') && value) {
+                const keyWithoutSuffix = key.replace('_API_KEYS', '');
+                const idx = keyWithoutSuffix.indexOf('_');
+                if (idx > 0) {
+                    const providerKey = keyWithoutSuffix.substring(0, idx).toLowerCase() + '_' + keyWithoutSuffix.substring(idx + 1).toLowerCase();
+                    names.add(providerKey);
+                }
+            }
+        }
+        return [...names].sort();
+    }
+
     function populateFallbackSelects() {
         const fromSel = document.getElementById('fbFromProvider');
         const toSel = document.getElementById('fbToProvider');
         if (!fromSel || !toSel) return;
 
-        const providers = Object.keys(window._providerConfig || {});
+        const providers = getProviderNames();
         const opts = providers.map(p => `<option value="${p}">${p}</option>`).join('');
         fromSel.innerHTML = opts || '<option disabled>No providers</option>';
         toSel.innerHTML = opts || '<option disabled>No providers</option>';
+        toggleFallbackModelField();
+    }
+
+    const AI_PROVIDER_TYPES = ['openai', 'gemini'];
+
+    function toggleFallbackModelField() {
+        const fromSel = document.getElementById('fbFromProvider');
+        const modelGroup = document.getElementById('fbModelGroup');
+        if (!fromSel || !modelGroup) return;
+        const val = fromSel.value || '';
+        const apiType = val.split('_')[0].toLowerCase();
+        modelGroup.style.display = AI_PROVIDER_TYPES.includes(apiType) ? '' : 'none';
+    }
+
+    // Unified provider settings data
+    let providerSettingsData = {
+        providers: [],       // [{name, apiType}]
+        syncExclusive: [],   // [providerKey]
+        retryPerProvider: {}, // {providerKey: {maxRetries, retryDelayMs, retryBackoff}}
+        retryGlobal: {},     // {maxRetries, retryDelayMs, retryBackoff}
+        lbStrategy: {}       // {providerKey: {strategy, weights}}
+    };
+
+    async function loadProviderSettings() {
+        try {
+            const [syncRes, retryRes, lbRes] = await Promise.all([
+                fetch('/admin/api/sync-exclusive', { headers: authHeaders() }),
+                fetch('/admin/api/retry-config'),
+                fetch('/admin/api/lb-strategy')
+            ]);
+
+            if (syncRes.ok) {
+                const syncData = await syncRes.json();
+                providerSettingsData.syncExclusive = syncData.exclusiveProviders || [];
+                if (!providerSettingsData.providers.length && syncData.allProviders) {
+                    providerSettingsData.providers = syncData.allProviders.map(p => ({ name: p.name.toLowerCase(), apiType: p.apiType }));
+                }
+            }
+
+            if (retryRes.ok) {
+                const retryData = await retryRes.json();
+                providerSettingsData.retryGlobal = retryData.global || {};
+                providerSettingsData.retryPerProvider = retryData.perProvider || {};
+                // Populate global retry inputs in Retry & Throttle section
+                const el = (id) => document.getElementById(id);
+                if (el('globalMaxRetries')) el('globalMaxRetries').value = retryData.global.maxRetries;
+                if (el('globalRetryDelay')) el('globalRetryDelay').value = retryData.global.retryDelayMs;
+                if (el('globalRetryBackoff')) el('globalRetryBackoff').value = retryData.global.retryBackoff;
+            }
+
+            if (lbRes.ok) {
+                lbStrategyData = await lbRes.json();
+                providerSettingsData.lbStrategy = lbStrategyData;
+            }
+
+            renderProviderSettingsTable();
+        } catch (err) {
+            console.error('Failed to load provider settings:', err);
+        }
+    }
+
+    function renderProviderSettingsTable() {
+        const tbody = document.getElementById('providerSettingsBody');
+        if (!tbody) return;
+
+        const providers = providerSettingsData.providers;
+        if (!providers.length) {
+            tbody.innerHTML = '<tr><td colspan="6" class="py-4 text-center text-muted-foreground">No providers configured</td></tr>';
+            return;
+        }
+
+        const strategies = ['round-robin', 'weighted-random', 'least-used'];
+        const g = providerSettingsData.retryGlobal;
+
+        tbody.innerHTML = providers.map(p => {
+            const key = p.name;
+            const isExcluded = providerSettingsData.syncExclusive.includes(key);
+            const retry = providerSettingsData.retryPerProvider[key];
+            const isOverride = retry && (retry.maxRetries !== g.maxRetries || retry.retryDelayMs !== g.retryDelayMs || retry.retryBackoff !== g.retryBackoff);
+            const lb = providerSettingsData.lbStrategy[key];
+            const lbOpts = strategies.map(s => `<option value="${s}"${lb && lb.strategy === s ? ' selected' : ''}>${s}</option>`).join('');
+
+            return `<tr class="border-b border-border/50 hover:bg-muted/20">
+                <td class="py-2 pr-3">
+                    <div class="flex items-center gap-1.5">
+                        <span class="font-mono font-medium text-foreground">${escapeHtml(key)}</span>
+                        <span class="text-[10px] text-muted-foreground">${escapeHtml(p.apiType)}</span>
+                    </div>
+                </td>
+                <td class="py-2 pr-3 text-center">
+                    <input type="checkbox" ${isExcluded ? 'checked' : ''} class="rounded border-border text-red-500"
+                           data-ps-provider="${escapeHtml(key)}" data-ps-field="syncExclusive">
+                </td>
+                <td class="py-2 pr-3">
+                    <input type="number" min="1" max="20" placeholder="${g.maxRetries || 3}"
+                           value="${isOverride ? retry.maxRetries : ''}"
+                           class="input-field w-full px-1.5 py-1 rounded text-xs"
+                           data-ps-provider="${escapeHtml(key)}" data-ps-field="maxRetries">
+                </td>
+                <td class="py-2 pr-3">
+                    <input type="number" min="100" max="30000" step="100" placeholder="${g.retryDelayMs || 1000}"
+                           value="${isOverride ? retry.retryDelayMs : ''}"
+                           class="input-field w-full px-1.5 py-1 rounded text-xs"
+                           data-ps-provider="${escapeHtml(key)}" data-ps-field="retryDelayMs">
+                </td>
+                <td class="py-2 pr-3">
+                    <input type="number" min="1" max="10" step="0.5" placeholder="${g.retryBackoff || 2}"
+                           value="${isOverride ? retry.retryBackoff : ''}"
+                           class="input-field w-full px-1.5 py-1 rounded text-xs"
+                           data-ps-provider="${escapeHtml(key)}" data-ps-field="retryBackoff">
+                </td>
+                <td class="py-2">
+                    <select class="input-field px-1.5 py-1 rounded text-xs" onchange="saveProviderLbStrategy('${escapeHtml(key)}', this.value)">
+                        ${lbOpts}
+                    </select>
+                </td>
+            </tr>`;
+        }).join('');
+
+        // Render weight editors for weighted-random providers
+        const weightContainer = document.getElementById('providerLbWeights');
+        if (weightContainer) {
+            const weighted = providers.filter(p => {
+                const lb = providerSettingsData.lbStrategy[p.name];
+                return lb && lb.strategy === 'weighted-random';
+            });
+            if (!weighted.length) {
+                weightContainer.innerHTML = '';
+            } else {
+                weightContainer.innerHTML = weighted.map(p => {
+                    const lb = providerSettingsData.lbStrategy[p.name];
+                    if (!lb || !lb.weights) return '';
+                    const rows = lb.weights.map((w, i) =>
+                        `<div class="flex items-center gap-2">
+                            <span class="text-xs text-muted-foreground font-mono flex-1 truncate">${escapeHtml(w.maskedKey)}</span>
+                            <input type="range" min="1" max="10" value="${w.weight}" class="w-20 accent-primary"
+                                oninput="this.nextElementSibling.textContent=this.value"
+                                onchange="saveLbWeight('${escapeHtml(p.name)}', ${i}, this.value)">
+                            <span class="text-xs font-medium w-4 text-center">${w.weight}</span>
+                        </div>`
+                    ).join('');
+                    return `<div class="bg-muted/30 rounded-md px-3 py-2">
+                        <p class="text-xs font-medium text-foreground mb-1">${escapeHtml(p.name)} — Key Weights</p>
+                        <div class="space-y-1.5">${rows}</div>
+                    </div>`;
+                }).join('');
+            }
+        }
+    }
+
+    async function saveProviderSettings(button) {
+        button.disabled = true;
+        try {
+            // Collect sync exclusive — save each provider individually
+            const prevExclusive = new Set(providerSettingsData.syncExclusive);
+            const exclusivePromises = [];
+            document.querySelectorAll('[data-ps-field="syncExclusive"]').forEach(cb => {
+                const name = cb.dataset.psProvider;
+                const wasExcluded = prevExclusive.has(name);
+                const nowExcluded = cb.checked;
+                if (wasExcluded !== nowExcluded) {
+                    exclusivePromises.push(
+                        fetch('/admin/api/sync-exclusive', {
+                            method: 'POST',
+                            headers: { ...authHeaders(), 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+                            body: JSON.stringify({ providerName: name, exclusive: nowExcluded })
+                        })
+                    );
+                }
+            });
+            if (exclusivePromises.length) await Promise.all(exclusivePromises);
+
+            // Collect retry per-provider
+            const perProvider = {};
+            document.querySelectorAll('[data-ps-field="maxRetries"], [data-ps-field="retryDelayMs"], [data-ps-field="retryBackoff"]').forEach(input => {
+                const provider = input.dataset.psProvider;
+                const field = input.dataset.psField;
+                const val = input.value.trim();
+                if (val === '') return;
+                if (!perProvider[provider]) perProvider[provider] = {};
+                perProvider[provider][field] = field === 'retryBackoff' ? parseFloat(val) : parseInt(val);
+            });
+
+            await fetch('/admin/api/retry-config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ global: providerSettingsData.retryGlobal, perProvider })
+            });
+
+            showSuccess('providerSettingsSuccess', 'Provider settings saved successfully');
+            await loadProviderSettings();
+        } catch (e) {
+            showSuccess('providerSettingsError', 'Save failed: ' + e.message);
+        } finally {
+            button.disabled = false;
+        }
+    }
+
+    async function saveProviderLbStrategy(provider, strategy) {
+        try {
+            const res = await fetch('/admin/api/lb-strategy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ provider, strategy })
+            });
+            if (res.ok) {
+                if (providerSettingsData.lbStrategy[provider]) {
+                    providerSettingsData.lbStrategy[provider].strategy = strategy;
+                }
+                showSuccessToast('Strategy for ' + provider + ' set to ' + strategy);
+                renderProviderSettingsTable();
+            }
+        } catch (err) {
+            showErrorToast('Failed: ' + err.message);
+        }
     }
 
     async function addFallback() {

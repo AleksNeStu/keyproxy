@@ -5369,12 +5369,10 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
                 checkPasswordUpgrade();
                 loadNotifications();
                 loadFallbacks();
-                loadLbSettings();
+                loadProviderSettings();
                 loadGeneralSettings();
                 attachSettingsAutoSave();
                 updateGlobalSyncUI();
-                loadSyncExclusiveProviders();
-                loadRetryConfig();
                 loadProviderConfig();
             }
         }
@@ -5622,7 +5620,7 @@ ${googApiKeyHeader}  -H "Content-Type: application/json" \\
 
                     // Always load base data
                     await loadEnvVars();
-                    loadRetryConfig();
+                    loadProviderSettings();
 
                     // Restore tab from URL hash or show default
                     const tabFromUrl = getTabFromHash();
