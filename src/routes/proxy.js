@@ -333,6 +333,12 @@ function extractRelevantHeaders(headers, apiType) {
       'openai-organization',
       'openai-project'
     ];
+  } else {
+    headersToInclude = [
+      'content-type',
+      'accept',
+      'user-agent'
+    ];
   }
 
   for (const [key, value] of Object.entries(headers)) {
@@ -542,11 +548,11 @@ async function handleProxyRequest(server, req, res, body) {
 
   // Apply X-KeyProxy-Original-Host override for injection routing
   const originalHost = req.headers['x-keyproxy-original-host'];
-  if (originalHost) {
-    client._baseUrlOverride = `https://${originalHost}`;
-  }
 
   try {
+    if (originalHost) {
+      client._baseUrlOverride = `https://${originalHost}`;
+    }
     response = await client.makeRequest(req.method, apiPath, body, headers, customStatusCodes, streaming);
   } catch (error) {
     const isTimeout = error.message && error.message.toLowerCase().includes('timeout');
@@ -613,8 +619,14 @@ async function handleProxyRequest(server, req, res, body) {
     const streamChunks = [];
     let capturedSize = 0;
     let truncated = false;
+    let clientDisconnected = false;
+
+    res.on('close', () => {
+      clientDisconnected = true;
+    });
 
     response.stream.on('data', (chunk) => {
+      if (clientDisconnected || truncated) return;
       if (!truncated) {
         capturedSize += chunk.length;
         if (capturedSize <= MAX_CAPTURE) {

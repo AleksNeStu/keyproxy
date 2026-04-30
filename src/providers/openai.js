@@ -16,7 +16,7 @@ class OpenAIClient extends BaseProvider {
     } else if (requestPath.startsWith('/')) {
       fullUrl = baseUrl.endsWith('/') ? baseUrl + requestPath.substring(1) : baseUrl + requestPath;
     } else {
-      fullUrl = baseUrl.endsWith('/') ? baseUrl + requestPath : baseUrl + '/' + requestPath;
+      fullUrl = baseUrl.endsWith('/') ? baseUrl + request : baseUrl + '/' + requestPath;
     }
 
     // Support for query-parameter authentication (e.g. for Tavily MCP or other custom proxies)
@@ -37,6 +37,27 @@ class OpenAIClient extends BaseProvider {
       finalHeaders[this.authHeader] = authValue;
     }
 
+    // Inject rotated API key into body fields (Tavily, etc.)
+    let processedBody;
+    if (body && method !== 'GET') {
+      try {
+        const parsed = typeof body === 'string' ? JSON.parse(body) : body;
+        if (parsed && typeof parsed === 'object') {
+          const bodyKeyFields = ['api_key', 'apikey', 'api-key'];
+          let modified = false;
+          for (const field of bodyKeyFields) {
+            if (field in parsed && typeof parsed[field] === 'string') {
+              parsed[field] = apiKey;
+              modified = true;
+            }
+          }
+          if (modified) {
+            processedBody = JSON.stringify(parsed);
+          }
+        }
+      } catch {}
+    }
+
     const options = {
       hostname: url.hostname,
       port: url.port || 443,
@@ -45,12 +66,15 @@ class OpenAIClient extends BaseProvider {
       headers: finalHeaders
     };
 
-    if (body && method !== 'GET') {
+    if (processedBody && method !== 'GET') {
+      const bodyData = typeof processedBody === 'string' ? processedBody : JSON.stringify(processedBody);
+      options.headers['Content-Length'] = Buffer.byteLength(bodyData);
+    } else if (body && method !== 'GET') {
       const bodyData = typeof body === 'string' ? body : JSON.stringify(body);
       options.headers['Content-Length'] = Buffer.byteLength(bodyData);
     }
 
-    return options;
+    return { options, processedBody };
   }
 }
 

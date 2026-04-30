@@ -37,7 +37,11 @@ class Config {
     }
 
     // 2. Load rotation key files (all enabled files, later overrides earlier)
-    this.loadRotationKeyFiles(envVars);
+    try {
+      this.loadRotationKeyFiles(envVars);
+    } catch (err) {
+      console.log(`[CONFIG] Warning: loadRotationKeyFiles failed: ${err.message}`);
+    }
 
     if (Object.keys(envVars).length === 0) {
       console.error('\n❌ ERROR: No .env configuration found!');

@@ -197,13 +197,14 @@ class BaseProvider {
 
   _sendRequest(method, requestPath, body, headers, apiKey) {
     return new Promise((resolve, reject) => {
-      const options = this._buildRequestOptions(method, requestPath, body, headers, apiKey);
+      const result = this._buildRequestOptions(method, requestPath, body, headers, apiKey);
+      const options = result.options || result;
+      const sendBody = result.processedBody !== undefined ? result.processedBody : body;
 
       const req = https.request(options, (res) => {
         let data = '';
         res.on('data', chunk => data += chunk);
         res.on('end', () => {
-          // Log HTTP 405 errors with more context
           if (res.statusCode === 405) {
             console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] ⚠ HTTP 405 Method Not Allowed - ${method} ${requestPath}`);
             console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] Hint: This endpoint may require a different HTTP method (GET/POST/PUT/DELETE)`);
@@ -221,8 +222,8 @@ class BaseProvider {
         reject(error);
       });
 
-      if (body && method !== 'GET') {
-        const bodyData = typeof body === 'string' ? body : JSON.stringify(body);
+      if (sendBody && method !== 'GET') {
+        const bodyData = typeof sendBody === 'string' ? sendBody : JSON.stringify(sendBody);
         req.write(bodyData);
       }
 
@@ -232,10 +233,11 @@ class BaseProvider {
 
   _sendStreamingRequest(method, requestPath, body, headers, apiKey) {
     return new Promise((resolve, reject) => {
-      const options = this._buildRequestOptions(method, requestPath, body, headers, apiKey);
+      const result = this._buildRequestOptions(method, requestPath, body, headers, apiKey);
+      const options = result.options || result;
+      const sendBody = result.processedBody !== undefined ? result.processedBody : body;
 
       const req = https.request(options, (res) => {
-        // Log HTTP 405 errors with more context
         if (res.statusCode === 405) {
           console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] ⚠ HTTP 405 Method Not Allowed - ${method} ${requestPath}`);
           console.log(`[${this.providerName.toUpperCase()}::${maskApiKey(apiKey)}] Hint: This endpoint may require a different HTTP method (GET/POST/PUT/DELETE)`);
@@ -252,8 +254,8 @@ class BaseProvider {
         reject(error);
       });
 
-      if (body && method !== 'GET') {
-        const bodyData = typeof body === 'string' ? body : JSON.stringify(body);
+      if (sendBody && method !== 'GET') {
+        const bodyData = typeof sendBody === 'string' ? sendBody : JSON.stringify(sendBody);
         req.write(bodyData);
       }
 

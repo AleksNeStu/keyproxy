@@ -5,7 +5,6 @@ const svc = new Service({
   name: 'KeyProxy',
   description: 'API Key Orchestrator & Proxy — rotation, health checks, environment sync',
   script: path.join(__dirname, '..', 'main.js'),
-  nodeOptions: ['--harmony'],
   workingDirectory: path.join(__dirname, '..'),
   env: [
     { name: 'NODE_ENV', value: 'production' },
